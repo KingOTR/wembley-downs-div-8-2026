@@ -237,11 +237,9 @@ async function waitForApp(maxMs) {
 }
 
 async function waitForAuth(maxMs) {
-  var app = await waitForApp(maxMs || 30000);
-  if (!app) return null;
   var deadline = Date.now() + (maxMs || 30000);
   while (Date.now() < deadline) {
-    if (window.__svAuth && window.__svAuth.currentUser) return window.__svAuth;
+    if (window.__svFirebaseApp && window.__svAuth && window.__svAuth.currentUser) return window.__svAuth;
     await new Promise(function (r) {
       setTimeout(r, 200);
     });
@@ -401,7 +399,7 @@ async function batchWrite(writes) {
     }
     if (body && Array.isArray(body.status)) {
       var failed = body.status.find(function (s) {
-        return s && s.code && s.code !== 0;
+        return s && Number(s.code || 0) !== 0;
       });
       if (failed) {
         throw new Error(failed.message || "Batch write failed for one or more votes");
@@ -420,9 +418,9 @@ function docName(docId) {
 }
 
 async function loadCloudData(teamId) {
-  var app = await waitForApp(25000);
-  if (!app) throw new Error("Cloud not connected. Refresh the page and unlock super admin again.");
   var auth = await waitForAuth(25000);
+  var app = window.__svFirebaseApp;
+  if (!app) throw new Error("Cloud not connected. Refresh the page and unlock super admin again.");
   if (!auth || !auth.currentUser) {
     throw new Error("Sign in as super admin first (Coach / admin → Super admin → Unlock).");
   }
