@@ -1,7 +1,8 @@
 /* Minimal service worker for fast repeat loads + offline resilience. */
 /* global self */
 
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v6";
+const ASSET_TAG = "v118";
 const PRECACHE = `sv-precache-${CACHE_VERSION}`;
 const RUNTIME = `sv-runtime-${CACHE_VERSION}`;
 
@@ -9,9 +10,18 @@ const RUNTIME = `sv-runtime-${CACHE_VERSION}`;
 const PRECACHE_URLS = [
   "/",
   "/index.html",
-  "/dist/app.min.js",
+  `/dist/app.min.js?tag=${ASSET_TAG}`,
   "/wembley-downs-logo.png",
 ];
+
+async function precacheFresh(cache) {
+  await Promise.all(PRECACHE_URLS.map(async (url) => {
+    const req = new Request(url, { cache: "reload" });
+    const res = await fetch(req);
+    if (!res || !res.ok) throw new Error(`Precache failed for ${url}`);
+    await cache.put(req, res);
+  }));
+}
 
 function isSameOrigin(url) {
   try { return new URL(url).origin === self.location.origin; } catch { return false; }
@@ -20,7 +30,7 @@ function isSameOrigin(url) {
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(PRECACHE);
-    await cache.addAll(PRECACHE_URLS);
+    await precacheFresh(cache);
     self.skipWaiting();
   })());
 });
@@ -48,7 +58,7 @@ self.addEventListener("fetch", (event) => {
   if (req.mode === "navigate" || (req.headers.get("accept") || "").includes("text/html")) {
     event.respondWith((async () => {
       try {
-        const fresh = await fetch(req);
+        const fresh = await fetch(req, { cache: "no-store" });
         const cache = await caches.open(PRECACHE);
         cache.put("/index.html", fresh.clone());
         return fresh;
@@ -66,7 +76,7 @@ self.addEventListener("fetch", (event) => {
     const cached = await caches.match(req);
     if (cached) return cached;
     try {
-      const fresh = await fetch(req);
+      const fresh = await fetch(req, { cache: "reload" });
       const cache = await caches.open(RUNTIME);
       cache.put(req, fresh.clone());
       return fresh;

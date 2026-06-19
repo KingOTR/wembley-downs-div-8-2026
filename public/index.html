@@ -6,13 +6,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v117: fix merge-rounds / admin (lazy load, no CDN Firebase clash) -->
+  <!-- v118: fix cache rollout + require cloud auth for merge rounds -->
   <title>Team Player Vote</title>
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v117" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v118" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -2782,14 +2782,14 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v117"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v118"></script>
   <script>
     (function () {
       var loaded = false;
       function loadMergeRounds() {
         if (loaded) return;
         loaded = true;
-        import("./dist/admin-merge-rounds.js?tag=v117").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v118").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
         });
@@ -2823,7 +2823,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=4").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=6").then(function (reg) {
           try { reg.update(); } catch (e) {}
         }).catch(function () {});
       } catch (e) {}

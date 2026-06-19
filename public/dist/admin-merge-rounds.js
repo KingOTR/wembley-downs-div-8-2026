@@ -236,13 +236,26 @@ async function waitForApp(maxMs) {
   return null;
 }
 
+async function waitForAuth(maxMs) {
+  var app = await waitForApp(maxMs || 30000);
+  if (!app) return null;
+  var deadline = Date.now() + (maxMs || 30000);
+  while (Date.now() < deadline) {
+    if (window.__svAuth && window.__svAuth.currentUser) return window.__svAuth;
+    await new Promise(function (r) {
+      setTimeout(r, 200);
+    });
+  }
+  return window.__svAuth || null;
+}
+
 function projectId() {
   var app = window.__svFirebaseApp;
   return app && app.options && app.options.projectId ? app.options.projectId : "";
 }
 
 async function authHeaders() {
-  var auth = window.__svAuth;
+  var auth = await waitForAuth(25000);
   if (!auth || !auth.currentUser) {
     throw new Error("Sign in as super admin first (Coach / admin → Super admin → Unlock).");
   }
@@ -386,6 +399,14 @@ async function batchWrite(writes) {
       var msg = body && body.error && body.error.message ? body.error.message : "Batch write failed";
       throw new Error(msg);
     }
+    if (body && Array.isArray(body.status)) {
+      var failed = body.status.find(function (s) {
+        return s && s.code && s.code !== 0;
+      });
+      if (failed) {
+        throw new Error(failed.message || "Batch write failed for one or more votes");
+      }
+    }
   }
 }
 
@@ -400,8 +421,9 @@ function docName(docId) {
 
 async function loadCloudData(teamId) {
   var app = await waitForApp(25000);
-  if (!app) throw new Error("Cloud not connected. Wait for sync or refresh.");
-  if (!window.__svAuth || !window.__svAuth.currentUser) {
+  if (!app) throw new Error("Cloud not connected. Refresh the page and unlock super admin again.");
+  var auth = await waitForAuth(25000);
+  if (!auth || !auth.currentUser) {
     throw new Error("Sign in as super admin first (Coach / admin → Super admin → Unlock).");
   }
   var teams = await getConfigTeams();
@@ -424,21 +446,8 @@ function saveLocalData(data) {
 }
 
 async function loadData(teamId) {
-  var app = await waitForApp(500);
-  if (app && window.__svAuth && window.__svAuth.currentUser) {
-    try {
-      return await loadCloudData(teamId);
-    } catch (e) {
-      if (isSuperAdminUnlocked()) {
-        var local = loadLocalData();
-        return { teams: local.teams || [], votes: local.votes || [], localOnly: true };
-      }
-      throw e;
-    }
-  }
   if (!isSuperAdminUnlocked()) throw new Error("Unlock super admin first.");
-  var localData = loadLocalData();
-  return { teams: localData.teams || [], votes: localData.votes || [], localOnly: true };
+  return loadCloudData(teamId);
 }
 
 async function deleteSourceVotesCloud(teamId, srcLabel, sourceVotes) {
