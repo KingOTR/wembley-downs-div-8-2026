@@ -6,13 +6,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v117: fix merge-rounds / admin (lazy load, no CDN Firebase clash) -->
+  <!-- v118: SW cache bust + merge-rounds round dropdown fix -->
   <title>Team Player Vote</title>
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v117" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v118" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -2228,7 +2228,7 @@
       <div class="team-row">
         <select id="publicRoundSelect" aria-label="Select round"></select>
       </div>
-      <span class="round-pill" id="roundDisplay">Round —</span>
+      <span class="round-pill" id="roundDisplay">Round ?</span>
       <div class="sync-status" id="syncStatus"></div>
     </header>
 
@@ -2237,8 +2237,8 @@
       <div id="matchPretty">
         <div class="match-hero-row">
           <div class="match-hero-meta">
-            <div class="hint" id="matchMetaLine" style="margin:0 0 0.25rem">—</div>
-            <div style="font-weight:800; font-size:1.05rem; color: var(--red-dark)" id="matchOpponentLine">—</div>
+            <div class="hint" id="matchMetaLine" style="margin:0 0 0.25rem">?</div>
+            <div style="font-weight:800; font-size:1.05rem; color: var(--red-dark)" id="matchOpponentLine">?</div>
             <div class="hint" id="matchVenueLine" style="margin:0.35rem 0 0; display:none">
               <span aria-hidden="true" style="display:inline-flex; vertical-align:middle; margin-right:0.25rem">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -2250,9 +2250,9 @@
             </div>
           </div>
           <div class="score-pill">
-            <div class="score-num" id="matchScoreOur">–</div>
+            <div class="score-num" id="matchScoreOur">?</div>
             <div class="score-colon">:</div>
-            <div class="score-num" id="matchScoreOpp">–</div>
+            <div class="score-num" id="matchScoreOpp">?</div>
           </div>
         </div>
         <div id="matchScorers" style="display:none"></div>
@@ -2301,13 +2301,13 @@
         <datalist id="voterNameSuggest"></datalist>
         <div id="voterNameSuggestPanel" class="voter-suggest-panel" role="listbox" hidden aria-label="Name suggestions"></div>
       </div>
-      <div class="banner" id="offlineBanner">You’re offline. You can still pick players, but submitting may fail until you’re back online.</div>
+      <div class="banner" id="offlineBanner">You?re offline. You can still pick players, but submitting may fail until you?re back online.</div>
       <div class="picks-panel" id="picksPanel" aria-label="Your picks">
         <div style="font-size:0.85rem; font-weight:800; color: var(--text);">Your picks</div>
         <div class="picks-row" id="picksRow"></div>
-        <div class="hint" style="margin:0">Drag chips to reorder. Tap × to remove.</div>
+        <div class="hint" style="margin:0">Drag chips to reorder. Tap ? to remove.</div>
       </div>
-      <input type="text" id="playerSearch" class="vote-search" placeholder="Search players…" autocomplete="off" spellcheck="false" />
+      <input type="text" id="playerSearch" class="vote-search" placeholder="Search players?" autocomplete="off" spellcheck="false" />
       <div class="player-list" id="playerList" aria-live="polite"></div>
       <div class="subcard" style="padding: 0.65rem 0.75rem; margin: 0.65rem 0 0">
         <label class="field" for="guestPlayerInput" style="margin-bottom: 0.35rem">Guest / fill-in (not on squad)</label>
@@ -2326,7 +2326,7 @@
           <button type="button" class="ghost" id="addGuestToPicks">Add to picks</button>
         </div>
         <p class="hint" style="margin: 0.35rem 0 0">
-          Uses one pick slot (same 3 / 2 / 1 points). Reorder or remove in “Your picks” above. Counts in round totals; the “Over rounds” graph only traces the saved squad list.
+          Uses one pick slot (same 3 / 2 / 1 points). Reorder or remove in ?Your picks? above. Counts in round totals; the ?Over rounds? graph only traces the saved squad list.
         </p>
       </div>
       <div class="actions">
@@ -2336,10 +2336,10 @@
       <div id="voteReceipt" class="receipt-card" style="display:none">
         <div class="receipt-title">
           <div>Vote receipt</div>
-          <div class="receipt-sub" id="voteReceiptWhen">—</div>
+          <div class="receipt-sub" id="voteReceiptWhen">?</div>
         </div>
-        <div class="receipt-sub" id="voteReceiptMeta">—</div>
-        <div class="receipt-picks" id="voteReceiptPicks">—</div>
+        <div class="receipt-sub" id="voteReceiptMeta">?</div>
+        <div class="receipt-picks" id="voteReceiptPicks">?</div>
         <div class="actions" style="margin-top:0.65rem">
           <button type="button" class="ghost" id="voteReceiptEdit">Edit (within 1 hour)</button>
           <button type="button" class="ghost" id="voteReceiptHide">Hide</button>
@@ -2435,13 +2435,13 @@
           <label class="field" for="matchOppScorersInput" style="margin-top: 0.6rem">Opposition goalscorers (comma or new lines)</label>
           <textarea id="matchOppScorersInput" placeholder="e.g. Player A 18', Player B 65'"></textarea>
           <label class="field" for="matchReviewInput" style="margin-top: 0.6rem">Match review</label>
-          <textarea id="matchReviewInput" placeholder="Short match review…"></textarea>
+          <textarea id="matchReviewInput" placeholder="Short match review?"></textarea>
           <div class="actions" style="margin-top: 0.5rem">
             <button type="button" class="ghost" id="aiReviewRewrite">AI rewrite</button>
             <button type="button" class="ghost" id="aiReviewShorten">AI shorten</button>
             <button type="button" class="ghost" id="aiReviewKeyPoints">AI key points</button>
           </div>
-          <p class="hint" style="margin:0.5rem 0 0">Saved when you click “Save team &amp; round”.</p>
+          <p class="hint" style="margin:0.5rem 0 0">Saved when you click ?Save team &amp; round?.</p>
         </div>
 
         <div class="subcard" id="lineupEditorCard" style="padding:0.85rem; margin: 0.85rem 0 0.25rem">
@@ -2475,7 +2475,7 @@
             <div>
               <div id="lineupPitch" class="pitch" aria-label="Lineup pitch editor"></div>
               <p class="hint" style="margin:0.55rem 0 0">
-                Drag players to position them. Saved when you click “Save team &amp; round”.
+                Drag players to position them. Saved when you click ?Save team &amp; round?.
               </p>
             </div>
             <div class="lineup-side">
@@ -2490,7 +2490,7 @@
                   <div style="display:grid; grid-template-columns: 1fr 92px; gap:0.5rem; align-items:end">
                     <div>
                       <label class="field" for="lineupSelectedName" style="margin-bottom:0.25rem">Name</label>
-                      <input type="text" id="lineupSelectedName" placeholder="Tap a player…" />
+                      <input type="text" id="lineupSelectedName" placeholder="Tap a player?" />
                     </div>
                     <div>
                       <label class="field" for="lineupSelectedNumber" style="margin-bottom:0.25rem">#</label>
@@ -2510,7 +2510,7 @@
                     <button type="button" class="ghost" id="lineupApplyStartersPaste" style="padding:0.35rem 0.55rem">Apply</button>
                   </div>
                   <textarea id="lineupStartersPaste" placeholder="Paste 11 names (optionally with numbers), one per line&#10;e.g. 1 Sam&#10;2 Alex&#10;..." style="min-height: 120px"></textarea>
-                  <p class="hint" style="margin:0.35rem 0 0">Tip: You can paste more than 11 lines — we’ll take the first 11.</p>
+                  <p class="hint" style="margin:0.35rem 0 0">Tip: You can paste more than 11 lines ? we?ll take the first 11.</p>
                 </div>
               </div>
 
@@ -2684,7 +2684,7 @@
           </div>
           <div class="actions" style="margin-top: 0.5rem">
             <button type="button" class="ghost" id="downloadSeasonArchive">Download season archive (JSON)</button>
-            <button type="button" class="ghost" id="resetSeasonVotes">Reset all team &amp; coach votes…</button>
+            <button type="button" class="ghost" id="resetSeasonVotes">Reset all team &amp; coach votes?</button>
           </div>
           <p class="hint" style="margin: 0.35rem 0 0">
             Archive saves squads, config, and all ballots. Reset deletes every team vote and coach ballot (keeps squads and settings). Download first.
@@ -2700,7 +2700,7 @@
             <div style="font-weight: 800; font-size: 0.9rem; margin-bottom: 0.25rem; color: var(--red-dark)">Agree with squad</div>
             <div id="coachAgreeWithSquadLine" style="font-size: 0.88rem; line-height: 1.45"></div>
             <p class="hint" style="margin: 0.35rem 0 0">
-              For the round above: names that appear in both the combined coaches’ top 3 and the team vote top 3 (by weighted points).
+              For the round above: names that appear in both the combined coaches? top 3 and the team vote top 3 (by weighted points).
             </p>
           </div>
           <div class="actions result-view-toggle" style="margin-top: 0.5rem">
@@ -2712,7 +2712,7 @@
           <div id="coachResultsGraphWrap" class="graph-wrap"></div>
           <div id="coachResultsTrendWrap" style="display: none">
             <p class="hint" style="margin: 0.25rem 0 0.5rem">
-              Rounds by first coach ballot time; y-axis is running total (3 / 2 / 1) — lines never go down.
+              Rounds by first coach ballot time; y-axis is running total (3 / 2 / 1) ? lines never go down.
             </p>
             <div class="trend-chart">
               <canvas id="coachResultsTrendCanvas" width="460" height="260" style="width: 100%; height: 260px"></canvas>
@@ -2782,14 +2782,14 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v117"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v118"></script>
   <script>
     (function () {
       var loaded = false;
       function loadMergeRounds() {
         if (loaded) return;
         loaded = true;
-        import("./dist/admin-merge-rounds.js?tag=v117").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v118").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
         });
@@ -2823,9 +2823,23 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=5").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=118").then(function (reg) {
           try { reg.update(); } catch (e) {}
+          if (reg.waiting) {
+            try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}
+          }
+          reg.addEventListener("updatefound", function () {
+            var nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener("statechange", function () {
+              if (nw.state === "installed" && navigator.serviceWorker.controller) {
+                try { nw.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}
+              }
+            });
+          });
         }).catch(function () {});
+        // Stuck on old bundle? DevTools ? Application ? Service Workers ? Unregister,
+        // or console: navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});location.reload();});
       } catch (e) {}
     })();
   </script>

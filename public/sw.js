@@ -1,20 +1,39 @@
 /* Minimal service worker for fast repeat loads + offline resilience. */
 /* global self */
 
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v118";
 const PRECACHE = `sv-precache-${CACHE_VERSION}`;
 const RUNTIME = `sv-runtime-${CACHE_VERSION}`;
 
-// Keep this list small + high impact. Use runtime caching for the rest.
+// Keep this list small. Versioned JS/CSS use network-first (not precached).
 const PRECACHE_URLS = [
   "/",
   "/index.html",
-  "/dist/app.min.js",
   "/wembley-downs-logo.png",
 ];
 
 function isSameOrigin(url) {
   try { return new URL(url).origin === self.location.origin; } catch { return false; }
+}
+
+function isVersionedDistAsset(url) {
+  return url.pathname.startsWith("/dist/") &&
+    (url.pathname.endsWith(".js") || url.pathname.endsWith(".css"));
+}
+
+async function networkFirst(req) {
+  try {
+    const fresh = await fetch(req);
+    if (fresh && fresh.ok) {
+      const cache = await caches.open(RUNTIME);
+      cache.put(req, fresh.clone());
+    }
+    return fresh;
+  } catch {
+    const cached = await caches.match(req);
+    if (cached) return cached;
+    throw new Error("offline");
+  }
 }
 
 self.addEventListener("install", (event) => {
@@ -29,11 +48,21 @@ self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(keys.map((k) => {
-      if (k !== PRECACHE && k !== RUNTIME) return caches.delete(k);
-      return null;
+      if (k === PRECACHE || k === RUNTIME) return null;
+      return caches.delete(k);
     }));
-    self.clients.claim();
+    // Drop stale runtime entries from prior deploys (e.g. old ?tag=v116 bundles).
+    try {
+      const runtime = await caches.open(RUNTIME);
+      const stale = await runtime.keys();
+      await Promise.all(stale.map((r) => runtime.delete(r)));
+    } catch { /* ignore */ }
+    await self.clients.claim();
   })());
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("fetch", (event) => {
@@ -41,16 +70,21 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
 
   const url = new URL(req.url);
-  // Don’t cache cross-origin (Firestore/Google) requests here.
   if (!isSameOrigin(req.url)) return;
 
-  // HTML: network-first so updates come through; fall back to cache for offline.
-  if (req.mode === "navigate" || (req.headers.get("accept") || "").includes("text/html")) {
+  // HTML + service worker script: network-first so updates roll out.
+  if (
+    req.mode === "navigate" ||
+    (req.headers.get("accept") || "").includes("text/html") ||
+    url.pathname === "/sw.js"
+  ) {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req);
-        const cache = await caches.open(PRECACHE);
-        cache.put("/index.html", fresh.clone());
+        if (fresh && fresh.ok) {
+          const cache = await caches.open(PRECACHE);
+          cache.put("/index.html", fresh.clone());
+        }
         return fresh;
       } catch {
         return (await caches.match("/index.html")) || (await caches.match("/"));
@@ -59,10 +93,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets: cache-first.
+  // Versioned bundles: network-first so ?tag=v118 always wins over stale cache.
+  if (isVersionedDistAsset(url)) {
+    event.respondWith(networkFirst(req));
+    return;
+  }
+
+  // Other static assets: cache-first.
   event.respondWith((async () => {
-    // IMPORTANT: do NOT ignore querystrings.
-    // We version assets with `?tag=...`, and ignoring search would force stale JS without a hard refresh.
     const cached = await caches.match(req);
     if (cached) return cached;
     try {
@@ -75,4 +113,3 @@ self.addEventListener("fetch", (event) => {
     }
   })());
 });
-

@@ -3,6 +3,7 @@
  * Lazy-loaded alongside app.min.js; uses window.__svFirebaseApp / __svAuth (no CDN Firebase imports).
  */
 const STORAGE_KEY = "soccerVoteApp_v2";
+const PREFS_KEY = STORAGE_KEY + "_cache";
 const ADMIN_SESSION_KEY = "soccerVoteAdminUnlock";
 
 function qo(c) {
@@ -57,13 +58,33 @@ function isSuperAdminUnlocked() {
 }
 
 function getAdminTeamId() {
-  var tabs = document.querySelectorAll("#adminTeamTabs button");
-  for (var i = 0; i < tabs.length; i++) {
-    if (tabs[i].classList.contains("active")) return i + 1;
-  }
   var sel = document.getElementById("resultsTeamSelect");
-  if (sel) return parseInt(sel.value, 10) || 1;
+  if (sel && sel.value) return parseInt(sel.value, 10) || 1;
+  var tabs = document.querySelectorAll("#adminTeamTabs button");
+  var teams = [];
+  try {
+    teams = loadLocalData().teams || [];
+  } catch {
+    teams = [];
+  }
+  for (var i = 0; i < tabs.length; i++) {
+    if (!tabs[i].classList.contains("active")) continue;
+    var team = teams[i];
+    if (team && team.id != null) return team.id;
+    return i + 1;
+  }
   return 1;
+}
+
+function loadRoundByTeamPrefs() {
+  try {
+    var raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return {};
+    var prefs = JSON.parse(raw);
+    return prefs && prefs.roundByTeam && typeof prefs.roundByTeam === "object" ? prefs.roundByTeam : {};
+  } catch {
+    return {};
+  }
 }
 
 function collectRounds(teamId, teams, votes) {
@@ -78,6 +99,14 @@ function collectRounds(teamId, teams, votes) {
       if (n) map[n] = true;
     });
   }
+  try {
+    var roundByTeam = loadRoundByTeamPrefs();
+    var prefRound = roundByTeam[teamIdStr(teamId)];
+    if (prefRound) {
+      var pr = normalizeRoundLabel(prefRound) || prefRound;
+      if (pr) map[pr] = true;
+    }
+  } catch { /* ignore */ }
   (votes || []).forEach(function (v) {
     if (!v || teamIdStr(v.teamId) !== teamIdStr(teamId)) return;
     var rl = voteRoundLabel(v);
@@ -236,6 +265,17 @@ async function waitForApp(maxMs) {
   return null;
 }
 
+async function waitForAuth(maxMs) {
+  var deadline = Date.now() + (maxMs || 30000);
+  while (Date.now() < deadline) {
+    if (window.__svAuth && window.__svAuth.currentUser) return window.__svAuth.currentUser;
+    await new Promise(function (r) {
+      setTimeout(r, 200);
+    });
+  }
+  return null;
+}
+
 function projectId() {
   var app = window.__svFirebaseApp;
   return app && app.options && app.options.projectId ? app.options.projectId : "";
@@ -336,11 +376,25 @@ async function getConfigTeams() {
   return Array.isArray(teams) ? teams : [];
 }
 
+function ingestVoteRows(rows, byId) {
+  rows.forEach(function (row) {
+    if (!row || !row.document) return;
+    var id = docPath(row.document.name);
+    if (!id || byId[id]) return;
+    var data = {};
+    var fields = row.document.fields || {};
+    Object.keys(fields).forEach(function (k) {
+      data[k] = parseFsValue(fields[k]);
+    });
+    byId[id] = Object.assign({ id: id }, data);
+  });
+}
+
 async function fetchVotesRest(teamId) {
   var byId = Object.create(null);
   for (var i = 0; i < 2; i++) {
     var tid = i === 0 ? teamId : String(teamId);
-    var rows = await runQuery({
+    var structuredQuery = {
       from: [{ collectionId: "votes" }],
       where: {
         fieldFilter: {
@@ -349,18 +403,30 @@ async function fetchVotesRest(teamId) {
           value: fsValue(tid),
         },
       },
-    });
-    rows.forEach(function (row) {
-      if (!row || !row.document) return;
-      var id = docPath(row.document.name);
-      if (!id || byId[id]) return;
-      var data = {};
-      var fields = row.document.fields || {};
-      Object.keys(fields).forEach(function (k) {
-        data[k] = parseFsValue(fields[k]);
+      orderBy: [{ field: { fieldPath: "__name__" }, direction: "ASCENDING" }],
+    };
+    var startAt = null;
+    for (var page = 0; page < 50; page++) {
+      var query = structuredQuery;
+      if (startAt) query = Object.assign({}, structuredQuery, { startAt: startAt });
+      var rows = await runQuery(query);
+      if (!rows.length) break;
+      var lastDoc = null;
+      var gotDoc = false;
+      rows.forEach(function (row) {
+        if (row && row.document) {
+          lastDoc = row.document;
+          gotDoc = true;
+        }
       });
-      byId[id] = Object.assign({ id: id }, data);
-    });
+      ingestVoteRows(rows, byId);
+      if (!gotDoc || !lastDoc) break;
+      startAt = {
+        values: [{ referenceValue: lastDoc.name }],
+        before: false,
+      };
+      if (rows.length < 300) break;
+    }
   }
   return Object.keys(byId).map(function (id) {
     return byId[id];
@@ -423,22 +489,50 @@ function saveLocalData(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+function mergeVoteLists() {
+  var lists = [];
+  for (var i = 0; i < arguments.length; i++) {
+    if (arguments[i] && arguments[i].length) lists.push(arguments[i]);
+  }
+  if (!lists.length) return [];
+  var byId = Object.create(null);
+  lists.forEach(function (votes) {
+    votes.forEach(function (v) {
+      if (!v) return;
+      var id = v.id || (v.teamId + "|" + (v.voterNameKey || v.voterName) + "|" + voteRoundLabel(v));
+      byId[id] = v;
+    });
+  });
+  return Object.keys(byId).map(function (id) {
+    return byId[id];
+  });
+}
+
 async function loadData(teamId) {
-  var app = await waitForApp(500);
-  if (app && window.__svAuth && window.__svAuth.currentUser) {
+  await waitForApp(25000);
+  if (isSuperAdminUnlocked()) await waitForAuth(20000);
+  var localData = loadLocalData();
+  var localVotes = (localData.votes || []).filter(function (v) {
+    return v && teamIdStr(v.teamId) === teamIdStr(teamId);
+  });
+  if (window.__svFirebaseApp && window.__svAuth && window.__svAuth.currentUser) {
     try {
-      return await loadCloudData(teamId);
+      var cloud = await loadCloudData(teamId);
+      cloud.votes = mergeVoteLists(cloud.votes, localVotes);
+      return cloud;
     } catch (e) {
       if (isSuperAdminUnlocked()) {
-        var local = loadLocalData();
-        return { teams: local.teams || [], votes: local.votes || [], localOnly: true };
+        return {
+          teams: localData.teams || [],
+          votes: localVotes,
+          localOnly: true,
+        };
       }
       throw e;
     }
   }
   if (!isSuperAdminUnlocked()) throw new Error("Unlock super admin first.");
-  var localData = loadLocalData();
-  return { teams: localData.teams || [], votes: localData.votes || [], localOnly: true };
+  return { teams: localData.teams || [], votes: localVotes, localOnly: true };
 }
 
 async function deleteSourceVotesCloud(teamId, srcLabel, sourceVotes) {
