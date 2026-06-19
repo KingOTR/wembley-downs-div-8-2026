@@ -1,19 +1,7 @@
 /**
  * Admin: merge team votes from one round into another (super admin).
- * Loaded alongside app.min.js; uses window.__svFirebaseApp when cloud is active.
+ * Lazy-loaded alongside app.min.js; uses window.__svFirebaseApp / __svAuth (no CDN Firebase imports).
  */
-import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  getDoc,
-  writeBatch,
-} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
-
 const STORAGE_KEY = "soccerVoteApp_v2";
 const ADMIN_SESSION_KEY = "soccerVoteAdminUnlock";
 
@@ -208,7 +196,7 @@ function renderSummary(el, plan, teamName) {
   }
   if (plan.invalid.length) {
     lines.push(
-      "<details style='margin-top:0.35rem'><summary>Invalid names</summary><p class='hint' style='margin:0.35rem 0 0'>" +
+      "<details style='margin-top:0.45rem'><summary>Invalid names</summary><p class='hint' style='margin:0.35rem 0 0'>" +
         escapeHtml(plan.invalid.join(", ")) +
         "</p></details>"
     );
@@ -248,34 +236,177 @@ async function waitForApp(maxMs) {
   return null;
 }
 
-async function loadCloudData(teamId) {
-  var app = await waitForApp(25000);
-  if (!app) throw new Error("Cloud not connected. Wait for sync or refresh.");
-  var auth = getAuth(app);
-  if (!auth.currentUser) throw new Error("Sign in as super admin first (Coach / admin → Super admin → Unlock).");
-  var db = getFirestore(app);
-  var configSnap = await getDoc(doc(db, "config", "main"));
-  var teams = (configSnap.exists() && configSnap.data().teams) || [];
-  var votes = await fetchVotes(db, teamId);
-  return { teams: teams, votes: votes, db: db, app: app };
+function projectId() {
+  var app = window.__svFirebaseApp;
+  return app && app.options && app.options.projectId ? app.options.projectId : "";
 }
 
-async function fetchVotes(db, teamId) {
-  var q1 = query(collection(db, "votes"), where("teamId", "==", teamId));
-  var q2 = query(collection(db, "votes"), where("teamId", "==", String(teamId)));
-  var snaps = await Promise.all([getDocs(q1), getDocs(q2)]);
-  var byId = Object.create(null);
-  snaps.forEach(function (snap) {
-    snap.docs.forEach(function (d) {
-      if (!byId[d.id]) {
-        var data = d.data();
-        byId[d.id] = Object.assign({ id: d.id }, data);
-      }
+async function authHeaders() {
+  var auth = window.__svAuth;
+  if (!auth || !auth.currentUser) {
+    throw new Error("Sign in as super admin first (Coach / admin → Super admin → Unlock).");
+  }
+  var token = await auth.currentUser.getIdToken();
+  return {
+    Authorization: "Bearer " + token,
+    "Content-Type": "application/json",
+  };
+}
+
+function fsValue(val) {
+  if (val == null) return { nullValue: null };
+  if (typeof val === "boolean") return { booleanValue: val };
+  if (typeof val === "number") {
+    if (Number.isInteger(val)) return { integerValue: String(val) };
+    return { doubleValue: val };
+  }
+  if (Array.isArray(val)) {
+    return { arrayValue: { values: val.map(fsValue) } };
+  }
+  if (typeof val === "object") {
+    var fields = {};
+    Object.keys(val).forEach(function (k) {
+      fields[k] = fsValue(val[k]);
     });
+    return { mapValue: { fields: fields } };
+  }
+  return { stringValue: String(val) };
+}
+
+function parseFsValue(v) {
+  if (!v || typeof v !== "object") return null;
+  if ("stringValue" in v) return v.stringValue;
+  if ("integerValue" in v) return parseInt(v.integerValue, 10);
+  if ("doubleValue" in v) return v.doubleValue;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("nullValue" in v) return null;
+  if (v.arrayValue && Array.isArray(v.arrayValue.values)) {
+    return v.arrayValue.values.map(parseFsValue);
+  }
+  if (v.mapValue && v.mapValue.fields) {
+    var out = {};
+    Object.keys(v.mapValue.fields).forEach(function (k) {
+      out[k] = parseFsValue(v.mapValue.fields[k]);
+    });
+    return out;
+  }
+  return null;
+}
+
+function docPath(name) {
+  var m = String(name || "").match(/documents\/(.+)$/);
+  return m ? m[1] : "";
+}
+
+async function runQuery(structuredQuery) {
+  var pid = projectId();
+  if (!pid) throw new Error("Cloud not connected.");
+  var url =
+    "https://firestore.googleapis.com/v1/projects/" +
+    encodeURIComponent(pid) +
+    "/databases/(default)/documents:runQuery";
+  var res = await fetch(url, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify({ structuredQuery: structuredQuery }),
   });
+  var rows = await res.json();
+  if (!res.ok) {
+    var msg = rows && rows.error && rows.error.message ? rows.error.message : "Query failed (" + res.status + ")";
+    throw new Error(msg);
+  }
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getConfigTeams() {
+  var pid = projectId();
+  if (!pid) throw new Error("Cloud not connected.");
+  var url =
+    "https://firestore.googleapis.com/v1/projects/" +
+    encodeURIComponent(pid) +
+    "/databases/(default)/documents/config/main";
+  var res = await fetch(url, { headers: await authHeaders() });
+  if (res.status === 404) return [];
+  var row = await res.json();
+  if (!res.ok) {
+    var msg = row && row.error && row.error.message ? row.error.message : "Config load failed";
+    throw new Error(msg);
+  }
+  var teams = row.fields && row.fields.teams ? parseFsValue(row.fields.teams) : [];
+  return Array.isArray(teams) ? teams : [];
+}
+
+async function fetchVotesRest(teamId) {
+  var byId = Object.create(null);
+  for (var i = 0; i < 2; i++) {
+    var tid = i === 0 ? teamId : String(teamId);
+    var rows = await runQuery({
+      from: [{ collectionId: "votes" }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: "teamId" },
+          op: "EQUAL",
+          value: fsValue(tid),
+        },
+      },
+    });
+    rows.forEach(function (row) {
+      if (!row || !row.document) return;
+      var id = docPath(row.document.name);
+      if (!id || byId[id]) return;
+      var data = {};
+      var fields = row.document.fields || {};
+      Object.keys(fields).forEach(function (k) {
+        data[k] = parseFsValue(fields[k]);
+      });
+      byId[id] = Object.assign({ id: id }, data);
+    });
+  }
   return Object.keys(byId).map(function (id) {
     return byId[id];
   });
+}
+
+async function batchWrite(writes) {
+  var pid = projectId();
+  if (!pid) throw new Error("Cloud not connected.");
+  var url =
+    "https://firestore.googleapis.com/v1/projects/" +
+    encodeURIComponent(pid) +
+    "/databases/(default)/documents:batchWrite";
+  for (var i = 0; i < writes.length; i += 400) {
+    var chunk = writes.slice(i, i + 400);
+    var res = await fetch(url, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify({ writes: chunk }),
+    });
+    var body = await res.json();
+    if (!res.ok) {
+      var msg = body && body.error && body.error.message ? body.error.message : "Batch write failed";
+      throw new Error(msg);
+    }
+  }
+}
+
+function docName(docId) {
+  return (
+    "projects/" +
+    projectId() +
+    "/databases/(default)/documents/votes/" +
+    encodeURIComponent(docId).replace(/%2F/g, "/")
+  );
+}
+
+async function loadCloudData(teamId) {
+  var app = await waitForApp(25000);
+  if (!app) throw new Error("Cloud not connected. Wait for sync or refresh.");
+  if (!window.__svAuth || !window.__svAuth.currentUser) {
+    throw new Error("Sign in as super admin first (Coach / admin → Super admin → Unlock).");
+  }
+  var teams = await getConfigTeams();
+  var votes = await fetchVotesRest(teamId);
+  return { teams: teams, votes: votes, cloudRest: true };
 }
 
 function loadLocalData() {
@@ -294,7 +425,7 @@ function saveLocalData(data) {
 
 async function loadData(teamId) {
   var app = await waitForApp(500);
-  if (app) {
+  if (app && window.__svAuth && window.__svAuth.currentUser) {
     try {
       return await loadCloudData(teamId);
     } catch (e) {
@@ -310,45 +441,44 @@ async function loadData(teamId) {
   return { teams: localData.teams || [], votes: localData.votes || [], localOnly: true };
 }
 
-async function deleteSourceVotesCloud(db, teamId, srcLabel, sourceVotes) {
+async function deleteSourceVotesCloud(teamId, srcLabel, sourceVotes) {
   var ids = Object.create(null);
   sourceVotes.forEach(function (v) {
     if (v && v.id) ids[v.id] = true;
   });
-  var extra = await fetchVotes(db, teamId);
+  var extra = await fetchVotesRest(teamId);
   extra.forEach(function (v) {
     if (v && voteRoundLabel(v) === srcLabel) ids[v.id] = true;
   });
   var idList = Object.keys(ids);
-  for (var i = 0; i < idList.length; i += 400) {
-    var batch = writeBatch(db);
-    idList.slice(i, i + 400).forEach(function (id) {
-      batch.delete(doc(db, "votes", id));
-    });
-    await batch.commit();
-  }
+  var writes = idList.map(function (id) {
+    return { delete: docName(id) };
+  });
+  if (writes.length) await batchWrite(writes);
   return idList.length;
 }
 
-async function runMergeCloud(db, teamId, plan) {
-  var batch = writeBatch(db);
-  var count = 0;
-  plan.merged.forEach(function (v) {
+async function runMergeCloud(teamId, plan) {
+  var writes = plan.merged.map(function (v) {
     var key = v.voterNameKey || nameKey(v.voterName);
     var newId = "t" + teamId + "_r" + plan.dstRoundKey + "_v" + key;
-    var data = {
-      teamId: teamId,
-      voterName: v.voterName,
-      voterNameKey: key,
-      round: plan.dstLabel,
-      picks: Array.isArray(v.picks) ? v.picks.slice() : [],
-      submittedAt: v.submittedAt || new Date().toISOString(),
+    return {
+      update: {
+        name: docName(newId),
+        fields: {
+          teamId: fsValue(teamId),
+          voterName: fsValue(v.voterName),
+          voterNameKey: fsValue(key),
+          round: fsValue(plan.dstLabel),
+          picks: fsValue(Array.isArray(v.picks) ? v.picks.slice() : []),
+          submittedAt: fsValue(v.submittedAt || new Date().toISOString()),
+        },
+      },
+      updateMask: { fieldPaths: ["teamId", "voterName", "voterNameKey", "round", "picks", "submittedAt"] },
     };
-    batch.set(doc(db, "votes", newId), data);
-    count++;
   });
-  if (count) await batch.commit();
-  return count;
+  if (writes.length) await batchWrite(writes);
+  return writes.length;
 }
 
 function runMergeLocal(teamId, plan, deleteSource) {
@@ -393,6 +523,7 @@ var lastPlan = null;
 var bound = false;
 
 async function refreshRoundSelects() {
+  if (!isSuperAdminUnlocked()) return;
   var srcSel = document.getElementById("mergeSourceRound");
   var dstSel = document.getElementById("mergeDestRound");
   if (!srcSel || !dstSel) return;
@@ -447,7 +578,6 @@ function wireMergeUi() {
       lastPlan = planMerge(teamId, data.teams, data.votes, srcRound, dstRound);
       lastPlan.teamId = teamId;
       lastPlan.localOnly = !!data.localOnly;
-      lastPlan.db = data.db || null;
       renderSummary(summaryEl, lastPlan, (team && team.name) || "Team " + teamId);
       runBtn.disabled = !lastPlan.merged.length;
       if (!lastPlan.merged.length && errEl) {
@@ -486,11 +616,9 @@ function wireMergeUi() {
         mergedCount = res.merged;
         deletedCount = res.removed;
       } else {
-        if (!lastPlan.db) throw new Error("Cloud database not available.");
-        mergedCount = await runMergeCloud(lastPlan.db, lastPlan.teamId, lastPlan);
+        mergedCount = await runMergeCloud(lastPlan.teamId, lastPlan);
         if (deleteSource) {
           deletedCount = await deleteSourceVotesCloud(
-            lastPlan.db,
             lastPlan.teamId,
             lastPlan.srcLabel,
             lastPlan.sourceVotes
@@ -515,7 +643,7 @@ function wireMergeUi() {
             : "") +
           (lastPlan.localOnly
             ? "<p class='hint' style='margin:0.45rem 0 0'>Refresh the page to see updated results.</p>"
-            : "");
+            : "<p class='hint' style='margin:0.45rem 0 0'>Results will update on next sync.</p>");
       }
       lastPlan = null;
       setTimeout(refreshRoundSelects, 500);
@@ -527,8 +655,6 @@ function wireMergeUi() {
       previewBtn.disabled = false;
     }
   });
-
-  refreshRoundSelects();
 }
 
 function observeAdminMount() {

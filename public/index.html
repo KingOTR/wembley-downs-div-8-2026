@@ -6,13 +6,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v116: merge-rounds admin module -->
+  <!-- v117: fix merge-rounds / admin (lazy load, no CDN Firebase clash) -->
   <title>Team Player Vote</title>
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v116" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v117" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -2782,8 +2782,33 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v116"></script>
-  <script type="module" src="dist/admin-merge-rounds.js?tag=v116"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v117"></script>
+  <script>
+    (function () {
+      var loaded = false;
+      function loadMergeRounds() {
+        if (loaded) return;
+        loaded = true;
+        import("./dist/admin-merge-rounds.js?tag=v117").catch(function (e) {
+          console.warn("merge-rounds module failed to load", e);
+          loaded = false;
+        });
+      }
+      function hook() {
+        var btn = document.getElementById("showAdminBtn");
+        if (btn) btn.addEventListener("click", loadMergeRounds);
+        var mount = document.getElementById("adminDeferredMount");
+        if (mount) {
+          new MutationObserver(loadMergeRounds).observe(mount, { childList: true, subtree: true });
+        }
+      }
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", hook, { once: true });
+      } else {
+        hook();
+      }
+    })();
+  </script>
 
   <script>
     (function () {
