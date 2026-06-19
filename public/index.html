@@ -1,0 +1,2834 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
+  <title>Team Player Vote</title>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+  <link rel="dns-prefetch" href="//www.gstatic.com" />
+  <link rel="dns-prefetch" href="//firestore.googleapis.com" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v115" />
+  <style>
+    /* Sporty theme is the permanent default. */
+    :root {
+      --gray: #f3f4f6;
+      --white: #ffffff;
+      --text: #111827;
+      --border: rgba(17, 24, 39, 0.10);
+      /* Tuned to Wembley Downs logo red */
+      --red: #EE2B33;
+      --red-dark: #B8161C;
+      --red-soft: rgba(238, 43, 51, 0.18);
+      --shadow: 0 10px 32px rgba(238, 43, 51, 0.14);
+      --radius: 14px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --red: #EE2B33;
+        /* avoid low-contrast pale reds for text */
+        --red-dark: #FF737A;
+        --red-soft: rgba(238, 43, 51, 0.22);
+        /* Claude-style lighter charcoal background + surfaces */
+        --gray: #262626;
+        --white: #2b2b2b;
+        --text: #e5e7eb;
+        --border: rgba(255, 255, 255, 0.10);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      /* Plain background (no stripes/gradient) */
+      background: var(--gray);
+      background-color: var(--gray);
+      color: var(--text);
+      min-height: 100dvh;
+      line-height: 1.45;
+      font-size: 15.5px;
+      letter-spacing: -0.005em;
+    }
+
+    /* keep app above overlay */
+    .kick-layer { z-index: 9999; }
+    .wrap { position: relative; z-index: 1; }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 1.35rem 1.15rem 3.5rem;
+    }
+
+    @media (min-width: 900px) {
+      .wrap {
+        max-width: 760px;
+        padding-left: 1.35rem;
+        padding-right: 1.35rem;
+      }
+    }
+
+    /* Make match result card a bit wider */
+    #matchCard {
+      max-width: 760px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* When viewing the lineup tab, let the layout go full-width */
+    body.main-tab-lineup .wrap {
+      max-width: 100%;
+    }
+
+    body.main-tab-lineup #lineupCard {
+      margin-left: 0;
+      margin-right: 0;
+    }
+
+    /* Make lineup grid use the space better on wide screens */
+    @media (min-width: 900px) {
+      body.main-tab-lineup .lineup-grid {
+        grid-template-columns: 1.65fr 0.95fr;
+      }
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 1.35rem;
+      padding-bottom: 0.15rem;
+    }
+
+    header h1 {
+      margin: 0 0 0.35rem;
+      font-size: clamp(1.2rem, 3.8vw, 1.5rem);
+      color: var(--red-dark);
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .round-pill {
+      display: inline-block;
+      background: var(--red);
+      color: var(--white);
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    /* Round is already selected in the dropdowns */
+    #roundDisplay {
+      display: none;
+    }
+
+    .sync-status {
+      margin-top: 0.5rem;
+      font-size: 0.78rem;
+      color: #52525b;
+    }
+
+    /* Show cloud-sync status (helps troubleshooting + clarity) */
+    #syncStatus {
+      display: block;
+    }
+
+    .sync-status.cloud {
+      color: #15803d;
+    }
+
+    .sync-status.warn {
+      color: #a16207;
+    }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.1rem 1.2rem;
+      margin-bottom: 1rem;
+      box-shadow: var(--shadow);
+    }
+
+    #voteSection .hint:first-of-type {
+      margin-bottom: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .vote-flow-head {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .vote-flow-head .step-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(127, 29, 29, 0.72);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body::before {
+        opacity: 0.18;
+        mix-blend-mode: normal;
+      }
+      .card {
+        box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+      }
+      .hint,
+      .sync-status,
+      .empty-state,
+      .lock-msg {
+        color: rgba(226, 232, 240, 0.78);
+      }
+      .sync-status.cloud { color: #34d399; }
+      .sync-status.warn { color: #fbbf24; }
+      button.ghost {
+        color: var(--text);
+        border-color: rgba(239, 68, 68, 0.22);
+      }
+      .player-btn.selected {
+        background: rgba(239, 68, 68, 0.10);
+      }
+      header h1 {
+        color: var(--text);
+      }
+      .card h2 {
+        color: var(--text);
+      }
+
+      /* Match card readability in dark mode */
+      #matchCard {
+        background: linear-gradient(
+          135deg,
+          rgba(2, 6, 23, 0.98) 0%,
+          rgba(2, 6, 23, 0.96) 45%,
+          rgba(15, 23, 42, 0.92) 100%
+        );
+        border-color: rgba(148, 163, 184, 0.22);
+        backdrop-filter: none;
+      }
+      #matchCard::before {
+        /* Darker, less pink overlay in dark mode */
+        opacity: 0.60;
+        background:
+          radial-gradient(115% 110% at 0% 0%, rgba(127, 29, 29, 0.34) 0%, rgba(127, 29, 29, 0.00) 62%),
+          radial-gradient(110% 100% at 100% 0%, rgba(127, 29, 29, 0.20) 0%, rgba(127, 29, 29, 0.00) 66%),
+          linear-gradient(180deg, rgba(127, 29, 29, 0.18) 0%, rgba(127, 29, 29, 0.00) 56%);
+      }
+      #matchCard .score-pill {
+        border-color: rgba(148, 163, 184, 0.22);
+        /* Keep the score pill light so black digits/colon are readable */
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: none;
+      }
+      #matchCard .score-num {
+        color: var(--text);
+      }
+      /* Score colon: higher contrast in dark mode */
+      #matchCard .score-colon {
+        color: #111827 !important;
+      }
+
+      /* Match review: lighter header in dark mode */
+      #matchCard .match-review-box {
+        background: rgba(15, 23, 42, 0.55) !important;
+        border-color: rgba(148, 163, 184, 0.22) !important;
+      }
+      #matchCard .match-review-title {
+        color: rgba(226, 232, 240, 0.72) !important;
+        font-weight: 750 !important;
+      }
+      #matchCard .match-review-body {
+        color: rgba(241, 245, 249, 0.92) !important;
+      }
+    }
+
+    .card h2 {
+      margin: 0 0 0.65rem;
+      font-size: 1rem;
+      color: var(--red-dark);
+    }
+
+    .hint {
+      font-size: 0.82rem;
+      color: #52525b;
+      margin: 0 0 0.75rem;
+    }
+
+    .player-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      background: rgba(2, 6, 23, 0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.55rem;
+    }
+
+    .player-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 0.75rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--white);
+      font-size: 1rem;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, transform 0.08s, box-shadow 0.15s;
+      color: var(--text);
+      touch-action: manipulation;
+    }
+
+    .player-btn:hover {
+      border-color: rgba(239, 68, 68, 0.45);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.06);
+    }
+
+    .player-btn.placeholder {
+      pointer-events: none;
+      cursor: default;
+      position: relative;
+      overflow: hidden;
+      color: transparent;
+    }
+
+    .player-btn.placeholder::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        rgba(148, 163, 184, 0.12) 0%,
+        rgba(148, 163, 184, 0.22) 35%,
+        rgba(148, 163, 184, 0.12) 70%,
+        rgba(148, 163, 184, 0.12) 100%
+      );
+      transform: translateX(-60%);
+      animation: shimmer 1200ms ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-60%); }
+      100% { transform: translateX(60%); }
+    }
+
+    .player-btn:active {
+      transform: scale(0.99);
+    }
+
+    .player-btn.selected {
+      border-color: rgba(239, 68, 68, 0.55);
+      background: rgba(239, 68, 68, 0.08);
+    }
+
+    .player-btn .rank-badge {
+      min-width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 8px;
+      background: var(--red);
+      color: var(--white);
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .player-btn.selected .rank-badge {
+      display: flex;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    button.primary {
+      background: var(--red);
+      color: var(--white);
+      border: none;
+      padding: 0.7rem 1.1rem;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 0.95rem;
+      cursor: pointer;
+      box-shadow: 0 12px 26px rgba(185, 28, 28, 0.18);
+    }
+
+    button.primary:hover { filter: brightness(0.98); }
+
+    button.primary:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .kick-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      overflow: hidden;
+      perspective: 900px;
+    }
+
+    .kick-ball {
+      position: absolute;
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      background-color: #fff;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cdefs%3E%3CradialGradient id='g' cx='35%25' cy='30%25' r='70%25'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E%3Cstop offset='1' stop-color='%23e5e7eb'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='60' cy='60' r='56' fill='url(%23g)' stroke='%23111827' stroke-width='4'/%3E%3Cg fill='%23111827'%3E%3Cpath d='M60 30 44 41 49 60 71 60 76 41Z'/%3E%3Cpath d='M44 41 28 49 34 67 49 60Z' opacity='.92'/%3E%3Cpath d='M76 41 71 60 86 67 92 49Z' opacity='.92'/%3E%3Cpath d='M49 60 34 67 44 86 60 80 60 60Z' opacity='.88'/%3E%3Cpath d='M71 60 60 60 60 80 76 86 86 67Z' opacity='.88'/%3E%3C/g%3E%3Cg fill='none' stroke='%23111827' stroke-opacity='.55' stroke-width='2'%3E%3Cpath d='M60 30 44 41 28 49 34 67 44 86 60 92 76 86 86 67 92 49 76 41Z'/%3E%3Cpath d='M44 41 49 60 60 80 71 60 76 41'/%3E%3C/g%3E%3C/svg%3E");
+      background-size: cover;
+      background-repeat: no-repeat;
+      border: 2px solid #111827;
+      box-shadow: 0 16px 28px rgba(0,0,0,0.22);
+      transform: translate3d(0,0,0);
+      will-change: transform, opacity;
+      animation: kick-fly 2600ms cubic-bezier(.12, .88, .18, 1) forwards;
+    }
+
+    .kick-ball::after {
+      content: "";
+      position: absolute;
+      inset: -6px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(185,28,28,0.25), rgba(185,28,28,0) 60%);
+      filter: blur(1px);
+      opacity: 0.9;
+    }
+
+    .kick-boot {
+      position: absolute;
+      width: 92px;
+      height: 52px;
+      border-radius: 18px 36px 22px 22px;
+      background:
+        linear-gradient(180deg, rgba(17,24,39,0.98), rgba(17,24,39,0.75)),
+        radial-gradient(circle at 28% 35%, rgba(255,255,255,0.10), rgba(255,255,255,0) 60%);
+      box-shadow: 0 18px 32px rgba(0,0,0,0.24);
+      border: 2px solid rgba(255,255,255,0.16);
+      transform: translate3d(var(--bx0), var(--by0), 0) rotate(var(--br0)) scale(0.95);
+      opacity: 0;
+      will-change: transform, opacity;
+      animation: boot-kick 2200ms cubic-bezier(.12, .88, .18, 1) forwards;
+    }
+
+    .kick-boot::before {
+      content: "";
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      width: 42px;
+      height: 20px;
+      border-radius: 12px;
+      background: linear-gradient(90deg, rgba(185,28,28,0.92), rgba(185,28,28,0.55));
+      opacity: 0.85;
+    }
+
+    .kick-boot::after {
+      content: "";
+      position: absolute;
+      left: 8px;
+      bottom: -6px;
+      width: 80px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      filter: blur(0.2px);
+      box-shadow: inset 0 -2px 0 rgba(0,0,0,0.22);
+    }
+
+    @keyframes boot-kick {
+      0% { opacity: 0; transform: translate3d(var(--bx0), var(--by0), 0) rotate(var(--br0)) scale(0.9); }
+      20% { opacity: 1; }
+      35% { transform: translate3d(var(--bx1), var(--by1), 0) rotate(var(--br1)) scale(1); }
+      45% { transform: translate3d(var(--bx1), var(--by1), 0) rotate(calc(var(--br1) - 22deg)) scale(1.08); }
+      55% { transform: translate3d(var(--bx1), var(--by1), 0) rotate(calc(var(--br1) - 10deg)) scale(1.03); }
+      72% { transform: translate3d(var(--bx1), var(--by1), 0) rotate(calc(var(--br1) - 6deg)) scale(1.01); opacity: 1; }
+      100% { opacity: 0; transform: translate3d(var(--bx2), var(--by2), 0) rotate(var(--br2)) scale(0.92); }
+    }
+
+    .wrap.screen-shake {
+      animation: screen-shake 520ms cubic-bezier(.2,.8,.2,1);
+    }
+
+    @keyframes screen-shake {
+      0% { transform: translate3d(0,0,0); }
+      12% { transform: translate3d(-2px, 1px, 0) rotate(-0.2deg); }
+      24% { transform: translate3d(3px, -1px, 0) rotate(0.25deg); }
+      36% { transform: translate3d(-3px, 2px, 0) rotate(-0.25deg); }
+      48% { transform: translate3d(2px, -2px, 0) rotate(0.2deg); }
+      60% { transform: translate3d(-2px, 1px, 0) rotate(-0.15deg); }
+      100% { transform: translate3d(0,0,0); }
+    }
+
+    /* Match card aesthetic */
+    #matchCard {
+      position: relative;
+      overflow: hidden;
+      /* more "hero" result panel */
+      background: linear-gradient(
+        135deg,
+        rgba(254, 226, 226, 0.95) 0%,
+        rgba(254, 202, 202, 0.88) 42%,
+        rgba(255, 241, 242, 0.86) 100%
+      );
+      border-color: rgba(185, 28, 28, 0.26);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10), var(--shadow);
+      backdrop-filter: none;
+      padding: 1.25rem 1.1rem 1.25rem;
+      text-align: left;
+    }
+
+    #matchCard::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      pointer-events: none;
+      background:
+        radial-gradient(115% 110% at 0% 0%, rgba(127, 29, 29, 0.38) 0%, rgba(127, 29, 29, 0.00) 60%),
+        radial-gradient(110% 100% at 100% 0%, rgba(127, 29, 29, 0.22) 0%, rgba(127, 29, 29, 0.00) 62%),
+        linear-gradient(180deg, rgba(127, 29, 29, 0.22) 0%, rgba(127, 29, 29, 0.00) 56%);
+      opacity: 1;
+    }
+
+    #matchCard > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .match-hero-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.9rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .match-hero-meta {
+      flex: 1 1 220px;
+      min-width: 200px;
+    }
+
+    #matchCard h2 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.65rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 0.88rem;
+      margin-bottom: 0.8rem;
+      color: rgba(127, 29, 29, 0.92);
+    }
+
+    #matchCard h2 .match-badge {
+      margin-left: auto;
+    }
+
+    @media (min-width: 520px) {
+      #matchCard {
+        padding: 1.45rem 1.25rem 1.5rem;
+      }
+    }
+
+    /* Make voting instructions more visible */
+    #voteSection .hint {
+      color: #3f3f46;
+      font-weight: 650;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      #voteSection .hint {
+        color: rgba(226, 232, 240, 0.9);
+      }
+    }
+
+    #matchCard .score-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.78rem 1.25rem;
+      border-radius: 999px;
+      border: 1px solid rgba(185, 28, 28, 0.18);
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow:
+        0 14px 30px rgba(15, 23, 42, 0.12),
+        0 10px 25px rgba(185, 28, 28, 0.12);
+    }
+
+    #matchCard .score-num {
+      font-weight: 950;
+      font-size: 2.35rem;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      color: var(--text);
+    }
+
+    #matchCard .score-colon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 0.85rem;
+      font-weight: 900;
+      font-size: 1.6rem;
+      line-height: 1;
+      transform: translateY(-0.02em);
+      color: rgba(17, 24, 39, 0.72);
+    }
+
+    /* Force score digits to black (on the light score pill) */
+    #matchCard .score-pill .score-num {
+      color: #111827;
+    }
+
+    #matchCard .score-pill > div:not(.score-num) {
+      color: rgba(17, 24, 39, 0.85);
+    }
+
+    #matchCard .hint,
+    #matchCard #matchMetaLine,
+    #matchCard #matchVenueLine {
+      color: rgba(24, 24, 27, 0.78);
+    }
+
+    #matchCard #matchOpponentLine {
+      color: var(--text);
+    }
+
+    #matchCard #matchMetaLine {
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 650;
+      opacity: 0.95;
+      color: rgba(127, 29, 29, 0.70);
+    }
+
+    #matchCard #matchOpponentLine {
+      font-size: 1.12rem;
+      letter-spacing: -0.02em;
+    }
+
+    #matchCard #matchOpponentLine .vs {
+      color: var(--red-dark);
+      font-weight: 950;
+      letter-spacing: 0.02em;
+      margin-right: 0.25rem;
+    }
+
+    #matchCard #matchOpponentLine .opp {
+      color: rgba(17, 24, 39, 0.92);
+      font-weight: 650;
+    }
+
+    #matchCard #matchVenueLine {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+      font-weight: 650;
+    }
+
+    #matchCard #matchVenueLine.venue-home {
+      color: rgba(127, 29, 29, 0.86);
+      font-weight: 800;
+    }
+
+    #matchCard #matchVenueLine.venue-home svg path {
+      stroke: rgba(127, 29, 29, 0.78);
+    }
+
+    #matchCard #matchVenueLine > span[aria-hidden="true"] {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 0;
+      transform: translateY(0.02em);
+    }
+
+    #matchCard #matchVenueLine svg {
+      display: block;
+    }
+
+    /* Scorers: no big inner box, keep it clean */
+    #matchCard .scorers-block {
+      margin-top: 0.9rem;
+      border: none;
+      background: transparent;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+    }
+
+    #matchCard .scorers-title {
+      margin: 0 0 0.45rem;
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 900;
+      color: rgba(127, 29, 29, 0.80);
+    }
+
+    #matchCard .scorers-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+
+    #matchCard .scorers-chip {
+      border: 1px solid rgba(185, 28, 28, 0.16);
+      background: rgba(255, 255, 255, 0.92);
+      color: rgba(127, 29, 29, 0.92);
+      padding: 0.32rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.86rem;
+      font-weight: 650;
+    }
+
+    #matchCard .scorers-chip .meta {
+      opacity: 0.75;
+      font-weight: 650;
+    }
+
+    #matchCard .opp-scorers .scorers-title {
+      color: rgba(17, 24, 39, 0.74);
+    }
+
+    #matchCard .opp-scorers .scorers-chip {
+      border-color: rgba(17, 24, 39, 0.14);
+      color: rgba(17, 24, 39, 0.92);
+    }
+
+    /* Lineup builder */
+    .lineup-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+
+    @media (min-width: 520px) {
+      .lineup-grid {
+        grid-template-columns: 1.2fr 0.8fr;
+        align-items: start;
+      }
+    }
+
+    .pitch {
+      position: relative;
+      /* Keep ratio stable even with max-height constraints */
+      margin-inline: auto;
+      inline-size: min(100%, calc(var(--pitch-max-h) * 68 / 105));
+      /* Real pitch ratio: 68m x 105m */
+      aspect-ratio: 68 / 105;
+      max-block-size: var(--pitch-max-h);
+      border-radius: 0;
+      border: 1px solid rgba(185, 28, 28, 0.18);
+      overflow: hidden;
+      background: rgba(15, 23, 42, 0.03);
+      /* Make pitch a container so markings scale proportionally */
+      container-type: inline-size;
+      --pitch-max-h: 520px;
+      --pitch-inset: clamp(8px, 2cqw, 14px);
+      --pitch-line: clamp(2px, 0.6cqw, 4px);
+      --pitch-line-soft: rgba(255, 255, 255, 0.78);
+      --pitch-line-strong: rgba(255, 255, 255, 0.95);
+      --pitch-outline: rgba(15, 23, 42, 0.12);
+      --pitch-spot: clamp(6px, 1.2cqw, 10px);
+      --pitch-spot-small: clamp(5px, 1cqw, 8px);
+      --corner-r: clamp(6px, 1.6cqw, 12px);
+      /* Real-dimension helpers */
+      --m-per-w: 1.4706%; /* 1m / 68m */
+      --m-per-h: 0.9524%; /* 1m / 105m */
+    }
+
+    /* Full pitch markings overlay */
+    .pitch-lines {
+      position: absolute;
+      inset: var(--pitch-inset);
+      border-radius: 0;
+      border: var(--pitch-line) solid var(--pitch-line-strong);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pitch-outline) 85%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--pitch-outline) 70%, transparent),
+        0 1px 0 rgba(0, 0, 0, 0.04);
+      pointer-events: none;
+    }
+
+    /* Optional tactical lane guides (wings / half-spaces / centre) */
+    .pitch-guides {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+      z-index: 0;
+    }
+
+    body.pitch-guides-on .pitch-guides {
+      display: block !important;
+    }
+
+    .pitch-guide {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      border-left: max(2px, calc(var(--pitch-line) * 0.9)) dashed rgba(17, 24, 39, 0.65);
+      opacity: 1;
+    }
+
+    .pitch-guide.center {
+      border-left-style: dashed;
+      border-left-width: var(--pitch-line);
+      border-left-width: max(2.5px, calc(var(--pitch-line) * 1.1));
+      border-left-color: rgba(17, 24, 39, 0.75);
+      opacity: 1;
+    }
+
+    /* Keep normal pitch markings above guides */
+    .pitch-lines > :not(.pitch-guides) {
+      position: absolute;
+      z-index: 1;
+    }
+
+    /* Advanced guides (grid overlay like reference image) */
+    .pitch-adv-guides {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+      z-index: 0;
+    }
+    body.pitch-adv-guides-on .pitch-adv-guides {
+      display: block !important;
+    }
+    .pitch-adv-line {
+      position: absolute;
+      background: rgba(17, 24, 39, 0.65);
+      opacity: 1;
+    }
+    .pitch-adv-line.h {
+      left: 0;
+      right: 0;
+      height: max(2px, calc(var(--pitch-line) * 0.9));
+      transform: translateY(-50%);
+    }
+    .pitch-adv-line.v {
+      top: 0;
+      bottom: 0;
+      width: max(2px, calc(var(--pitch-line) * 0.9));
+      transform: translateX(-50%);
+    }
+    /* Make advanced guides dashed too */
+    .pitch-adv-line.h {
+      background: transparent;
+      border-top: max(2px, calc(var(--pitch-line) * 0.9)) dashed rgba(17, 24, 39, 0.65);
+      height: 0;
+    }
+    .pitch-adv-line.v {
+      background: transparent;
+      border-left: max(2px, calc(var(--pitch-line) * 0.9)) dashed rgba(17, 24, 39, 0.65);
+      width: 0;
+    }
+    .pitch-adv-line.strong {
+      background: transparent;
+      border-left: var(--pitch-line) dashed rgba(17, 24, 39, 0.75);
+      opacity: 1;
+      width: 0;
+    }
+
+    /* When Advanced guides are on, hide the white halfway line so the black dashed one is visible */
+    body.pitch-adv-guides-on .pitch-halfway {
+      opacity: 0;
+    }
+    /* Vertical segments only in top/bottom third blocks */
+    .pitch-adv-line.v.seg-top {
+      top: 0;
+      height: 33.333%;
+      bottom: auto;
+    }
+    .pitch-adv-line.v.seg-bot {
+      bottom: 0;
+      height: 33.333%;
+      top: auto;
+    }
+    /* Vertical lines that should not run through the penalty boxes */
+    .pitch-adv-line.v.seg-between-boxes {
+      top: 15.7%;
+      bottom: 15.7%;
+      height: auto;
+    }
+    .pitch-halfway {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: var(--pitch-line);
+      background: var(--pitch-line-soft);
+      border-radius: 999px;
+      transform: translateY(-1px);
+      box-shadow: 0 0 0 1px var(--pitch-outline);
+    }
+    .pitch-centre-circle {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      /* Centre circle diameter 18.3m */
+      width: 26.9%;
+      height: 17.4%;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      border: var(--pitch-line) solid var(--pitch-line-soft);
+      box-shadow: 0 0 0 1px var(--pitch-outline);
+    }
+    .pitch-centre-spot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: var(--pitch-spot);
+      height: var(--pitch-spot);
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.75);
+      box-shadow: 0 0 0 1px var(--pitch-outline);
+    }
+    .pitch-box {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      border: var(--pitch-line) solid var(--pitch-line-soft);
+      border-top: none;
+      border-radius: 0;
+      box-shadow: 0 0 0 1px var(--pitch-outline);
+    }
+    .pitch-box--top-pen {
+      top: 0;
+      /* Penalty area: 40.32m x 16.5m => 59.3% width, 15.7% height */
+      width: 59.3%;
+      height: 15.7%;
+      border-top: var(--pitch-line) solid var(--pitch-line-soft);
+      border-radius: 0;
+    }
+    .pitch-box--bottom-pen {
+      bottom: 0;
+      width: 59.3%;
+      height: 15.7%;
+      border-bottom: var(--pitch-line) solid var(--pitch-line-soft);
+      border-top: none;
+      border-radius: 0;
+    }
+    .pitch-box--top-six {
+      top: 0;
+      /* Goal area: 18.32m x 5.5m => 26.9% width, 5.2% height */
+      width: 26.9%;
+      height: 5.2%;
+      border-top: var(--pitch-line) solid var(--pitch-line-soft);
+      border-radius: 0;
+    }
+    .pitch-box--bottom-six {
+      bottom: 0;
+      width: 26.9%;
+      height: 5.2%;
+      border-bottom: var(--pitch-line) solid var(--pitch-line-soft);
+      border-top: none;
+      border-radius: 0;
+    }
+    .pitch-spot {
+      position: absolute;
+      left: 50%;
+      width: var(--pitch-spot-small);
+      height: var(--pitch-spot-small);
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.75);
+    }
+    /* Penalty spot is 11m from goal line => 10.5% of pitch length */
+    .pitch-spot--top { top: 10.5%; }
+    .pitch-spot--bottom { top: 89.5%; }
+    .pitch-arc {
+      position: absolute;
+      left: 50%;
+      /* Penalty arc ("D"): circle centered on the penalty spot */
+      /* Penalty arc radius 9.15m => diameter 18.3m */
+      width: 26.9%;
+      height: 17.4%;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      border: var(--pitch-line) solid var(--pitch-line-soft);
+      background: transparent;
+      /* No extra outline here: it can create a faint clipped edge artifact */
+      box-shadow: none;
+    }
+
+    /* Avoid filter drop-shadow here (it creates halos around overlapping chips). */
+    /* The "D" arcs: show only the outer half */
+    .pitch-arc--top {
+      /* centre on the top penalty spot; show only the small segment outside the box */
+      top: 10.5%;
+      /* Cut at the penalty area line (16.5m): shows only the segment outside the box */
+      clip-path: inset(80% 0 0 0);
+    }
+    .pitch-arc--bottom {
+      /* centre on the bottom penalty spot; show only the small segment outside the box */
+      top: 89.5%;
+      clip-path: inset(0 0 80% 0);
+    }
+
+    /* Corner arc: radius 1m (very small) */
+    .pitch-corner-arc {
+      width: calc(var(--m-per-w) * 2);
+      height: calc(var(--m-per-h) * 2);
+      border-radius: 999px;
+      border: var(--pitch-line) solid var(--pitch-line-soft);
+      box-shadow: none;
+      background: transparent;
+    }
+    /* Centre each arc on the corner, then clip to the inner quarter */
+    .pitch-corner-arc.tl { left: calc(var(--m-per-w) * -1); top: calc(var(--m-per-h) * -1); clip-path: inset(50% 0 0 50%); }
+    .pitch-corner-arc.tr { right: calc(var(--m-per-w) * -1); top: calc(var(--m-per-h) * -1); clip-path: inset(50% 50% 0 0); }
+    .pitch-corner-arc.bl { left: calc(var(--m-per-w) * -1); bottom: calc(var(--m-per-h) * -1); clip-path: inset(0 0 50% 50%); }
+    .pitch-corner-arc.br { right: calc(var(--m-per-w) * -1); bottom: calc(var(--m-per-h) * -1); clip-path: inset(0 50% 50% 0); }
+
+    .player-chip {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.35rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(185, 28, 28, 0.18);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: rgba(17, 24, 39, 0.92);
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      max-width: 88%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Dark mode: make XI chips more readable (darker chip + darker name text) */
+    @media (prefers-color-scheme: dark) {
+      #lineupCard .player-chip--public-circle {
+        background: rgba(15, 23, 42, 0.78);
+        border-color: rgba(248, 113, 113, 0.32);
+      }
+      #lineupCard .player-chip--public-circle .nm {
+        background: rgba(15, 23, 42, 0.82);
+        border-color: rgba(148, 163, 184, 0.22);
+        color: rgba(241, 245, 249, 0.95);
+      }
+
+      /* Starting XI list (right panel): darker rows + higher contrast names */
+      #lineupCard .lineup-xi-row {
+        background: rgba(15, 23, 42, 0.78) !important;
+        border-color: rgba(148, 163, 184, 0.22) !important;
+      }
+      #lineupCard .lineup-xi-name {
+        color: rgba(241, 245, 249, 0.95) !important;
+        font-weight: 750 !important;
+      }
+      #lineupCard .lineup-xi-num {
+        color: rgba(226, 232, 240, 0.80) !important;
+        opacity: 1 !important;
+      }
+    }
+
+    /* Public lineup: larger pitch + tighter name labels to avoid overlap */
+    #lineupCard .pitch {
+      --pitch-max-h: 660px;
+    }
+    @media (max-width: 520px) {
+      #lineupCard .pitch {
+        --pitch-max-h: 720px;
+      }
+      #lineupCard .player-chip {
+        padding: 0.42rem 0.6rem;
+        font-size: 0.8rem;
+        max-width: 94%;
+      }
+      #lineupCard .player-chip .num {
+        width: 1.25rem;
+        height: 1.25rem;
+        font-size: 0.78rem;
+      }
+    }
+    #lineupCard .player-chip .nm {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+      max-width: 12.5ch;
+      display: inline-block;
+    }
+
+    /* Public pitch: keep consistent scaling (do not distort positions) */
+    #lineupCard .pitch--public {
+      --pitch-max-h: 660px;
+    }
+    @media (max-width: 520px) {
+      #lineupCard .pitch--public {
+        --pitch-max-h: 860px;
+      }
+    }
+
+    /* Let lineup card go wider on mobile */
+    @media (max-width: 520px) {
+      #lineupCard {
+        margin-left: -0.75rem;
+        margin-right: -0.75rem;
+        border-radius: 16px;
+      }
+    }
+
+    /* Public pitch chips: fixed circles so text never overlaps */
+    #lineupCard .player-chip--public-circle {
+      height: clamp(38px, 8.2cqw, 48px);
+      width: clamp(38px, 8.2cqw, 48px);
+      padding: 0;
+      border-radius: 999px;
+      justify-content: center;
+      font-weight: 950;
+      letter-spacing: 0.02em;
+      background: rgba(255, 255, 255, 0.95);
+      border-color: rgba(185, 28, 28, 0.22);
+      box-shadow: 0 12px 26px rgba(15, 23, 42, 0.14);
+      white-space: nowrap;
+      overflow: visible;
+      position: absolute;
+    }
+
+    /* Always show name label under the circle */
+    #lineupCard .player-chip--public-circle .nm {
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 6px);
+      transform: translateX(-50%);
+      max-width: min(22ch, 44vw);
+      padding: 0.2rem 0.45rem;
+      border-radius: 999px;
+      border: 1px solid rgba(185, 28, 28, 0.18);
+      background: rgba(255, 255, 255, 0.92);
+      color: rgba(17, 24, 39, 0.92);
+      font-size: 0.78rem;
+      font-weight: 850;
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+      z-index: 6;
+    }
+
+    /* GK: put name above the dot so it doesn't cover the small box lines */
+    #lineupCard .player-chip--public-circle.is-gk .nm {
+      top: auto;
+      bottom: calc(100% + 6px);
+    }
+
+    /* Keep chips and labels above pitch markings/guides */
+    #lineupCard .player-chip--public-circle {
+      z-index: 5;
+    }
+
+    /* Position label inside the dot */
+    #lineupCard .player-chip--public-circle .pos {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      font-size: 0.78rem;
+      font-weight: 950;
+      letter-spacing: 0.04em;
+      color: rgba(17, 24, 39, 0.92);
+      pointer-events: none;
+      user-select: none;
+    }
+    @media (max-width: 520px) {
+      #lineupCard .player-chip--public-circle .pos {
+        font-size: 0.74rem;
+      }
+    }
+    @media (max-width: 520px) {
+      #lineupCard .player-chip--public-circle .nm {
+        top: calc(100% + 5px);
+        font-size: 0.74rem;
+        max-width: min(18ch, 56vw);
+      }
+    }
+
+    .player-chip:active {
+      cursor: grabbing;
+    }
+
+    .player-chip .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.35rem;
+      height: 1.35rem;
+      border-radius: 8px;
+      background: rgba(185, 28, 28, 0.10);
+      color: rgba(127, 29, 29, 0.92);
+      font-weight: 900;
+      font-size: 0.82rem;
+      flex: 0 0 auto;
+    }
+
+    .player-chip.is-selected {
+      border-color: rgba(185, 28, 28, 0.45);
+      box-shadow: 0 16px 32px rgba(185, 28, 28, 0.18), 0 10px 24px rgba(15, 23, 42, 0.12);
+    }
+
+    .lineup-side .subcard {
+      margin: 0;
+    }
+
+    .lineup-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .lineup-controls .field {
+      margin: 0;
+    }
+
+    .lineup-controls select {
+      width: auto;
+      min-width: 170px;
+    }
+
+    .lineup-mini-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      max-height: 220px;
+      overflow: auto;
+      padding-right: 0.25rem;
+    }
+
+    .lineup-mini-row {
+      display: flex;
+      gap: 0.45rem;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 0.45rem 0.5rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .lineup-mini-row.is-selected {
+      border-color: rgba(238, 43, 51, 0.55);
+      background: rgba(238, 43, 51, 0.08);
+    }
+
+    .lineup-mini-row button {
+      padding: 0.32rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      flex: 0 0 auto;
+      cursor: pointer;
+    }
+
+    .lineup-mini-row .lineup-swap-btn {
+      padding: 0.38rem 0.55rem;
+      min-width: 3.1rem;
+      border: 1px solid rgba(238, 43, 51, 0.28);
+      background: rgba(238, 43, 51, 0.08);
+      color: var(--red-dark);
+      font-size: 0.74rem;
+      letter-spacing: 0.02em;
+      touch-action: manipulation;
+    }
+
+    .lineup-mini-row .lineup-swap-btn:hover {
+      border-color: rgba(238, 43, 51, 0.45);
+      background: rgba(238, 43, 51, 0.14);
+    }
+
+    .lineup-mini-row.is-swap-pending {
+      border-color: rgba(238, 43, 51, 0.55);
+      background: rgba(238, 43, 51, 0.10);
+      box-shadow: 0 0 0 2px rgba(238, 43, 51, 0.12);
+    }
+
+    .lineup-mini-row .name {
+      font-weight: 750;
+      font-size: 0.9rem;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .lineup-mini-meta {
+      opacity: 0.72;
+      font-weight: 700;
+      font-size: 0.82rem;
+      flex: 0 0 auto;
+      min-width: 1.5rem;
+      text-align: right;
+    }
+
+    .lineup-bench-hint {
+      margin: 0 0 0.45rem;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      color: #52525b;
+    }
+
+    textarea#lineupSubsInput {
+      min-height: 120px;
+    }
+
+    .lineup-share-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .lineup-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      display: none;
+      background: rgba(2, 6, 23, 0.72);
+      backdrop-filter: blur(6px);
+      padding: 0.9rem;
+    }
+
+    body.lineup-modal-open {
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .lineup-modal.visible {
+      display: block;
+    }
+
+    .lineup-modal-card {
+      max-width: 980px;
+      margin: 0 auto;
+      height: calc(100dvh - 1.8rem);
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(185, 28, 28, 0.22);
+      border-radius: 18px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .lineup-modal-head {
+      padding: 0.75rem 0.85rem;
+      border-bottom: 1px solid rgba(185, 28, 28, 0.14);
+      display: flex;
+      gap: 0.65rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .lineup-modal-head .title {
+      font-weight: 950;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      color: rgba(127, 29, 29, 0.86);
+    }
+
+    .lineup-modal-body {
+      padding: 0.85rem;
+      overflow: auto;
+      flex: 1;
+    }
+
+    .lineup-modal-body .pitch {
+      max-height: none;
+      height: min(72dvh, 720px);
+      aspect-ratio: auto;
+    }
+
+    @media (min-width: 800px) {
+      .lineup-modal-body .lineup-grid {
+        grid-template-columns: 1.55fr 0.85fr;
+      }
+      .lineup-modal-body .pitch {
+        height: min(76dvh, 820px);
+      }
+    }
+
+    /* Ensure the ":" divider is readable too */
+    #matchCard .score-pill {
+      color: var(--text);
+    }
+
+    #matchCard .score-pill > div:not(.score-num) {
+      color: rgba(82, 82, 91, 0.95);
+    }
+
+    /* (reverted) Score should be visible */
+
+    @media (prefers-color-scheme: dark) {
+      .player-list {
+        /* match the new Claude-style surface palette */
+        background: rgba(255, 255, 255, 0.06);
+      }
+      #matchCard .score-pill > div:not(.score-num) {
+        color: rgba(226, 232, 240, 0.8);
+      }
+    }
+
+    @keyframes kick-fly {
+      0%   { transform: translate3d(var(--x0), var(--y0), 0) scale(0.92) rotate(0deg); opacity: 0; }
+      12%  { opacity: 1; }
+      60%  { transform: translate3d(calc(var(--x0) + (var(--x1) - var(--x0)) * 0.62), calc(var(--y0) + (var(--y1) - var(--y0)) * 0.62), 0) scale(0.9) rotate(260deg); opacity: 1; }
+      82%  { transform: translate3d(calc(var(--x0) + (var(--x1) - var(--x0)) * 0.88), calc(var(--y0) + (var(--y1) - var(--y0)) * 0.88), 0) scale(0.78) rotate(560deg); opacity: 1; }
+      100% { transform: translate3d(var(--x1), var(--y1), 0) scale(0.66) rotate(780deg); opacity: 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .kick-ball { animation: none; display: none; }
+      .kick-boot { animation: none; display: none; }
+      .wrap.screen-shake { animation: none; }
+    }
+
+    button.ghost {
+      background: transparent;
+      color: var(--red-dark);
+      border: 1px solid var(--border);
+      padding: 0.6rem 1rem;
+      border-radius: 12px;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    button.ghost:hover {
+      border-color: rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.06);
+    }
+
+    /* Guides toggle visual indicator */
+    #togglePitchGuides[aria-pressed="true"] {
+      border-color: rgba(239, 68, 68, 0.55);
+      background: rgba(239, 68, 68, 0.10);
+      color: var(--red-dark);
+      box-shadow: 0 10px 24px rgba(185, 28, 28, 0.14);
+    }
+
+    #togglePitchAdvGuides[aria-pressed="true"] {
+      border-color: rgba(239, 68, 68, 0.55);
+      background: rgba(239, 68, 68, 0.10);
+      color: var(--red-dark);
+      box-shadow: 0 10px 24px rgba(185, 28, 28, 0.14);
+    }
+
+    .admin-toggle {
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+
+    .admin-toggle button {
+      background: transparent;
+      border: none;
+      color: #71717a;
+      text-decoration: underline;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .admin-panel {
+      display: none;
+      margin-top: 1.15rem;
+    }
+
+    .admin-panel .subcard {
+      margin-top: 1rem;
+    }
+
+    .admin-panel .field {
+      margin-top: 0.15rem;
+    }
+
+    .admin-panel input[type="text"],
+    .admin-panel input[type="password"],
+    .admin-panel input[type="date"],
+    .admin-panel input[type="number"],
+    .admin-panel select,
+    .admin-panel textarea {
+      width: 100%;
+      padding: 0.62rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      background: var(--white);
+      color: var(--text);
+      margin-bottom: 0.55rem;
+    }
+
+    .admin-panel.visible {
+      display: block;
+    }
+
+    .admin-login {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .admin-login input {
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    .admin-login > form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .err {
+      color: var(--red);
+      font-size: 0.85rem;
+      margin: 0;
+      min-height: 1.2em;
+    }
+
+    textarea#playerEditor {
+      width: 100%;
+      min-height: 220px;
+      padding: 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      resize: vertical;
+    }
+
+    textarea#matchReviewInput,
+    textarea#matchScorersInput {
+      width: 100%;
+      min-height: 120px;
+      padding: 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      resize: vertical;
+      background: var(--white);
+      color: var(--text);
+    }
+
+    label.field {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--red-dark);
+      margin-bottom: 0.25rem;
+    }
+
+    input#roundInput {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .subcard {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.85rem;
+      margin-top: 0.85rem;
+      background: var(--white);
+      color: var(--text);
+    }
+
+    /* Results text should be high-contrast */
+    #resultsSummaryCard,
+    #resultsSummaryCard * ,
+    #resultsTableWrap,
+    #resultsTableWrap * ,
+    #resultsGraphWrap,
+    #resultsGraphWrap * {
+      color: var(--text);
+    }
+
+    .subcard h3 {
+      margin: 0 0 0.5rem;
+      font-size: 0.95rem;
+      color: var(--red-dark);
+    }
+
+    table.results {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    table.results th,
+    table.results td {
+      border-bottom: 1px solid var(--border);
+      padding: 0.45rem 0.35rem;
+      text-align: left;
+    }
+
+    table.results th {
+      color: var(--red-dark);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Results text should be black in light theme (some elements use inline grey) */
+    table.results td {
+      color: var(--text);
+    }
+    #resultsLeaderLine {
+      color: var(--text) !important;
+    }
+
+    .empty-state {
+      color: #71717a;
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    .lock-msg {
+      font-size: 0.85rem;
+      color: #52525b;
+      margin: 0 0 0.5rem;
+    }
+
+    .coach-inner .player-list {
+      margin-top: 0.5rem;
+    }
+
+    .setup-note {
+      font-size: 0.75rem;
+      color: #71717a;
+      margin: 0.5rem 0 0;
+      line-height: 1.4;
+    }
+
+    .team-row {
+      margin: 0.85rem auto 0.55rem;
+      max-width: 320px;
+    }
+
+    .team-row select {
+      width: 100%;
+      padding: 0.72rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 650;
+      background: var(--white);
+      color: var(--text);
+      min-height: 2.75rem;
+    }
+
+    .team-row {
+      margin-bottom: 0.75rem;
+    }
+
+    #publicRoundSelect {
+      font-size: 1.02rem;
+      letter-spacing: -0.01em;
+    }
+
+    .mode-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      margin: 0.5rem 0 0.75rem;
+      font-size: 0.9rem;
+    }
+
+    .mode-row label {
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .team-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin: 0 0 0.75rem;
+    }
+
+    /* Main tabs (Voting / Lineup) */
+    .main-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.55rem;
+      margin: 0 0 1rem;
+    }
+
+    .main-tabs button {
+      min-width: 0;
+      padding: 0.68rem 0.85rem;
+      border-radius: 12px;
+      border: 2px solid var(--border);
+      background: var(--white);
+      font-size: 0.96rem;
+      cursor: pointer;
+      font-weight: 850;
+      color: var(--text);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+    }
+
+    .main-tabs button.active {
+      border-color: var(--red);
+      background: rgba(239, 68, 68, 0.08);
+      color: var(--red-dark);
+    }
+
+    .team-tabs button {
+      padding: 0.4rem 0.65rem;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      background: var(--white);
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .team-tabs button.active {
+      border-color: var(--red);
+      background: #fff5f5;
+      color: var(--red-dark);
+    }
+
+    .coach-split {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .admin-login select {
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      width: 100%;
+    }
+
+    /* Smooth boot: show a blank/skeleton match card until round loads */
+    #matchCard {
+      transition: opacity 240ms ease, transform 240ms ease;
+    }
+
+    body.booting #matchCard {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    body.booting #matchCard > * {
+      opacity: 0;
+    }
+
+    body.booting #matchCard::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        /* title line */
+        linear-gradient(90deg, rgba(148,163,184,0.16) 0%, rgba(148,163,184,0.26) 35%, rgba(148,163,184,0.16) 70%) 1.1rem 1.35rem / 180px 14px no-repeat,
+        /* meta line */
+        linear-gradient(90deg, rgba(148,163,184,0.14) 0%, rgba(148,163,184,0.24) 35%, rgba(148,163,184,0.14) 70%) 1.1rem 2.65rem / 240px 10px no-repeat,
+        /* opponent line */
+        linear-gradient(90deg, rgba(148,163,184,0.14) 0%, rgba(148,163,184,0.24) 35%, rgba(148,163,184,0.14) 70%) 1.1rem 3.15rem / 260px 12px no-repeat,
+        /* score pill placeholder */
+        linear-gradient(90deg, rgba(148,163,184,0.16) 0%, rgba(148,163,184,0.26) 35%, rgba(148,163,184,0.16) 70%) calc(100% - 1.1rem) 2.1rem / 140px 56px no-repeat;
+      opacity: 0.9;
+      filter: saturate(0.9);
+      animation: match-skeleton 1200ms ease-in-out infinite;
+    }
+
+    @keyframes match-skeleton {
+      0% { opacity: 0.65; }
+      50% { opacity: 0.95; }
+      100% { opacity: 0.65; }
+    }
+
+    .vote-name-wrap {
+      position: relative;
+      margin-bottom: 0.35rem;
+    }
+
+    .vote-name-input {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 0;
+    }
+
+    .voter-suggest-panel {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 2px);
+      z-index: 50;
+      max-height: 220px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--white);
+      color: var(--text);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+    }
+
+    .voter-suggest-panel[hidden] {
+      display: none !important;
+    }
+
+    .voter-suggest-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 0.55rem 0.75rem;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      background: var(--white);
+      color: var(--text);
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+
+    .voter-suggest-item:last-child {
+      border-bottom: none;
+    }
+
+    .voter-suggest-item:active {
+      background: #fff5f5;
+    }
+
+    .vote-search {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      margin-bottom: 0.6rem;
+      background: var(--white);
+      color: var(--text);
+    }
+
+    .picks-panel {
+      display: grid;
+      gap: 0.5rem;
+      margin: 0.4rem 0 0.75rem;
+      padding: 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--white);
+      color: var(--text);
+    }
+
+    /* Sticky "Your picks" on mobile while scrolling the list */
+    @media (max-width: 520px) {
+      .picks-panel {
+        position: sticky;
+        top: 0.65rem;
+        z-index: 20;
+        box-shadow: 0 14px 34px rgba(0,0,0,0.10);
+        backdrop-filter: blur(8px);
+        background: color-mix(in srgb, var(--white) 92%, transparent);
+      }
+    }
+
+    .picks-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      align-items: center;
+    }
+
+    .pick-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(239, 68, 68, 0.08);
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 650;
+      user-select: none;
+      cursor: grab;
+      touch-action: manipulation;
+    }
+
+    .pick-chip[draggable="true"]:active { cursor: grabbing; }
+
+    .chip-btn {
+      border: none;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font-weight: 800;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(18px, env(safe-area-inset-bottom, 0px));
+      transform: translateX(-50%);
+      z-index: 10001;
+      width: min(520px, calc(100% - 18px));
+      display: none;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(17, 24, 39, 0.94);
+      color: #fff;
+      padding: 0.78rem 0.9rem;
+      box-shadow: 0 14px 40px rgba(0,0,0,0.35);
+      backdrop-filter: blur(8px);
+      font-size: 0.95rem;
+      font-weight: 650;
+      line-height: 1.4;
+    }
+
+    .toast.toast-success {
+      border-color: rgba(34, 197, 94, 0.35);
+      background: linear-gradient(135deg, rgba(6, 78, 59, 0.96), rgba(17, 24, 39, 0.94));
+    }
+
+    .toast .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .toast button {
+      border: 1px solid rgba(255,255,255,0.25);
+      background: transparent;
+      color: #fff;
+      border-radius: 999px;
+      padding: 0.35rem 0.65rem;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    .banner {
+      display: none;
+      margin: 0 0 0.75rem;
+      padding: 0.65rem 0.75rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(239, 68, 68, 0.10);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    .focus-ring:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: 3px solid rgba(239, 68, 68, 0.35);
+      outline-offset: 2px;
+    }
+
+    .match-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      background: var(--white);
+      color: var(--text);
+      margin-left: 0.4rem;
+    }
+
+    .match-badge.win { border-color: rgba(34,197,94,0.35); background: rgba(34,197,94,0.10); }
+    .match-badge.draw { border-color: rgba(59,130,246,0.35); background: rgba(59,130,246,0.10); }
+    .match-badge.loss { border-color: rgba(239,68,68,0.35); background: rgba(239,68,68,0.10); }
+
+    @media (prefers-color-scheme: dark) {
+      /* Make guides readable on dark pitch */
+      .pitch-guide {
+        border-left-color: rgba(241, 245, 249, 0.55);
+      }
+      .pitch-guide.center {
+        border-left-color: rgba(241, 245, 249, 0.70);
+      }
+      .pitch-adv-line.h {
+        border-top-color: rgba(241, 245, 249, 0.55);
+      }
+      .pitch-adv-line.v,
+      .pitch-adv-line.strong {
+        border-left-color: rgba(241, 245, 249, 0.60);
+      }
+
+      /* Darker LOSS badge in dark mode */
+      .match-badge.loss {
+        border-color: rgba(248, 113, 113, 0.55);
+        background: rgba(127, 29, 29, 0.55);
+        color: rgba(254, 226, 226, 0.95);
+      }
+    }
+
+    .match-pulse {
+      animation: match-pulse 650ms ease-out;
+    }
+    @keyframes match-pulse {
+      0% { transform: translate3d(0,0,0); box-shadow: 0 0 0 rgba(239,68,68,0); }
+      30% { transform: translate3d(0,-1px,0); box-shadow: 0 10px 30px rgba(239,68,68,0.18); }
+      100% { transform: translate3d(0,0,0); box-shadow: 0 0 0 rgba(239,68,68,0); }
+    }
+
+    .result-view-toggle {
+      margin: 0.45rem 0 0.75rem;
+    }
+
+    .graph-wrap {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.35rem;
+    }
+
+    .graph-meta {
+      font-size: 0.88rem;
+      font-weight: 650;
+      margin: 0 0 0.35rem;
+      padding: 0.45rem 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(239, 68, 68, 0.06);
+      color: var(--text);
+    }
+
+    .graph-meta-detail {
+      font-weight: 550;
+      color: #52525b;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .graph-meta-detail {
+        color: #a1a1aa;
+      }
+      .graph-meta {
+        background: rgba(239, 68, 68, 0.10);
+      }
+    }
+
+    .graph-row {
+      display: grid;
+      grid-template-columns: minmax(90px, 1fr) minmax(110px, 3fr) 50px;
+      gap: 0.4rem;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    .graph-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .graph-bar {
+      height: 14px;
+      background: rgba(2,6,23,0.06);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .graph-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--red) 0%, rgba(239, 68, 68, 0.65) 100%);
+    }
+
+    .trend-chart {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.5rem;
+      position: relative;
+    }
+
+    .trend-tooltip {
+      position: absolute;
+      display: none;
+      pointer-events: none;
+      background: #111827;
+      color: #fff;
+      padding: 0.35rem 0.5rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      max-width: 240px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    }
+
+    .guest-inline-tools {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .guest-inline-tools--mt {
+      margin-top: 0.5rem;
+    }
+
+    .guest-inline-input {
+      flex: 1;
+      min-width: min(140px, 100%);
+    }
+
+    .receipt-card {
+      margin-top: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.75rem 0.85rem;
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    .receipt-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.65rem;
+      align-items: baseline;
+      flex-wrap: wrap;
+      font-weight: 900;
+      margin-bottom: 0.25rem;
+    }
+
+    .receipt-sub {
+      font-size: 0.86rem;
+      color: #52525b;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .receipt-sub {
+        color: #a1a1aa;
+      }
+    }
+
+    .receipt-picks {
+      margin-top: 0.5rem;
+      font-size: 0.95rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .brand-logo {
+      width: 60px;
+      height: 60px;
+      flex: 0 0 60px;
+      border-radius: 999px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,0.08);
+      background: rgba(255,255,255,0.35);
+    }
+
+    .brand-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    @media (min-width: 520px) {
+      .brand-logo {
+        width: 72px;
+        height: 72px;
+        flex-basis: 72px;
+      }
+    }
+
+  </style>
+</head>
+<body class="booting">
+  <script>
+    // If app.js is slow to download, don't leave the match card blank.
+    // app.js will still render/replace content when it loads.
+    setTimeout(function () {
+      try { document.body.classList.remove("booting"); } catch (e) {}
+    }, 700);
+  </script>
+  <div id="fatalBanner" style="display:none; position:sticky; top:0; z-index:10000; background:#7f1d1d; color:#fff; padding:0.65rem 0.9rem; font-family:Segoe UI, system-ui, -apple-system, sans-serif;">
+    <div style="max-width:520px; margin:0 auto;">
+      <div style="font-weight:800; margin-bottom:0.15rem;">Something went wrong loading the page.</div>
+      <div id="fatalBannerMsg" style="font-size:0.9rem; opacity:0.95;"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite">
+    <div class="row">
+      <div id="toastMsg">Saved.</div>
+      <button type="button" id="toastAction" style="display:none">Undo</button>
+    </div>
+  </div>
+  <div class="kick-layer" id="kickLayer" aria-hidden="true"></div>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="brand-logo">
+          <img src="/wembley-downs-logo.png" alt="Wembley Downs Soccer Club logo" />
+        </div>
+        <h1 style="margin:0">Wembley Downs Div 8s Player's Player Award</h1>
+      </div>
+      <div class="team-row" id="publicTeamRow" style="display:none">
+        <label class="field" for="publicTeamSelect" style="margin-bottom: 0.25rem">Team</label>
+        <select id="publicTeamSelect" aria-label="Select team"></select>
+      </div>
+      <div class="team-row">
+        <select id="publicRoundSelect" aria-label="Select round"></select>
+      </div>
+      <span class="round-pill" id="roundDisplay">Round —</span>
+      <div class="sync-status" id="syncStatus"></div>
+    </header>
+
+    <section class="card" id="matchCard">
+      <h2>Match result <span id="matchBadge" class="match-badge" style="display:none"></span></h2>
+      <div id="matchPretty">
+        <div class="match-hero-row">
+          <div class="match-hero-meta">
+            <div class="hint" id="matchMetaLine" style="margin:0 0 0.25rem">—</div>
+            <div style="font-weight:800; font-size:1.05rem; color: var(--red-dark)" id="matchOpponentLine">—</div>
+            <div class="hint" id="matchVenueLine" style="margin:0.35rem 0 0; display:none">
+              <span aria-hidden="true" style="display:inline-flex; vertical-align:middle; margin-right:0.25rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z" stroke="#52525b" stroke-width="2" />
+                  <path d="M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="#52525b" stroke-width="2" />
+                </svg>
+              </span>
+              <span id="matchVenueText"></span>
+            </div>
+          </div>
+          <div class="score-pill">
+            <div class="score-num" id="matchScoreOur">–</div>
+            <div class="score-colon">:</div>
+            <div class="score-num" id="matchScoreOpp">–</div>
+          </div>
+        </div>
+        <div id="matchScorers" style="display:none"></div>
+        <div id="matchOppScorers" style="display:none"></div>
+        <p class="hint" id="matchLine" style="margin-top:0.65rem">Add match details in Coach / admin.</p>
+      </div>
+    </section>
+
+    <nav class="main-tabs" aria-label="Main tabs">
+      <button type="button" id="tabVote" class="active" aria-controls="voteSection" aria-selected="true">Voting</button>
+      <button type="button" id="tabLineup" aria-controls="lineupCard" aria-selected="false">Lineup</button>
+    </nav>
+
+    <section class="card" id="lineupCard">
+      <h2 style="display:flex; align-items:center; justify-content:space-between; gap:0.6rem; flex-wrap:wrap">
+        <span>Lineup</span>
+        <span style="display:inline-flex; gap:0.45rem">
+          <button type="button" class="ghost" id="lineupPublicDef" style="padding:0.45rem 0.7rem">Defensive</button>
+          <button type="button" class="ghost" id="lineupPublicAtt" style="padding:0.45rem 0.7rem">Attacking</button>
+          <button type="button" class="ghost" id="togglePitchGuides" aria-pressed="false" style="padding:0.45rem 0.7rem">Guides</button>
+          <button type="button" class="ghost" id="togglePitchAdvGuides" aria-pressed="false" style="padding:0.45rem 0.7rem">Advanced</button>
+        </span>
+      </h2>
+      <div id="lineupPublicWrap">
+        <p class="hint" style="margin:0">No lineup yet for this round.</p>
+      </div>
+    </section>
+
+    <section class="card" id="voteSection">
+      <div class="vote-flow-head">
+        <span class="step-label">Step 1</span>
+        <h2 style="margin:0">Your vote</h2>
+      </div>
+      <p class="hint">Tap in order: 1st = 3 pts, 2nd = 2, 3rd = 1. Tap again to remove.</p>
+      <label class="field" for="voterNameInput">Your name</label>
+      <div class="vote-name-wrap">
+        <input
+          type="text"
+          id="voterNameInput"
+          class="vote-name-input"
+          placeholder="Enter your name before voting"
+          autocomplete="off"
+          list="voterNameSuggest"
+          aria-autocomplete="list"
+        />
+        <datalist id="voterNameSuggest"></datalist>
+        <div id="voterNameSuggestPanel" class="voter-suggest-panel" role="listbox" hidden aria-label="Name suggestions"></div>
+      </div>
+      <div class="banner" id="offlineBanner">You’re offline. You can still pick players, but submitting may fail until you’re back online.</div>
+      <div class="picks-panel" id="picksPanel" aria-label="Your picks">
+        <div style="font-size:0.85rem; font-weight:800; color: var(--text);">Your picks</div>
+        <div class="picks-row" id="picksRow"></div>
+        <div class="hint" style="margin:0">Drag chips to reorder. Tap × to remove.</div>
+      </div>
+      <input type="text" id="playerSearch" class="vote-search" placeholder="Search players…" autocomplete="off" spellcheck="false" />
+      <div class="player-list" id="playerList" aria-live="polite"></div>
+      <div class="subcard" style="padding: 0.65rem 0.75rem; margin: 0.65rem 0 0">
+        <label class="field" for="guestPlayerInput" style="margin-bottom: 0.35rem">Guest / fill-in (not on squad)</label>
+        <div class="guest-inline-tools">
+          <input
+            type="text"
+            id="guestPlayerInput"
+            class="vote-search guest-inline-input"
+            placeholder="Name"
+            maxlength="60"
+            autocomplete="off"
+            spellcheck="false"
+            enterkeyhint="done"
+            aria-label="Guest player name"
+          />
+          <button type="button" class="ghost" id="addGuestToPicks">Add to picks</button>
+        </div>
+        <p class="hint" style="margin: 0.35rem 0 0">
+          Uses one pick slot (same 3 / 2 / 1 points). Reorder or remove in “Your picks” above. Counts in round totals; the “Over rounds” graph only traces the saved squad list.
+        </p>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary" id="submitVote" disabled>Submit vote</button>
+        <button type="button" class="ghost" id="clearPicks">Clear picks</button>
+      </div>
+      <div id="voteReceipt" class="receipt-card" style="display:none">
+        <div class="receipt-title">
+          <div>Vote receipt</div>
+          <div class="receipt-sub" id="voteReceiptWhen">—</div>
+        </div>
+        <div class="receipt-sub" id="voteReceiptMeta">—</div>
+        <div class="receipt-picks" id="voteReceiptPicks">—</div>
+        <div class="actions" style="margin-top:0.65rem">
+          <button type="button" class="ghost" id="voteReceiptEdit">Edit (within 1 hour)</button>
+          <button type="button" class="ghost" id="voteReceiptHide">Hide</button>
+        </div>
+      </div>
+      <p class="err" id="voteMsg" aria-live="assertive"></p>
+    </section>
+
+    <div class="admin-toggle">
+      <button type="button" id="showAdminBtn">Coach / admin</button>
+    </div>
+
+    <section class="card admin-panel" id="adminPanel">
+      <h2>Coach / admin</h2>
+      <div id="adminLoginBlock" class="admin-login">
+        <p class="lock-msg" id="adminLoginIntro">Choose how to sign in.</p>
+        <div class="mode-row" id="adminModeRow">
+          <label><input type="radio" name="adminMode" value="super" checked /> Super admin</label>
+          <label><input type="radio" name="adminMode" value="teamcoach" /> Team coach</label>
+        </div>
+
+        <div id="superAdminLogin">
+          <form autocomplete="off" onsubmit="return false;">
+            <label class="field" for="adminPass">Super admin unlock (Firebase)</label>
+            <input
+              type="password"
+              id="adminPass"
+              name="coach-unlock"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              enterkeyhint="done"
+            />
+            <button type="button" class="primary" id="unlockAdmin">Unlock</button>
+          </form>
+        </div>
+
+        <div id="teamCoachLoginBlock" style="display: none">
+          <label class="field" for="tcTeamSelect">Team</label>
+          <select id="tcTeamSelect"></select>
+          <label class="field" for="tcSlotSelect">You are</label>
+          <select id="tcSlotSelect">
+            <option value="1">Coach 1</option>
+            <option value="2">Coach 2</option>
+          </select>
+          <label class="field" for="teamCoachPass">Team coach unlock code</label>
+          <input type="password" id="teamCoachPass" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          <button type="button" class="primary" id="unlockTeamCoach">Unlock</button>
+        </div>
+
+        <p class="err" id="adminErr"></p>
+        <p class="setup-note" id="setupNote" style="display: none"></p>
+      </div>
+
+      <div id="adminDeferredMount"></div>
+      <template id="adminDeferredTemplate">
+      <div id="superAdminContent" style="display: none">
+        <p class="err" id="adminOpErr" style="min-height: 0; margin-bottom: 0.5rem"></p>
+        <p class="hint" style="margin-top: 0">
+          Up to four teams. Set a display name, round, squad, and two coach unlock codes per team (hashed in the database). Super admin sees all results.
+        </p>
+        <div class="team-tabs" id="adminTeamTabs"></div>
+        <label class="field" for="teamNameInput">Team name</label>
+        <input type="text" id="teamNameInput" placeholder="e.g. U12 Div A" />
+        <label class="field" for="coach1NameInput">Coach 1 display name</label>
+        <input type="text" id="coach1NameInput" placeholder="e.g. Alex" />
+        <label class="field" for="coach2NameInput">Coach 2 display name</label>
+        <input type="text" id="coach2NameInput" placeholder="e.g. Sam" />
+        <label class="field" for="roundInput">Current round (this team)</label>
+        <input type="text" id="roundInput" placeholder="e.g. Week 4, Playoffs" />
+        <div class="subcard" style="padding:0.85rem; margin: 0.85rem 0 0.25rem">
+          <h3 style="margin:0 0 0.35rem; font-size: 0.95rem; color: var(--red-dark)">Match (pick round)</h3>
+          <label class="field" for="adminMatchRoundSelect">Round to edit</label>
+          <select id="adminMatchRoundSelect"></select>
+          <label class="field" for="matchDateInput">Date</label>
+          <input type="date" id="matchDateInput" />
+          <label class="field" for="matchVenueInput">Venue</label>
+          <input type="text" id="matchVenueInput" placeholder="e.g. Wembley Downs Reserve" />
+          <label class="field" for="matchOpponentInput">Opponent</label>
+          <input type="text" id="matchOpponentInput" placeholder="e.g. Rivals FC" />
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem">
+            <div>
+              <label class="field" for="matchOurScoreInput">Our score</label>
+              <input type="number" id="matchOurScoreInput" min="0" step="1" placeholder="0" />
+            </div>
+            <div>
+              <label class="field" for="matchOppScoreInput">Opponent score</label>
+              <input type="number" id="matchOppScoreInput" min="0" step="1" placeholder="0" />
+            </div>
+          </div>
+          <label class="field" for="matchScorersInput">Our goalscorers (comma or new lines)</label>
+          <textarea id="matchScorersInput" placeholder="e.g. Alex, Sam, Jordan"></textarea>
+          <label class="field" for="matchOppScorersInput" style="margin-top: 0.6rem">Opposition goalscorers (comma or new lines)</label>
+          <textarea id="matchOppScorersInput" placeholder="e.g. Player A 18', Player B 65'"></textarea>
+          <label class="field" for="matchReviewInput" style="margin-top: 0.6rem">Match review</label>
+          <textarea id="matchReviewInput" placeholder="Short match review…"></textarea>
+          <div class="actions" style="margin-top: 0.5rem">
+            <button type="button" class="ghost" id="aiReviewRewrite">AI rewrite</button>
+            <button type="button" class="ghost" id="aiReviewShorten">AI shorten</button>
+            <button type="button" class="ghost" id="aiReviewKeyPoints">AI key points</button>
+          </div>
+          <p class="hint" style="margin:0.5rem 0 0">Saved when you click “Save team &amp; round”.</p>
+        </div>
+
+        <div class="subcard" id="lineupEditorCard" style="padding:0.85rem; margin: 0.85rem 0 0.25rem">
+          <h3 style="margin:0 0 0.35rem; font-size: 0.95rem; color: var(--red-dark)">Lineup</h3>
+          <div class="lineup-controls" style="margin: 0.35rem 0 0.6rem">
+            <div style="display:flex; gap:0.45rem; align-items:end">
+              <div style="display:flex; flex-direction:column; gap:0.25rem">
+                <div class="field" style="margin:0">Setup</div>
+                <div style="display:flex; gap:0.45rem">
+                  <button type="button" class="ghost" id="lineupSetupDef" aria-pressed="true" style="padding:0.45rem 0.65rem">Defensive</button>
+                  <button type="button" class="ghost" id="lineupSetupAtt" aria-pressed="false" style="padding:0.45rem 0.65rem">Attacking</button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label class="field" for="lineupFormationSelect">Formation</label>
+              <select id="lineupFormationSelect">
+                <option value="4-3-3">4-3-3</option>
+                <option value="4-4-2">4-4-2</option>
+                <option value="3-5-2">3-5-2</option>
+                <option value="4-2-3-1">4-2-3-1</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <button type="button" class="ghost" id="lineupResetPositions">Reset positions</button>
+            <button type="button" class="ghost" id="lineupOpenFullscreen">Full screen</button>
+            <button type="button" class="ghost" id="lineupSwapMode" aria-pressed="false">Swap positions</button>
+          </div>
+
+          <div class="lineup-grid" id="lineupEditorGrid">
+            <div>
+              <div id="lineupPitch" class="pitch" aria-label="Lineup pitch editor"></div>
+              <p class="hint" style="margin:0.55rem 0 0">
+                Drag players to position them. Saved when you click “Save team &amp; round”.
+              </p>
+            </div>
+            <div class="lineup-side">
+              <div class="subcard" style="padding:0.75rem">
+                <div style="font-weight:900; letter-spacing:0.06em; text-transform:uppercase; font-size:0.8rem; color: rgba(127,29,29,0.82); margin-bottom:0.45rem">
+                  Starting XI
+                </div>
+                <div class="subcard" style="padding:0.65rem; margin: 0 0 0.6rem">
+                  <div style="font-weight:900; letter-spacing:0.06em; text-transform:uppercase; font-size:0.75rem; color: rgba(17,24,39,0.72); margin-bottom:0.35rem">
+                    Selected player
+                  </div>
+                  <div style="display:grid; grid-template-columns: 1fr 92px; gap:0.5rem; align-items:end">
+                    <div>
+                      <label class="field" for="lineupSelectedName" style="margin-bottom:0.25rem">Name</label>
+                      <input type="text" id="lineupSelectedName" placeholder="Tap a player…" />
+                    </div>
+                    <div>
+                      <label class="field" for="lineupSelectedNumber" style="margin-bottom:0.25rem">#</label>
+                      <input type="text" id="lineupSelectedNumber" inputmode="numeric" placeholder="10" />
+                    </div>
+                  </div>
+                  <div class="actions" style="margin-top:0.55rem">
+                    <button type="button" class="primary" id="lineupApplySelected" disabled>Apply</button>
+                  </div>
+                </div>
+                <div id="lineupStartersList" class="lineup-mini-list" aria-label="Starting lineup list"></div>
+                <div style="margin-top:0.6rem">
+                  <div style="display:flex; justify-content:space-between; align-items:baseline; gap:0.5rem; margin-bottom:0.35rem">
+                    <div style="font-weight:900; letter-spacing:0.06em; text-transform:uppercase; font-size:0.75rem; color: rgba(17,24,39,0.72)">
+                      Paste starting XI
+                    </div>
+                    <button type="button" class="ghost" id="lineupApplyStartersPaste" style="padding:0.35rem 0.55rem">Apply</button>
+                  </div>
+                  <textarea id="lineupStartersPaste" placeholder="Paste 11 names (optionally with numbers), one per line&#10;e.g. 1 Sam&#10;2 Alex&#10;..." style="min-height: 120px"></textarea>
+                  <p class="hint" style="margin:0.35rem 0 0">Tip: You can paste more than 11 lines — we’ll take the first 11.</p>
+                </div>
+              </div>
+
+              <div class="subcard" style="padding:0.75rem; margin-top:0.65rem">
+                <div class="lineup-share-row" style="margin-bottom:0.45rem">
+                  <div style="font-weight:900; letter-spacing:0.06em; text-transform:uppercase; font-size:0.8rem; color: rgba(17,24,39,0.72)">
+                    Substitutes
+                  </div>
+                  <button type="button" class="ghost" id="lineupFillSubsFromSquad" style="padding:0.45rem 0.65rem">Fill from squad</button>
+                </div>
+                <p class="lineup-bench-hint">Tap a starter then ↑ XI on a sub (or ↓ Sub) to swap bench ↔ starting lineup.</p>
+                <div id="lineupSubsList" class="lineup-mini-list" aria-label="Substitutes list" style="margin-bottom:0.55rem"></div>
+                <textarea id="lineupSubsInput" placeholder="One per line (or use the list above)"></textarea>
+              </div>
+
+              <div class="actions" style="margin-top:0.65rem">
+                <button type="button" class="primary" id="lineupCopyShareLink">Copy share link</button>
+                <button type="button" class="ghost" id="lineupExportPng">Export PNG</button>
+              </div>
+              <p class="hint" id="authStatusLine" style="margin:0.45rem 0 0; min-height: 1.1rem"></p>
+              <p class="hint" id="lineupEditorMsg" style="margin:0.35rem 0 0; min-height: 1.1rem"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="lineup-modal" id="lineupModal" role="dialog" aria-modal="true" aria-label="Lineup editor full screen">
+          <div class="lineup-modal-card">
+            <div class="lineup-modal-head">
+              <div class="title">Lineup editor</div>
+              <div style="display:flex; gap:0.5rem; align-items:center">
+                <button type="button" class="ghost" id="lineupCloseFullscreen">Close</button>
+              </div>
+            </div>
+            <div class="lineup-modal-body">
+              <div id="lineupModalMount"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="primary" id="saveRound">Save team &amp; round</button>
+        </div>
+        <label class="field" for="playerEditor" style="margin-top: 1rem">Squad (one player per line, up to 50)</label>
+        <textarea id="playerEditor" placeholder="Player names, one per line"></textarea>
+        <div class="actions">
+          <button type="button" class="primary" id="savePlayers">Save squad</button>
+        </div>
+        <label class="field" for="coach1PassSet" style="margin-top: 1rem">Coach 1 unlock code (leave blank to keep)</label>
+        <input type="password" id="coach1PassSet" autocomplete="off" />
+        <label class="field" for="coach2PassSet">Coach 2 unlock code (leave blank to keep)</label>
+        <input type="password" id="coach2PassSet" autocomplete="off" />
+        <div class="actions" style="margin-top: 0.75rem">
+          <button type="button" class="primary" id="saveTeamSecrets">Save coach codes</button>
+        </div>
+
+        <div class="coach-split" id="superCoachBallots">
+          <div class="subcard coach-inner" id="coachBlock1">
+            <h3>Coach 1 ballot</h3>
+            <p class="hint" style="margin-bottom: 0.5rem">1st = 3 pts, 2nd = 2, 3rd = 1.</p>
+            <select id="coach1RoundSelect" aria-label="Coach 1 ballot round" style="width:100%; margin: 0 0 0.5rem"></select>
+            <div class="player-list" id="coachPlayerList1"></div>
+            <div class="guest-inline-tools guest-inline-tools--mt">
+              <input
+                type="text"
+                id="guestCoach1Input"
+                class="vote-search guest-inline-input"
+                placeholder="Guest name"
+                maxlength="60"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="button" class="ghost" id="addGuestCoach1">Add guest</button>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary" id="submitCoach1Vote" disabled>Submit coach 1 vote</button>
+              <button type="button" class="ghost" id="clearCoach1Picks">Clear</button>
+            </div>
+            <p class="err" id="coachMsg1"></p>
+          </div>
+          <div class="subcard coach-inner" id="coachBlock2">
+            <h3>Coach 2 ballot</h3>
+            <p class="hint" style="margin-bottom: 0.5rem">1st = 3 pts, 2nd = 2, 3rd = 1.</p>
+            <select id="coach2RoundSelect" aria-label="Coach 2 ballot round" style="width:100%; margin: 0 0 0.5rem"></select>
+            <div class="player-list" id="coachPlayerList2"></div>
+            <div class="guest-inline-tools guest-inline-tools--mt">
+              <input
+                type="text"
+                id="guestCoach2Input"
+                class="vote-search guest-inline-input"
+                placeholder="Guest name"
+                maxlength="60"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="button" class="ghost" id="addGuestCoach2">Add guest</button>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary" id="submitCoach2Vote" disabled>Submit coach 2 vote</button>
+              <button type="button" class="ghost" id="clearCoach2Picks">Clear</button>
+            </div>
+            <p class="err" id="coachMsg2"></p>
+          </div>
+        </div>
+
+        <div class="subcard" id="resultsBlock">
+          <h3>Results (team votes)</h3>
+          <label class="field" for="resultsTeamSelect">Show results for</label>
+          <select id="resultsTeamSelect"></select>
+          <label class="field" for="resultsRoundSelect" style="margin-top: 0.5rem">Round</label>
+          <select id="resultsRoundSelect" aria-label="Select round"></select>
+          <p class="hint">Totals for the selected team and round. Hidden from players.</p>
+          <div class="subcard" id="resultsSummaryCard" style="padding:0.75rem; margin: 0.5rem 0 0.75rem">
+            <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:baseline">
+              <div><strong id="votesReceivedCount">0</strong> votes received</div>
+              <div style="color:#52525b" id="resultsLeaderLine"></div>
+            </div>
+            <div style="margin-top:0.5rem" id="resultsTop3Line"></div>
+          </div>
+          <div class="subcard" id="resultsStatsWrap" style="padding:0.75rem; margin: 0 0 0.75rem">
+            <div style="font-weight: 900; font-size: 0.92rem; margin-bottom: 0.35rem; color: var(--red-dark)">Stats</div>
+            <div id="resultsStatsBody" style="font-size: 0.9rem; line-height: 1.45"></div>
+            <p class="hint" style="margin: 0.45rem 0 0">Computed from saved ballots for this team.</p>
+          </div>
+          <div class="actions result-view-toggle">
+            <button type="button" class="ghost" id="resultsViewTable">Table</button>
+            <button type="button" class="ghost" id="resultsViewGraph">Graph</button>
+            <button type="button" class="ghost" id="resultsViewTrend">Over rounds</button>
+          </div>
+          <div id="resultsTableWrap"></div>
+          <div id="resultsGraphWrap" class="graph-wrap"></div>
+          <div id="resultsTrendWrap" style="display:none">
+            <p class="hint" style="margin: 0.25rem 0 0.5rem">
+              Rounds left-to-right by when votes first arrived; y-axis is running total points (never decreases).
+            </p>
+            <div class="trend-chart">
+              <canvas id="resultsTrendCanvas" width="460" height="260" style="width: 100%; height: 260px;"></canvas>
+              <div id="resultsTrendTooltip" class="trend-tooltip"></div>
+            </div>
+            <div id="resultsTrendLegend" style="margin-top: 0.75rem; font-size: 0.85rem;"></div>
+          </div>
+          <details style="margin-top: 0.75rem">
+            <summary style="cursor: pointer; font-size: 0.9rem">Ballots</summary>
+            <p class="hint" style="margin-top: 0.5rem">Super admin only. Remove individual votes for this team + round.</p>
+            <div id="resultsBallotsWrap" style="margin-top: 0.5rem"></div>
+          </details>
+          <div class="actions" style="margin-top: 0.75rem">
+            <button type="button" class="ghost" id="exportRoundCsv">Export this round (CSV)</button>
+            <button type="button" class="ghost" id="exportSeasonCsv">Export all rounds (CSV)</button>
+            <button type="button" class="ghost" id="clearRoundVotes">Clear team votes this round</button>
+          </div>
+          <div class="actions" style="margin-top: 0.5rem">
+            <button type="button" class="ghost" id="downloadSeasonArchive">Download season archive (JSON)</button>
+            <button type="button" class="ghost" id="resetSeasonVotes">Reset all team &amp; coach votes…</button>
+          </div>
+          <p class="hint" style="margin: 0.35rem 0 0">
+            Archive saves squads, config, and all ballots. Reset deletes every team vote and coach ballot (keeps squads and settings). Download first.
+          </p>
+        </div>
+
+        <div class="subcard" id="coachResultsBlock">
+          <h3>Coach votes</h3>
+          <p class="hint">Coach ballots for the team tab above. Pick a round for table, graph, history, and clear.</p>
+          <label class="field" for="coachResultsRoundSelect" style="margin-top: 0.5rem">Round (coach ballots)</label>
+          <select id="coachResultsRoundSelect" aria-label="Coach results round"></select>
+          <div id="coachAgreeWithSquadWrap" class="subcard" style="padding: 0.65rem 0.75rem; margin: 0.5rem 0; display: none">
+            <div style="font-weight: 800; font-size: 0.9rem; margin-bottom: 0.25rem; color: var(--red-dark)">Agree with squad</div>
+            <div id="coachAgreeWithSquadLine" style="font-size: 0.88rem; line-height: 1.45"></div>
+            <p class="hint" style="margin: 0.35rem 0 0">
+              For the round above: names that appear in both the combined coaches’ top 3 and the team vote top 3 (by weighted points).
+            </p>
+          </div>
+          <div class="actions result-view-toggle" style="margin-top: 0.5rem">
+            <button type="button" class="ghost" id="coachResultsViewTable">Table</button>
+            <button type="button" class="ghost" id="coachResultsViewGraph">Graph</button>
+            <button type="button" class="ghost" id="coachResultsViewTrend">Over rounds</button>
+          </div>
+          <div id="coachResultsTableWrap"></div>
+          <div id="coachResultsGraphWrap" class="graph-wrap"></div>
+          <div id="coachResultsTrendWrap" style="display: none">
+            <p class="hint" style="margin: 0.25rem 0 0.5rem">
+              Rounds by first coach ballot time; y-axis is running total (3 / 2 / 1) — lines never go down.
+            </p>
+            <div class="trend-chart">
+              <canvas id="coachResultsTrendCanvas" width="460" height="260" style="width: 100%; height: 260px"></canvas>
+              <div id="coachResultsTrendTooltip" class="trend-tooltip"></div>
+            </div>
+            <div id="coachResultsTrendLegend" style="margin-top: 0.75rem; font-size: 0.85rem"></div>
+          </div>
+          <details style="margin-top: 0.75rem">
+            <summary style="cursor: pointer; font-size: 0.9rem">Ballot history</summary>
+            <div id="coachResultsHistoryWrap" style="margin-top: 0.5rem"></div>
+          </details>
+          <div class="actions" style="margin-top: 0.75rem">
+            <button type="button" class="ghost" id="clearCoachRoundVotes">Clear coach votes this round</button>
+          </div>
+        </div>
+
+        <div class="actions" style="margin-top: 1rem">
+          <button type="button" class="ghost" id="lockAdmin">Lock / sign out</button>
+        </div>
+      </div>
+
+      <div id="teamCoachPanel" style="display: none">
+        <p class="hint" id="teamCoachBanner"></p>
+        <div class="subcard coach-inner" id="tcBallotCard">
+          <h3 id="tcBallotTitle">Your ballot</h3>
+          <p class="hint" style="margin-bottom: 0.5rem">1st = 3 pts, 2nd = 2, 3rd = 1.</p>
+          <select id="coachTcRoundSelect" aria-label="Your ballot round" style="width:100%; margin: 0 0 0.5rem"></select>
+          <div class="player-list" id="coachPlayerListTc"></div>
+          <div class="guest-inline-tools guest-inline-tools--mt">
+            <input
+              type="text"
+              id="guestCoachTcInput"
+              class="vote-search guest-inline-input"
+              placeholder="Guest name"
+              maxlength="60"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" class="ghost" id="addGuestCoachTc">Add guest</button>
+          </div>
+          <div class="actions">
+            <button type="button" class="primary" id="submitCoachTcVote" disabled>Submit vote</button>
+            <button type="button" class="ghost" id="clearCoachTcPicks">Clear</button>
+          </div>
+          <p class="err" id="coachMsgTc"></p>
+        </div>
+        <div class="subcard" id="tcResultsCard">
+          <h3>Team results</h3>
+          <div class="actions result-view-toggle">
+            <button type="button" class="ghost" id="tcResultsViewTable">Table</button>
+            <button type="button" class="ghost" id="tcResultsViewGraph">Graph</button>
+          </div>
+          <div id="resultsTableWrapTc"></div>
+          <div id="resultsGraphWrapTc" class="graph-wrap"></div>
+        </div>
+        <div class="subcard" id="tcCoachHistCard" style="display: none">
+          <h3>Your coach ballot history</h3>
+          <div id="coachResultsWrapTc"></div>
+        </div>
+        <div class="actions" style="margin-top: 1rem">
+          <button type="button" class="ghost" id="lockTeamCoach">Lock</button>
+        </div>
+      </div>
+      </template>
+    </section>
+  </div>
+
+  <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
+  <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v115"></script>
+
+  <script>
+    (function () {
+      try {
+        if (!("serviceWorker" in navigator)) return;
+        // Cache-bust SW URL so updates roll out reliably.
+        // If a new SW activates, reload once so users immediately get new assets.
+        var reloaded = false;
+        navigator.serviceWorker.addEventListener("controllerchange", function () {
+          if (reloaded) return;
+          reloaded = true;
+          try { location.reload(); } catch (e) {}
+        });
+
+        navigator.serviceWorker.register("/sw.js?v=4").then(function (reg) {
+          try { reg.update(); } catch (e) {}
+        }).catch(function () {});
+      } catch (e) {}
+    })();
+  </script>
+
+  <script>
+    (function () {
+      function setMainTab(tab) {
+        var voteBtn = document.getElementById("tabVote");
+        var lineupBtn = document.getElementById("tabLineup");
+        var voteSection = document.getElementById("voteSection");
+        var lineupCard = document.getElementById("lineupCard");
+        if (!voteBtn || !lineupBtn || !voteSection || !lineupCard) return;
+
+        var isVote = tab === "vote";
+        try {
+          document.body.classList.toggle("main-tab-lineup", !isVote);
+        } catch (e) {}
+        voteBtn.classList.toggle("active", isVote);
+        lineupBtn.classList.toggle("active", !isVote);
+        voteBtn.setAttribute("aria-selected", String(isVote));
+        lineupBtn.setAttribute("aria-selected", String(!isVote));
+
+        voteSection.style.display = isVote ? "" : "none";
+        lineupCard.style.display = isVote ? "none" : "";
+
+        try {
+          sessionStorage.setItem("mainTab", isVote ? "vote" : "lineup");
+        } catch (e) {}
+      }
+
+      function initMainTabs() {
+        var voteBtn = document.getElementById("tabVote");
+        var lineupBtn = document.getElementById("tabLineup");
+        if (!voteBtn || !lineupBtn) return;
+
+        voteBtn.addEventListener("click", function () { setMainTab("vote"); });
+        lineupBtn.addEventListener("click", function () { setMainTab("lineup"); });
+
+        var saved = null;
+        try { saved = sessionStorage.getItem("mainTab"); } catch (e) {}
+        // Per request: default to Voting.
+        setMainTab(saved === "lineup" ? "lineup" : "vote");
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initMainTabs, { once: true });
+      } else {
+        initMainTabs();
+      }
+    })();
+  </script>
+
+</body>
+</html>
