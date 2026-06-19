@@ -80,6 +80,46 @@ function getCurrentRound(teamId) {
   return normalizeRoundLabel(team && team.round) || "Round 1";
 }
 
+function projectId() {
+  var app = window.__svFirebaseApp;
+  return app && app.options && app.options.projectId ? app.options.projectId : "";
+}
+
+function apiKey() {
+  var app = window.__svFirebaseApp;
+  return app && app.options && app.options.apiKey ? app.options.apiKey : "";
+}
+
+async function restHeaders() {
+  var headers = { "Content-Type": "application/json" };
+  var auth = window.__svAuth;
+  if (auth && auth.currentUser) {
+    try {
+      var token = await auth.currentUser.getIdToken();
+      headers.Authorization = "Bearer " + token;
+    } catch (e) {
+      console.warn("[voter-enhancements] could not get auth token", e);
+    }
+  }
+  return headers;
+}
+
+function firestoreUrl(path, query) {
+  var pid = projectId();
+  if (!pid) return "";
+  var url =
+    "https://firestore.googleapis.com/v1/projects/" +
+    encodeURIComponent(pid) +
+    "/databases/(default)/documents/" +
+    path;
+  var params = [];
+  var key = apiKey();
+  if (key) params.push("key=" + encodeURIComponent(key));
+  if (query) params.push(query);
+  if (params.length) url += "?" + params.join("&");
+  return url;
+}
+
 function findExistingVote(teamId, voterName, roundLabel) {
   var key = nameKey(voterName);
   var round = voteRoundLabel({ round: roundLabel });
@@ -97,6 +137,12 @@ function findExistingVote(teamId, voterName, roundLabel) {
   return hit || null;
 }
 
+function setBannerVisible(el, visible) {
+  if (!el) return;
+  el.classList.toggle("is-visible", !!visible);
+  el.style.display = visible ? "block" : "";
+}
+
 function ensureAlreadyVotedBanner() {
   var wrap = document.querySelector(".vote-name-wrap");
   if (!wrap) return null;
@@ -105,7 +151,6 @@ function ensureAlreadyVotedBanner() {
     el = document.createElement("div");
     el.id = "alreadyVotedBanner";
     el.className = "banner banner--already-voted";
-    el.style.display = "none";
     el.setAttribute("role", "status");
     wrap.insertAdjacentElement("afterend", el);
   }
@@ -118,7 +163,7 @@ function updateAlreadyVotedBanner() {
   var nameInput = document.getElementById("voterNameInput");
   var name = nameInput ? nameInput.value.trim() : "";
   if (!name) {
-    banner.style.display = "none";
+    setBannerVisible(banner, false);
     banner.textContent = "";
     return;
   }
@@ -126,11 +171,11 @@ function updateAlreadyVotedBanner() {
   var round = getCurrentRound(teamId);
   var existing = findExistingVote(teamId, name, round);
   if (!existing) {
-    banner.style.display = "none";
+    setBannerVisible(banner, false);
     return;
   }
   var picks = (existing.picks || []).join(" · ");
-  banner.style.display = "block";
+  setBannerVisible(banner, true);
   banner.innerHTML =
     "<strong>You already voted</strong> this round as <em>" +
     escapeHtml(name) +
@@ -211,18 +256,38 @@ function fsValue(val) {
   return { stringValue: String(val) };
 }
 
+function parseFsValue(v) {
+  if (!v || typeof v !== "object") return null;
+  if ("stringValue" in v) return v.stringValue;
+  if ("integerValue" in v) return parseInt(v.integerValue, 10);
+  if ("doubleValue" in v) return v.doubleValue;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("nullValue" in v) return null;
+  if (v.arrayValue && Array.isArray(v.arrayValue.values)) {
+    return v.arrayValue.values.map(parseFsValue);
+  }
+  if (v.mapValue && v.mapValue.fields) {
+    var out = {};
+    Object.keys(v.mapValue.fields).forEach(function (k) {
+      out[k] = parseFsValue(v.mapValue.fields[k]);
+    });
+    return out;
+  }
+  return null;
+}
+
+function docPath(name) {
+  var m = String(name || "").match(/documents\/(.+)$/);
+  return m ? m[1] : "";
+}
+
 async function submitVoteRest(docId, payload) {
-  var app = window.__svFirebaseApp;
-  if (!app || !app.options || !app.options.projectId) throw new Error("Cloud not ready");
-  var pid = app.options.projectId;
-  var url =
-    "https://firestore.googleapis.com/v1/projects/" +
-    encodeURIComponent(pid) +
-    "/databases/(default)/documents/votes/" +
-    encodeURIComponent(docId);
+  if (!projectId()) throw new Error("Cloud not ready");
+  var url = firestoreUrl("votes/" + encodeURIComponent(docId));
+  if (!url) throw new Error("Cloud not ready");
   var res = await fetch(url, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: await restHeaders(),
     body: JSON.stringify({
       fields: {
         teamId: fsValue(payload.teamId),
@@ -265,13 +330,33 @@ async function flushOfflineQueue() {
     window.dispatchEvent(new CustomEvent("sv-votes-merged", { detail: {} }));
     var status = document.getElementById("offlineBanner");
     if (status) {
-      status.style.display = "block";
+      setBannerVisible(status, true);
       status.textContent = "Back online — sent " + flushed + " queued vote(s).";
       setTimeout(function () {
-        if (navigator.onLine) status.style.display = "none";
+        if (navigator.onLine) updateOfflineBanner();
       }, 4000);
     }
   }
+}
+
+function updateOfflineBanner() {
+  var banner = document.getElementById("offlineBanner");
+  if (!banner) return;
+  var q = loadOfflineQueue();
+  if (!navigator.onLine) {
+    setBannerVisible(banner, true);
+    banner.textContent =
+      q.length > 0
+        ? "You're offline. " + q.length + " vote(s) queued — will submit when back online."
+        : "You're offline. You can still pick players; votes queue until you're back online.";
+    return;
+  }
+  if (q.length > 0) {
+    setBannerVisible(banner, true);
+    banner.textContent = "Vote queued (" + q.length + "). Submitting when connection is stable…";
+    return;
+  }
+  setBannerVisible(banner, false);
 }
 
 function wireOfflineQueue() {
@@ -320,21 +405,113 @@ function wireOfflineQueue() {
         msg.style.color = "#a16207";
         msg.textContent = "Offline — vote queued. It will submit when you're back online.";
       }
-      var banner = document.getElementById("offlineBanner");
-      if (banner) {
-        banner.style.display = "block";
-        banner.textContent = "Vote queued (" + q.length + "). Will auto-submit when online.";
-      }
+      updateOfflineBanner();
     },
     true
   );
 
   window.addEventListener("online", function () {
+    updateOfflineBanner();
     flushOfflineQueue().catch(function (e) {
       console.warn("[offline-queue]", e);
     });
   });
+  window.addEventListener("offline", updateOfflineBanner);
+  updateOfflineBanner();
   if (navigator.onLine) flushOfflineQueue().catch(function () {});
+}
+
+var cloudVotesCache = Object.create(null);
+var cloudVotesInflight = Object.create(null);
+
+async function fetchCloudVotes(teamId) {
+  var tid = String(teamId);
+  if (cloudVotesCache[tid] && Date.now() - cloudVotesCache[tid].at < 15000) {
+    return cloudVotesCache[tid].votes;
+  }
+  if (cloudVotesInflight[tid]) return cloudVotesInflight[tid];
+  if (!window.__svFirebaseApp || !projectId()) return [];
+
+  cloudVotesInflight[tid] = (async function () {
+    var byId = Object.create(null);
+    var url = firestoreUrl(":runQuery");
+    if (!url) return [];
+    for (var i = 0; i < 2; i++) {
+      var teamVal = i === 0 ? parseInt(teamId, 10) || 1 : String(teamId);
+      var structuredQuery = {
+        from: [{ collectionId: "votes" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "teamId" },
+            op: "EQUAL",
+            value: fsValue(teamVal),
+          },
+        },
+        orderBy: [{ field: { fieldPath: "__name__" }, direction: "ASCENDING" }],
+      };
+      var startAt = null;
+      for (var page = 0; page < 20; page++) {
+        var query = structuredQuery;
+        if (startAt) query = Object.assign({}, structuredQuery, { startAt: startAt });
+        var res = await fetch(url, {
+          method: "POST",
+          headers: await restHeaders(),
+          body: JSON.stringify({ structuredQuery: query }),
+        });
+        var rows = await res.json().catch(function () {
+          return [];
+        });
+        if (!res.ok) {
+          console.warn("[who-hasnt-voted] cloud query failed", rows.error || res.status);
+          break;
+        }
+        if (!Array.isArray(rows) || !rows.length) break;
+        var lastDoc = null;
+        var gotDoc = false;
+        rows.forEach(function (row) {
+          if (!row || !row.document) return;
+          lastDoc = row.document;
+          gotDoc = true;
+          var id = docPath(row.document.name);
+          if (!id || byId[id]) return;
+          var data = {};
+          var fields = row.document.fields || {};
+          Object.keys(fields).forEach(function (k) {
+            data[k] = parseFsValue(fields[k]);
+          });
+          byId[id] = Object.assign({ id: id }, data);
+        });
+        if (!gotDoc || !lastDoc) break;
+        startAt = { values: [{ referenceValue: lastDoc.name }], before: false };
+        if (rows.length < 300) break;
+      }
+    }
+    var votes = Object.keys(byId).map(function (id) {
+      return byId[id];
+    });
+    cloudVotesCache[tid] = { at: Date.now(), votes: votes };
+    return votes;
+  })();
+
+  try {
+    return await cloudVotesInflight[tid];
+  } finally {
+    delete cloudVotesInflight[tid];
+  }
+}
+
+function mergeVotesLists() {
+  var byId = Object.create(null);
+  for (var i = 0; i < arguments.length; i++) {
+    (arguments[i] || []).forEach(function (v) {
+      if (!v) return;
+      var id = v.id || "t" + v.teamId + "|" + (v.voterNameKey || v.voterName) + "|" + voteRoundLabel(v);
+      byId[id] = v;
+    });
+  }
+  return Object.keys(byId).map(function (k) {
+    return byId[k];
+  });
 }
 
 function ensureWhoHasntVotedBlock() {
@@ -346,12 +523,12 @@ function ensureWhoHasntVotedBlock() {
   details.style.cssText = "padding:0.65rem 0.75rem; margin:0.5rem 0 0";
   details.innerHTML =
     "<summary style='cursor:pointer;font-weight:800;color:var(--red-dark)'>Who hasn't voted?</summary>" +
-    "<p class='hint' style='margin:0.35rem 0 0'>Squad players without a ballot this round.</p>" +
+    "<p class='hint' style='margin:0.35rem 0 0'>Squad players without a ballot this round (local + cloud).</p>" +
     "<div id='whoHasntVotedList' style='margin-top:0.45rem;font-size:0.9rem;line-height:1.5'></div>";
   results.insertAdjacentElement("afterend", details);
 }
 
-function updateWhoHasntVoted() {
+async function updateWhoHasntVoted() {
   ensureWhoHasntVotedBlock();
   var listEl = document.getElementById("whoHasntVotedList");
   var teamSel = document.getElementById("resultsTeamSelect");
@@ -364,8 +541,23 @@ function updateWhoHasntVoted() {
     return String(t.id) === String(teamId);
   });
   var squad = (team && team.players ? team.players : []).filter(Boolean);
+  if (!squad.length) {
+    listEl.innerHTML = "<span class='hint'>No squad list saved.</span>";
+    return;
+  }
+  listEl.innerHTML = "<span class='hint'>Loading vote list…</span>";
+  var localVotes = (data.votes || []).filter(function (v) {
+    return v && String(v.teamId) === String(teamId);
+  });
+  var cloudVotes = [];
+  try {
+    cloudVotes = await fetchCloudVotes(teamId);
+  } catch (e) {
+    console.warn("[who-hasnt-voted]", e);
+  }
+  var votes = mergeVotesLists(localVotes, cloudVotes);
   var voters = Object.create(null);
-  (data.votes || []).forEach(function (v) {
+  votes.forEach(function (v) {
     if (!v || String(v.teamId) !== String(teamId)) return;
     if (voteRoundLabel(v) !== voteRoundLabel({ round: round })) return;
     voters[qo(v.voterName)] = true;
@@ -373,12 +565,9 @@ function updateWhoHasntVoted() {
   var missing = squad.filter(function (p) {
     return !voters[qo(p)];
   });
-  if (!squad.length) {
-    listEl.innerHTML = "<span class='hint'>No squad list saved.</span>";
-    return;
-  }
   if (!missing.length) {
-    listEl.innerHTML = "<span style='color:#15803d;font-weight:700'>Everyone on the squad has voted.</span>";
+    listEl.innerHTML =
+      "<span style='color:#15803d;font-weight:700'>Everyone on the squad has voted.</span>";
     return;
   }
   listEl.textContent = missing.join(", ") + " (" + missing.length + "/" + squad.length + " missing)";
@@ -391,6 +580,9 @@ function wireWhoHasntVoted() {
   if (teamSel) teamSel.addEventListener("change", updateWhoHasntVoted);
   if (roundSel) roundSel.addEventListener("change", updateWhoHasntVoted);
   window.addEventListener("sv-votes-merged", function () {
+    Object.keys(cloudVotesCache).forEach(function (k) {
+      delete cloudVotesCache[k];
+    });
     setTimeout(updateWhoHasntVoted, 300);
   });
   var obs = new MutationObserver(function () {
@@ -488,7 +680,6 @@ function wireThemeToggle() {
   btn.type = "button";
   btn.id = "themeToggle";
   btn.className = "ghost theme-toggle";
-  btn.style.cssText = "margin-top:0.5rem;padding:0.4rem 0.75rem;font-size:0.8rem";
   btn.addEventListener("click", cycleTheme);
   header.appendChild(btn);
   var saved = "auto";
@@ -532,7 +723,6 @@ if (document.readyState === "loading") {
   init();
 }
 
-// Admin panel mounts later — re-wire when it appears
 var adminObs = new MutationObserver(function () {
   wireWhoHasntVoted();
   ensureLineupSharePackButton();

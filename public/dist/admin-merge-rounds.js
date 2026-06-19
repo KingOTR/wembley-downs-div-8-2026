@@ -697,6 +697,14 @@ function runMergeLocal(teamId, plan, deleteSource) {
 
 var lastPlan = null;
 var bound = false;
+var lastMergeRunAt = 0;
+var MERGE_COOLDOWN_MS = 30000;
+
+function validateRoundLabel(label) {
+  var n = normalizeRoundLabel(label);
+  if (!n || n.length > 80) return null;
+  return n;
+}
 
 async function refreshRoundSelects() {
   if (!isSuperAdminUnlocked()) return;
@@ -746,9 +754,9 @@ function wireMergeUi() {
         throw new Error("Unlock super admin first (Coach / admin → Super admin).");
       }
       var teamId = getAdminTeamId();
-      var srcRound = document.getElementById("mergeSourceRound")?.value;
-      var dstRound = document.getElementById("mergeDestRound")?.value;
-      if (!srcRound || !dstRound) throw new Error("Select source and destination rounds.");
+      var srcRound = validateRoundLabel(document.getElementById("mergeSourceRound")?.value);
+      var dstRound = validateRoundLabel(document.getElementById("mergeDestRound")?.value);
+      if (!srcRound || !dstRound) throw new Error("Select valid source and destination rounds.");
       if (voteRoundLabel({ round: srcRound }) === voteRoundLabel({ round: dstRound })) {
         throw new Error("Source and destination rounds must be different.");
       }
@@ -787,9 +795,16 @@ function wireMergeUi() {
       "?" +
       (deleteSource ? " Source round votes will be deleted." : "");
     if (!confirm(msg)) return;
+    var now = Date.now();
+    if (now - lastMergeRunAt < MERGE_COOLDOWN_MS) {
+      var waitSec = Math.ceil((MERGE_COOLDOWN_MS - (now - lastMergeRunAt)) / 1000);
+      if (errEl) errEl.textContent = "Please wait " + waitSec + "s before running another merge.";
+      return;
+    }
     runBtn.disabled = true;
     previewBtn.disabled = true;
     try {
+      lastMergeRunAt = Date.now();
       var mergedCount = 0;
       var deletedCount = 0;
       if (lastPlan.localOnly) {

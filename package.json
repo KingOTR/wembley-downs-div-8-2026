@@ -1,0 +1,22 @@
+{
+  "name": "wembley-downs-div-8-2026",
+  "version": "1.0.0",
+  "description": "Static single-page app for team player voting, hosted on [Firebase Hosting](https://wembley-downs-div-8-2026.web.app/).",
+  "main": "index.js",
+  "scripts": {
+    "validate": "node tools/ci-validate.js",
+    "test": "node tools/ci-validate.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KingOTR/wembley-downs-div-8-2026.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/KingOTR/wembley-downs-div-8-2026/issues"
+  },
+  "homepage": "https://github.com/KingOTR/wembley-downs-div-8-2026#readme"
+}

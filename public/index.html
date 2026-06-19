@@ -2,17 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#EE2B33" />
+  <meta name="color-scheme" content="light dark" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v119: merge fix, voter enhancements, firestore rules -->
+  <!-- v120: polish pass — offline REST auth, cloud who-hasnt-voted, banner/CSS -->
   <title>Team Player Vote</title>
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v119" />
+  <link rel="preload" as="image" href="/wembley-downs-logo.png" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v120" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -90,7 +93,7 @@
     .wrap {
       max-width: 720px;
       margin: 0 auto;
-      padding: 1.35rem 1.15rem 3.5rem;
+      padding: max(1.35rem, env(safe-area-inset-top, 0px)) max(1.15rem, env(safe-area-inset-right, 0px)) max(3.5rem, env(safe-area-inset-bottom, 0px)) max(1.15rem, env(safe-area-inset-left, 0px));
     }
 
     @media (min-width: 900px) {
@@ -2013,10 +2016,13 @@
       line-height: 1.45;
     }
 
+    .banner.is-visible {
+      display: block;
+    }
+
     .banner--already-voted {
-      display: none;
-      background: rgba(239, 68, 68, 0.1);
-      border-color: rgba(239, 68, 68, 0.35);
+      background: rgba(238, 43, 51, 0.08);
+      border-color: rgba(238, 43, 51, 0.32);
       color: var(--text);
     }
 
@@ -2258,6 +2264,59 @@
       }
     }
 
+    .theme-toggle {
+      margin-top: 0.5rem;
+      padding: 0.45rem 0.8rem;
+      font-size: 0.8rem;
+      min-height: 2.5rem;
+    }
+
+    #fatalBanner .fatal-actions {
+      margin-top: 0.45rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    #fatalBanner .fatal-actions button {
+      border: 1px solid rgba(255,255,255,0.35);
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      border-radius: 10px;
+      padding: 0.4rem 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      min-height: 2.5rem;
+    }
+
+    @media (max-width: 520px) {
+      .admin-panel .subcard {
+        padding: 0.75rem;
+      }
+      .admin-panel input[type="text"],
+      .admin-panel input[type="password"],
+      .admin-panel input[type="date"],
+      .admin-panel input[type="number"],
+      .admin-panel select,
+      .admin-panel textarea {
+        font-size: 1rem;
+        min-height: 2.75rem;
+      }
+      .admin-panel .actions {
+        flex-direction: column;
+      }
+      .admin-panel .actions button {
+        width: 100%;
+        min-height: 2.85rem;
+      }
+      #mergeRoundsBlock .actions button {
+        width: 100%;
+      }
+      .lineup-modal {
+        padding: max(0.5rem, env(safe-area-inset-top, 0px)) max(0.5rem, env(safe-area-inset-right, 0px)) max(0.5rem, env(safe-area-inset-bottom, 0px)) max(0.5rem, env(safe-area-inset-left, 0px));
+      }
+    }
+
   </style>
 </head>
 <body class="booting">
@@ -2272,6 +2331,10 @@
     <div style="max-width:520px; margin:0 auto;">
       <div style="font-weight:800; margin-bottom:0.15rem;">Something went wrong loading the page.</div>
       <div id="fatalBannerMsg" style="font-size:0.9rem; opacity:0.95;"></div>
+      <div class="fatal-actions">
+        <button type="button" onclick="location.reload()">Reload page</button>
+        <button type="button" onclick="document.getElementById('fatalBanner').style.display='none'">Dismiss</button>
+      </div>
     </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite">
@@ -2369,11 +2432,11 @@
         <datalist id="voterNameSuggest"></datalist>
         <div id="voterNameSuggestPanel" class="voter-suggest-panel" role="listbox" hidden aria-label="Name suggestions"></div>
       </div>
-      <div class="banner" id="offlineBanner">You?re offline. You can still pick players, but submitting may fail until you?re back online.</div>
+      <div class="banner" id="offlineBanner">You're offline. You can still pick players; votes queue until you're back online.</div>
       <div class="picks-panel" id="picksPanel" aria-label="Your picks">
         <div style="font-size:0.85rem; font-weight:800; color: var(--text);">Your picks</div>
         <div class="picks-row" id="picksRow"></div>
-        <div class="hint" style="margin:0">Drag chips to reorder. Tap ? to remove.</div>
+        <div class="hint" style="margin:0">Drag chips to reorder. Tap × to remove.</div>
       </div>
       <input type="text" id="playerSearch" class="vote-search" placeholder="Search players?" autocomplete="off" spellcheck="false" />
       <div class="player-list" id="playerList" aria-live="polite"></div>
@@ -2394,7 +2457,7 @@
           <button type="button" class="ghost" id="addGuestToPicks">Add to picks</button>
         </div>
         <p class="hint" style="margin: 0.35rem 0 0">
-          Uses one pick slot (same 3 / 2 / 1 points). Reorder or remove in ?Your picks? above. Counts in round totals; the ?Over rounds? graph only traces the saved squad list.
+          Uses one pick slot (same 3 / 2 / 1 points). Reorder or remove in "Your picks" above. Counts in round totals; the "Over rounds" graph only traces the saved squad list.
         </p>
       </div>
       <div class="actions">
@@ -2509,7 +2572,7 @@
             <button type="button" class="ghost" id="aiReviewShorten">AI shorten</button>
             <button type="button" class="ghost" id="aiReviewKeyPoints">AI key points</button>
           </div>
-          <p class="hint" style="margin:0.5rem 0 0">Saved when you click ?Save team &amp; round?.</p>
+          <p class="hint" style="margin:0.5rem 0 0">Saved when you click "Save team &amp; round".</p>
         </div>
 
         <div class="subcard" id="lineupEditorCard" style="padding:0.85rem; margin: 0.85rem 0 0.25rem">
@@ -2543,7 +2606,7 @@
             <div>
               <div id="lineupPitch" class="pitch" aria-label="Lineup pitch editor"></div>
               <p class="hint" style="margin:0.55rem 0 0">
-                Drag players to position them. Saved when you click ?Save team &amp; round?.
+                Drag players to position them. Saved when you click "Save team &amp; round".
               </p>
             </div>
             <div class="lineup-side">
@@ -2578,7 +2641,7 @@
                     <button type="button" class="ghost" id="lineupApplyStartersPaste" style="padding:0.35rem 0.55rem">Apply</button>
                   </div>
                   <textarea id="lineupStartersPaste" placeholder="Paste 11 names (optionally with numbers), one per line&#10;e.g. 1 Sam&#10;2 Alex&#10;..." style="min-height: 120px"></textarea>
-                  <p class="hint" style="margin:0.35rem 0 0">Tip: You can paste more than 11 lines ? we?ll take the first 11.</p>
+                  <p class="hint" style="margin:0.35rem 0 0">Tip: You can paste more than 11 lines — we'll take the first 11.</p>
                 </div>
               </div>
 
@@ -2589,7 +2652,7 @@
                   </div>
                   <button type="button" class="ghost" id="lineupFillSubsFromSquad" style="padding:0.45rem 0.65rem">Fill from squad</button>
                 </div>
-                <p class="lineup-bench-hint">Tap a starter then ? XI on a sub (or ? Sub) to swap bench ? starting lineup.</p>
+                <p class="lineup-bench-hint">Tap a starter then ↑ XI on a sub (or ↓ Sub) to swap bench ↔ starting lineup.</p>
                 <div id="lineupSubsList" class="lineup-mini-list" aria-label="Substitutes list" style="margin-bottom:0.55rem"></div>
                 <textarea id="lineupSubsInput" placeholder="One per line (or use the list above)"></textarea>
               </div>
@@ -2686,7 +2749,7 @@
         <div class="subcard" id="mergeRoundsBlock">
           <h3>Merge round votes</h3>
           <p class="hint" style="margin-top: 0">
-            Move team votes from a mistaken round into the correct one (e.g. Round 9 ? Round 8). Voters already in the destination round are skipped. Names not on the squad list are flagged and not merged. Super admin only.
+            Move team votes from a mistaken round into the correct one (e.g. Round 9 → Round 8). Voters already in the destination round are skipped. Names not on the squad list are flagged and not merged. Super admin only.
           </p>
           <label class="field" for="mergeSourceRound">Source round (votes to move)</label>
           <select id="mergeSourceRound" aria-label="Source round for merge"></select>
@@ -2768,7 +2831,7 @@
             <div style="font-weight: 800; font-size: 0.9rem; margin-bottom: 0.25rem; color: var(--red-dark)">Agree with squad</div>
             <div id="coachAgreeWithSquadLine" style="font-size: 0.88rem; line-height: 1.45"></div>
             <p class="hint" style="margin: 0.35rem 0 0">
-              For the round above: names that appear in both the combined coaches? top 3 and the team vote top 3 (by weighted points).
+              For the round above: names that appear in both the combined coaches' top 3 and the team vote top 3 (by weighted points).
             </p>
           </div>
           <div class="actions result-view-toggle" style="margin-top: 0.5rem">
@@ -2780,7 +2843,7 @@
           <div id="coachResultsGraphWrap" class="graph-wrap"></div>
           <div id="coachResultsTrendWrap" style="display: none">
             <p class="hint" style="margin: 0.25rem 0 0.5rem">
-              Rounds by first coach ballot time; y-axis is running total (3 / 2 / 1) ? lines never go down.
+              Rounds by first coach ballot time; y-axis is running total (3 / 2 / 1) — lines never go down.
             </p>
             <div class="trend-chart">
               <canvas id="coachResultsTrendCanvas" width="460" height="260" style="width: 100%; height: 260px"></canvas>
@@ -2850,15 +2913,15 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v119"></script>
-  <script type="module" src="dist/voter-enhancements.js?tag=v119"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v120"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v120"></script>
   <script>
     (function () {
       var loaded = false;
       function loadMergeRounds() {
         if (loaded) return;
         loaded = true;
-        import("./dist/admin-merge-rounds.js?tag=v119").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v120").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
         });
@@ -2892,7 +2955,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=119").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=120").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}
@@ -2907,7 +2970,7 @@
             });
           });
         }).catch(function () {});
-        // Stuck on old bundle? DevTools ? Application ? Service Workers ? Unregister,
+        // Stuck on old bundle? DevTools → Application → Service Workers → Unregister,
         // or console: navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});location.reload();});
       } catch (e) {}
     })();

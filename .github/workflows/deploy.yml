@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate static assets
+        run: node tools/ci-validate.js
+
+  deploy-note:
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    steps:
+      - run: |
+          echo "CI passed. Deploy manually from a trusted machine:"
+          echo "  npx -y firebase-tools@latest deploy --only hosting,firestore:rules"
+          echo "Live: https://wembley-downs-div-8-2026.web.app/"

@@ -1,0 +1,63 @@
+const fs = require("fs");
+const path = require("path");
+
+const root = path.join(__dirname, "..");
+const publicDir = path.join(root, "public");
+const html = fs.readFileSync(path.join(publicDir, "index.html"), "utf8");
+const sw = fs.readFileSync(path.join(publicDir, "sw.js"), "utf8");
+
+const required = [
+  "public/index.html",
+  "public/sw.js",
+  "public/dist/app.min.js",
+  "public/dist/voter-enhancements.js",
+  "public/dist/admin-merge-rounds.js",
+  "firestore.rules",
+  "firebase.json",
+];
+
+let failed = false;
+required.forEach((rel) => {
+  const p = path.join(root, rel.replace(/\//g, path.sep));
+  if (!fs.existsSync(p)) {
+    console.error("MISSING:", rel);
+    failed = true;
+  }
+});
+
+function extractTag(name) {
+  const m = html.match(new RegExp(name + "[^\"']*\\?tag=(v\\d+)", "i"));
+  return m ? m[1] : null;
+}
+
+const appTag = extractTag("app.min.js");
+const enhTag = extractTag("voter-enhancements.js");
+const mergeTag = html.match(/admin-merge-rounds\.js\?tag=(v\d+)/);
+const mergeTagVal = mergeTag ? mergeTag[1] : null;
+const swMatch = sw.match(/CACHE_VERSION\s*=\s*"(v\d+)"/);
+const swVer = swMatch ? swMatch[1] : null;
+const swReg = html.match(/sw\.js\?v=(\d+)/);
+const swRegVer = swReg ? "v" + swReg[1] : null;
+
+console.log("Tags:", { appTag, enhTag, mergeTag: mergeTagVal, swVer, swRegVer });
+
+if (!appTag || appTag !== enhTag || appTag !== mergeTagVal) {
+  console.error("Version tag mismatch between app / enhancements / merge modules");
+  failed = true;
+}
+if (!swVer || swVer !== appTag) {
+  console.error("CACHE_VERSION must match ?tag= on dist scripts");
+  failed = true;
+}
+if (!swRegVer || swRegVer !== appTag) {
+  console.error("sw.js?v= must match dist ?tag= version");
+  failed = true;
+}
+
+if (!html.includes("<!DOCTYPE html>")) {
+  console.error("index.html missing DOCTYPE");
+  failed = true;
+}
+
+if (failed) process.exit(1);
+console.log("CI validate OK");
