@@ -6,12 +6,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
+  <!-- v116: merge-rounds admin module -->
   <title>Team Player Vote</title>
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v115" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v116" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -2614,6 +2615,27 @@
           </div>
         </div>
 
+        <div class="subcard" id="mergeRoundsBlock">
+          <h3>Merge round votes</h3>
+          <p class="hint" style="margin-top: 0">
+            Move team votes from a mistaken round into the correct one (e.g. Round 9 → Round 8). Voters already in the destination round are skipped. Names not on the squad list are flagged and not merged. Super admin only.
+          </p>
+          <label class="field" for="mergeSourceRound">Source round (votes to move)</label>
+          <select id="mergeSourceRound" aria-label="Source round for merge"></select>
+          <label class="field" for="mergeDestRound" style="margin-top: 0.5rem">Destination round (merge into)</label>
+          <select id="mergeDestRound" aria-label="Destination round for merge"></select>
+          <label class="field" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.65rem">
+            <input type="checkbox" id="mergeDeleteSource" checked />
+            Delete source round votes after merge
+          </label>
+          <div class="actions" style="margin-top: 0.65rem">
+            <button type="button" class="primary" id="mergeRoundsPreview">Preview merge</button>
+            <button type="button" class="ghost" id="mergeRoundsRun" disabled>Run merge</button>
+          </div>
+          <div id="mergeRoundsSummary" class="subcard" style="padding: 0.75rem; margin-top: 0.65rem; display: none"></div>
+          <p class="err" id="mergeRoundsErr" style="min-height: 0; margin-top: 0.35rem"></p>
+        </div>
+
         <div class="subcard" id="resultsBlock">
           <h3>Results (team votes)</h3>
           <label class="field" for="resultsTeamSelect">Show results for</label>
@@ -2760,7 +2782,8 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v115"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v116"></script>
+  <script type="module" src="dist/admin-merge-rounds.js?tag=v116"></script>
 
   <script>
     (function () {
