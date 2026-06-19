@@ -22,6 +22,11 @@ function nameKey(c) {
   );
 }
 
+/** Same as app.min.js Zp() — doc id segment for round / voter keys */
+function roundDocKey(label) {
+  return nameKey(voteRoundLabel({ round: label }));
+}
+
 function normalizeRoundLabel(c) {
   var l = String(c ?? "").trim();
   if (!l) return "";
@@ -185,7 +190,7 @@ function planMerge(teamId, teams, votes, srcRound, dstRound) {
   return {
     srcLabel: srcLabel,
     dstLabel: dstLabel,
-    dstRoundKey: nameKey(dstLabel),
+    dstRoundKey: roundDocKey(dstLabel),
     sourceVotes: sourceVotes,
     merged: merged,
     skippedDup: skippedDup,
@@ -442,6 +447,7 @@ async function batchWrite(writes) {
     "/databases/(default)/documents:batchWrite";
   for (var i = 0; i < writes.length; i += 400) {
     var chunk = writes.slice(i, i + 400);
+    console.log("[merge-rounds] batchWrite chunk", Math.floor(i / 400) + 1, "ops:", chunk.length);
     var res = await fetch(url, {
       method: "POST",
       headers: await authHeaders(),
@@ -449,8 +455,16 @@ async function batchWrite(writes) {
     });
     var body = await res.json();
     if (!res.ok) {
-      var msg = body && body.error && body.error.message ? body.error.message : "Batch write failed";
+      var msg = body && body.error && body.error.message ? body.error.message : "Batch write failed (" + res.status + ")";
+      console.error("[merge-rounds] batchWrite failed", body);
       throw new Error(msg);
+    }
+    if (body.writeResults) {
+      body.writeResults.forEach(function (wr, idx) {
+        if (wr && wr.status && wr.status.code !== 0) {
+          console.error("[merge-rounds] write error", idx, wr.status);
+        }
+      });
     }
   }
 }
@@ -556,6 +570,8 @@ async function runMergeCloud(teamId, plan) {
   var writes = plan.merged.map(function (v) {
     var key = v.voterNameKey || nameKey(v.voterName);
     var newId = "t" + teamId + "_r" + plan.dstRoundKey + "_v" + key;
+    console.log("[merge-rounds] upsert", newId, "←", v.voterName, plan.srcLabel, "→", plan.dstLabel);
+    // No updateMask: destination docs usually don't exist yet; masked update fails with NOT_FOUND.
     return {
       update: {
         name: docName(newId),
@@ -568,20 +584,63 @@ async function runMergeCloud(teamId, plan) {
           submittedAt: fsValue(v.submittedAt || new Date().toISOString()),
         },
       },
-      updateMask: { fieldPaths: ["teamId", "voterName", "voterNameKey", "round", "picks", "submittedAt"] },
     };
   });
   if (writes.length) await batchWrite(writes);
   return writes.length;
 }
 
-function runMergeLocal(teamId, plan, deleteSource) {
+async function writeMergeAuditLog(teamId, plan, mergedCount, deletedCount, deleteSource) {
+  try {
+    var auth = window.__svAuth;
+    if (!auth || !auth.currentUser) return;
+    var pid = projectId();
+    if (!pid) return;
+    var logId = "merge_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    var url =
+      "https://firestore.googleapis.com/v1/projects/" +
+      encodeURIComponent(pid) +
+      "/databases/(default)/documents/adminLog/" +
+      encodeURIComponent(logId);
+    var adminEmail = auth.currentUser.email || "";
+    var body = {
+      fields: {
+        action: fsValue("mergeRounds"),
+        teamId: fsValue(teamId),
+        sourceRound: fsValue(plan.srcLabel),
+        destRound: fsValue(plan.dstLabel),
+        mergedCount: fsValue(mergedCount),
+        deletedSourceCount: fsValue(deleteSource ? deletedCount : 0),
+        skippedDup: fsValue(plan.skippedDup.length),
+        invalid: fsValue(plan.invalid.length),
+        adminEmail: fsValue(adminEmail),
+        timestamp: fsValue(new Date().toISOString()),
+      },
+    };
+    var res = await fetch(url, {
+      method: "PATCH",
+      headers: await authHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      var row = await res.json().catch(function () {
+        return {};
+      });
+      console.warn("[merge-rounds] audit log failed", row.error || res.status);
+    } else {
+      console.log("[merge-rounds] audit log written", logId);
+    }
+  } catch (e) {
+    console.warn("[merge-rounds] audit log error", e);
+  }
+}
+
+function applyMergedVotesLocal(teamId, plan, deleteSource) {
   var data = loadLocalData();
   data.votes = data.votes || [];
-  var dstRoundKey = plan.dstRoundKey;
   plan.merged.forEach(function (v) {
     var key = v.voterNameKey || nameKey(v.voterName);
-    var newId = "t" + teamId + "_r" + dstRoundKey + "_v" + key;
+    var newId = "t" + teamId + "_r" + plan.dstRoundKey + "_v" + key;
     var row = {
       id: newId,
       teamId: teamId,
@@ -601,15 +660,38 @@ function runMergeLocal(teamId, plan, deleteSource) {
     }
     if (!found) data.votes.push(row);
   });
-  var removed = 0;
   if (deleteSource) {
-    var before = data.votes.length;
     data.votes = data.votes.filter(function (v) {
       return !(v && teamIdStr(v.teamId) === teamIdStr(teamId) && voteRoundLabel(v) === plan.srcLabel);
     });
-    removed = before - data.votes.length;
   }
   saveLocalData(data);
+  return data.votes.filter(function (v) {
+    return v && teamIdStr(v.teamId) === teamIdStr(teamId);
+  });
+}
+
+function notifyVotesMerged(teamId, votes) {
+  try {
+    window.dispatchEvent(
+      new CustomEvent("sv-votes-merged", {
+        detail: { teamId: teamId, votes: votes || [] },
+      })
+    );
+  } catch (e) {
+    console.warn("[merge-rounds] could not dispatch sv-votes-merged", e);
+  }
+}
+
+function runMergeLocal(teamId, plan, deleteSource) {
+  var data = loadLocalData();
+  var removed = deleteSource
+    ? (data.votes || []).filter(function (v) {
+        return v && teamIdStr(v.teamId) === teamIdStr(teamId) && voteRoundLabel(v) === plan.srcLabel;
+      }).length
+    : 0;
+  var teamVotes = applyMergedVotesLocal(teamId, plan, deleteSource);
+  notifyVotesMerged(teamId, teamVotes);
   return { merged: plan.merged.length, removed: removed };
 }
 
@@ -723,6 +805,21 @@ function wireMergeUi() {
             lastPlan.sourceVotes
           );
         }
+        var freshVotes = await fetchVotesRest(lastPlan.teamId);
+        var data = loadLocalData();
+        var byId = Object.create(null);
+        (data.votes || []).forEach(function (v) {
+          if (v && v.id) byId[v.id] = v;
+        });
+        freshVotes.forEach(function (v) {
+          if (v && v.id) byId[v.id] = v;
+        });
+        data.votes = Object.keys(byId).map(function (k) {
+          return byId[k];
+        });
+        saveLocalData(data);
+        notifyVotesMerged(lastPlan.teamId, freshVotes);
+        await writeMergeAuditLog(lastPlan.teamId, lastPlan, mergedCount, deletedCount, deleteSource);
       }
       if (summaryEl) {
         summaryEl.style.display = "block";
@@ -741,8 +838,8 @@ function wireMergeUi() {
               ".</div>"
             : "") +
           (lastPlan.localOnly
-            ? "<p class='hint' style='margin:0.45rem 0 0'>Refresh the page to see updated results.</p>"
-            : "<p class='hint' style='margin:0.45rem 0 0'>Results will update on next sync.</p>");
+            ? "<p class='hint' style='margin:0.45rem 0 0'>Results updated in this browser.</p>"
+            : "<p class='hint' style='margin:0.45rem 0 0'>Cloud updated — admin results refreshed.</p>");
       }
       lastPlan = null;
       setTimeout(refreshRoundSelects, 500);

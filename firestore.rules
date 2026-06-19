@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSuperAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'sydneywilliam29@gmail.com';
+    }
+
+    function isValidVote() {
+      return request.resource.data.keys().hasAll([
+          'teamId', 'voterName', 'voterNameKey', 'round', 'picks', 'submittedAt'
+        ])
+        && request.resource.data.picks is list
+        && request.resource.data.picks.size() == 3
+        && request.resource.data.voterName is string
+        && request.resource.data.round is string;
+    }
+
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /votes/{voteId} {
+      allow read: if true;
+      allow create, update: if voteId.matches('t[0-9]+_r.+_v.+') && isValidVote();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /coachVotes/{docId} {
+      allow read: if true;
+      allow create: if request.resource.data.picks is list
+        && request.resource.data.picks.size() == 3;
+      allow update, delete: if isSuperAdmin();
+    }
+
+    match /adminLog/{docId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSuperAdmin();
+      allow update, delete: if false;
+    }
+  }
+}

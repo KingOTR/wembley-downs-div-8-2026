@@ -6,13 +6,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v118: SW cache bust + merge-rounds round dropdown fix -->
+  <!-- v119: merge fix, voter enhancements, firestore rules -->
   <title>Team Player Vote</title>
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v118" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v119" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -40,6 +40,30 @@
         --text: #e5e7eb;
         --border: rgba(255, 255, 255, 0.10);
       }
+    }
+
+    /* Manual theme override (Theme toggle) */
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --red: #EE2B33;
+      --red-dark: #FF737A;
+      --red-soft: rgba(238, 43, 51, 0.22);
+      --gray: #262626;
+      --white: #2b2b2b;
+      --text: #e5e7eb;
+      --border: rgba(255, 255, 255, 0.10);
+    }
+
+    html[data-theme="light"] {
+      color-scheme: light;
+      --red: #EE2B33;
+      --red-dark: #B8161C;
+      --red-soft: rgba(238, 43, 51, 0.18);
+      --gray: #f3f4f6;
+      --white: #ffffff;
+      --text: #111827;
+      --border: rgba(17, 24, 39, 0.10);
+      --shadow: 0 10px 32px rgba(238, 43, 51, 0.14);
     }
 
     * {
@@ -329,6 +353,30 @@
 
     .player-btn:active {
       transform: scale(0.99);
+    }
+
+    /* Mobile-first: larger tap targets for voting chips */
+    @media (max-width: 520px) {
+      #voteSection .player-list {
+        gap: 0.55rem;
+        padding: 0.65rem;
+      }
+      #voteSection .player-btn {
+        padding: 0.95rem 1rem;
+        min-height: 3.25rem;
+        font-size: 1.05rem;
+        border-radius: 14px;
+      }
+      #voteSection .player-btn .rank-badge {
+        min-width: 2rem;
+        height: 2rem;
+        font-size: 0.95rem;
+      }
+      #voteSection .pick-chip {
+        padding: 0.65rem 0.85rem;
+        font-size: 1rem;
+        min-height: 2.75rem;
+      }
     }
 
     .player-btn.selected {
@@ -1955,13 +2003,33 @@
 
     .banner {
       display: none;
-      margin: 0 0 0.75rem;
-      padding: 0.65rem 0.75rem;
+      background: rgba(251, 191, 36, 0.18);
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      color: #92400e;
+      padding: 0.65rem 0.85rem;
       border-radius: 12px;
-      border: 1px solid var(--border);
-      background: rgba(239, 68, 68, 0.10);
+      margin: 0.65rem 0 0;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .banner--already-voted {
+      display: none;
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.35);
       color: var(--text);
-      font-size: 0.9rem;
+    }
+
+    html[data-theme="dark"] .banner {
+      color: #fde68a;
+    }
+    html[data-theme="dark"] .banner--already-voted {
+      color: #fecaca;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .banner { color: #fde68a; }
+      .banner--already-voted { color: #fecaca; }
     }
 
     .focus-ring:focus-visible,
@@ -2782,14 +2850,15 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v118"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v119"></script>
+  <script type="module" src="dist/voter-enhancements.js?tag=v119"></script>
   <script>
     (function () {
       var loaded = false;
       function loadMergeRounds() {
         if (loaded) return;
         loaded = true;
-        import("./dist/admin-merge-rounds.js?tag=v118").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v119").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
         });
@@ -2823,7 +2892,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=118").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=119").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}
