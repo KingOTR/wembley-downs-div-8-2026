@@ -551,9 +551,14 @@ function wireMergeUi() {
   if (!previewBtn || !runBtn) return;
   bound = true;
 
-  document.getElementById("adminTeamTabs")?.addEventListener("click", function () {
-    setTimeout(refreshRoundSelects, 80);
-  });
+  var teamTabs = document.getElementById("adminTeamTabs");
+  if (teamTabs) {
+    teamTabs.addEventListener("click", function () {
+      setTimeout(function () {
+        refreshRoundSelects().catch(function () {});
+      }, 80);
+    });
+  }
 
   previewBtn.addEventListener("click", async function () {
     if (errEl) errEl.textContent = "";
@@ -663,15 +668,22 @@ function observeAdminMount() {
   var obs = new MutationObserver(function () {
     if (document.getElementById("mergeSourceRound")) {
       wireMergeUi();
-      refreshRoundSelects();
+      refreshRoundSelects().catch(function () {});
     }
   });
   obs.observe(mount, { childList: true, subtree: true });
-  if (document.getElementById("mergeSourceRound")) wireMergeUi();
+  if (document.getElementById("mergeSourceRound")) {
+    wireMergeUi();
+    refreshRoundSelects().catch(function () {});
+  }
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", observeAdminMount, { once: true });
-} else {
-  observeAdminMount();
+try {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", observeAdminMount, { once: true });
+  } else {
+    observeAdminMount();
+  }
+} catch (e) {
+  console.warn("merge-rounds: init failed", e);
 }
