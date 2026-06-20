@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v134: name suggest on focus only, bundled Firestore batch for merge -->
+  <!-- v135: FotMob lineup units, row spacing, GK safe-area -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v134" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v135" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -1256,6 +1256,7 @@
     /* FotMob-style public lineup: dark pitch, formation header, generous spacing */
     .lineup-fotmob {
       width: 100%;
+      padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
     }
 
     .lineup-fotmob-header {
@@ -1281,7 +1282,7 @@
     }
 
     #lineupCard .lineup-pitch-fotmob {
-      --pitch-max-h: 700px;
+      --pitch-max-h: 720px;
       background:
         linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, transparent 18%, transparent 82%, rgba(0, 0, 0, 0.1) 100%),
         linear-gradient(180deg, #1b5e38 0%, #174a2e 48%, #1b5e38 100%);
@@ -1289,42 +1290,84 @@
       --pitch-line-soft: rgba(255, 255, 255, 0.24);
       --pitch-line-strong: rgba(255, 255, 255, 0.38);
       --pitch-outline: rgba(0, 0, 0, 0.22);
-      margin-bottom: 0.35rem;
+      overflow: visible;
+      margin-bottom: max(0.85rem, env(safe-area-inset-bottom, 0px));
     }
 
-    #lineupCard .lineup-pitch-fotmob .player-chip--public-circle {
-      height: clamp(40px, 8.8cqw, 52px);
-      width: clamp(40px, 8.8cqw, 52px);
-      background: rgba(255, 255, 255, 0.96);
-      border-color: rgba(255, 255, 255, 0.55);
-      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+    /* FotMob unit: ring + name as one compact chip */
+    #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit {
+      --fotmob-ring: clamp(34px, 8.2cqw, 44px);
+      width: auto;
+      height: auto;
+      padding: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
       cursor: default;
+      overflow: visible;
+      z-index: 5;
+      transform: translate(-50%, calc(-0.5 * var(--fotmob-ring)));
+      touch-action: auto;
     }
 
-    #lineupCard .lineup-pitch-fotmob .player-chip--public-circle .pos {
-      font-size: 0.8rem;
+    #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit .fotmob-unit__ring {
+      width: var(--fotmob-ring);
+      height: var(--fotmob-ring);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.76rem;
       font-weight: 950;
+      letter-spacing: 0.03em;
       color: rgba(17, 24, 39, 0.92);
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.26);
+      flex-shrink: 0;
+      pointer-events: none;
+      user-select: none;
     }
 
-    #lineupCard .lineup-pitch-fotmob .player-chip--public-circle .nm {
-      top: calc(100% + 7px);
-      max-width: min(11ch, 22vw);
-      min-width: 3.5ch;
-      padding: 0.2rem 0.45rem;
-      font-size: 0.74rem;
+    #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit .fotmob-unit__name {
+      margin-top: -2px;
+      max-width: min(10ch, 24vw);
+      min-width: 3.2ch;
+      padding: 0.14rem 0.38rem 0.18rem;
+      border-radius: 0 0 9px 9px;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-top: none;
+      font-size: 0.66rem;
       font-weight: 800;
-      background: rgba(255, 255, 255, 0.94);
-      border-color: rgba(255, 255, 255, 0.35);
+      letter-spacing: -0.01em;
       color: rgba(17, 24, 39, 0.92);
-      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.22);
+      text-align: center;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+      line-height: 1.15;
+      pointer-events: none;
     }
 
-    #lineupCard .lineup-pitch-fotmob .player-chip--public-circle.is-gk .nm {
-      bottom: calc(100% + 7px);
+    /* GK: name above ring, anchor shifted so label clears pitch bottom */
+    #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit.is-gk {
+      flex-direction: column-reverse;
+      transform: translate(-50%, calc(0.5 * var(--fotmob-ring)));
+      z-index: 6;
+    }
+
+    #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit.is-gk .fotmob-unit__name {
+      margin-top: 0;
+      margin-bottom: -2px;
+      border-radius: 9px 9px 0 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.4);
+      border-bottom: none;
     }
 
     .lineup-fotmob-subs {
@@ -1358,17 +1401,20 @@
 
     @media (max-width: 520px) {
       #lineupCard .lineup-pitch-fotmob {
-        --pitch-max-h: 900px;
+        --pitch-max-h: 920px;
       }
 
-      #lineupCard .lineup-pitch-fotmob .player-chip--public-circle {
-        height: clamp(44px, 10cqw, 54px);
-        width: clamp(44px, 10cqw, 54px);
+      #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit {
+        --fotmob-ring: clamp(36px, 9.5cqw, 46px);
       }
 
-      #lineupCard .lineup-pitch-fotmob .player-chip--public-circle .nm {
-        font-size: 0.72rem;
-        max-width: min(10ch, 24vw);
+      #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit .fotmob-unit__ring {
+        font-size: 0.74rem;
+      }
+
+      #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit .fotmob-unit__name {
+        font-size: 0.64rem;
+        max-width: min(9ch, 26vw);
       }
 
       .lineup-fotmob-formation {
@@ -1387,6 +1433,12 @@
 
       .lineup-fotmob-subs-title {
         color: rgba(226, 232, 240, 0.62);
+      }
+
+      #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit .fotmob-unit__ring,
+      #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit .fotmob-unit__name {
+        background: rgba(255, 255, 255, 0.94);
+        color: rgba(17, 24, 39, 0.92);
       }
     }
 
@@ -3268,9 +3320,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v134"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v134"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v134"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v135"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v135"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v135"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3284,7 +3336,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v134").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v135").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");

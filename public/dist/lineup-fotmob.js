@@ -2,7 +2,7 @@
  * FotMob-style public lineup view (single team, dark pitch, circular nodes).
  * Loaded by app.min.js via chunk-HQEVIJDY.js.
  */
-import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v134";
+import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v135";
 
 const FORMATION_ROLES = {
   "4-3-3": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "CM", "LW", "ST", "RW"],
@@ -160,6 +160,54 @@ function subName(sub) {
   return canonicalPlayerName(displayPlayerName(sub.name || ""));
 }
 
+var DISPLAY_GK_Y = 0.8;
+var DISPLAY_TOP_Y = 0.13;
+var DISPLAY_BOTTOM_Y = 0.8;
+
+/** Spread stored y coords into display bands (custom formations). */
+function spreadDataY(starters, playerIdx, gkIdx, clamp) {
+  var ys = [];
+  starters.forEach(function (p, i) {
+    if (i !== gkIdx) ys.push(clamp(p.y));
+  });
+  if (!ys.length) return 0.5;
+  var minY = Math.min.apply(null, ys);
+  var maxY = Math.max.apply(null, ys);
+  var y = clamp(starters[playerIdx].y);
+  var t = maxY > minY ? (y - minY) / (maxY - minY) : 0.5;
+  return DISPLAY_BOTTOM_Y - 0.12 - t * (DISPLAY_BOTTOM_Y - 0.12 - DISPLAY_TOP_Y);
+}
+
+/** Even row spacing for public pitch (does not mutate stored coords). */
+function displayRowY(starters, formation, playerIdx, gkIdx, clamp) {
+  if (playerIdx === gkIdx) return DISPLAY_GK_Y;
+
+  var splits = FORMATION_SPLITS[formation];
+  if (!splits || formation === "custom") {
+    return spreadDataY(starters, playerIdx, gkIdx, clamp);
+  }
+
+  var indices = sortedIndices(starters, clamp);
+  var order = indices.indexOf(playerIdx);
+  if (order < 0) order = playerIdx;
+
+  var row = 0;
+  var cursor = 0;
+  for (var r = 0; r < splits.length; r++) {
+    if (order < cursor + splits[r]) {
+      row = r;
+      break;
+    }
+    cursor += splits[r];
+  }
+
+  var numRows = splits.length;
+  if (row === 0) return DISPLAY_GK_Y;
+  var steps = numRows - 1;
+  var rowFromTop = numRows - 1 - row;
+  return DISPLAY_TOP_Y + (rowFromTop / steps) * (DISPLAY_BOTTOM_Y - DISPLAY_TOP_Y);
+}
+
 /**
  * @param {object} ctx - deps from app.min.js Bo()
  * @param {number|string} teamId
@@ -205,9 +253,9 @@ export function renderLineupTab(ctx, teamId) {
     var num = String(p.number || "").trim();
     var inner = num ? esc(num) : esc(role || "—");
     var isGk = role === "GK" || i === gkIdx;
-    var cls = "player-chip player-chip--public-circle" + (isGk ? " is-gk" : "");
+    var cls = "player-chip player-chip--fotmob-unit" + (isGk ? " is-gk" : "");
     var left = (clamp(p.x) * 100).toFixed(2);
-    var top = (clamp(p.y) * 100).toFixed(2);
+    var top = (displayRowY(starters, formation, i, gkIdx, clamp) * 100).toFixed(2);
     chips +=
       "<div class='" +
       cls +
@@ -218,10 +266,10 @@ export function renderLineupTab(ctx, teamId) {
       "%' data-idx='" +
       i +
       "'>" +
-      "<span class='pos'>" +
+      "<span class='fotmob-unit__ring'>" +
       inner +
       "</span>" +
-      "<span class='nm'>" +
+      "<span class='fotmob-unit__name'>" +
       esc(lineupLabel(p.name, p.number)) +
       "</span>" +
       "</div>";
