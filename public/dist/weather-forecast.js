@@ -74,6 +74,11 @@ function formatKickoffLocal(iso) {
 
 function parseKickoff(iso, dateFallback) {
   if (iso) {
+    var s = String(iso).trim();
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) {
+      var dl = new Date(s);
+      if (!isNaN(dl.getTime())) return dl;
+    }
     var d = new Date(iso);
     if (!isNaN(d.getTime())) return d;
   }
@@ -82,6 +87,24 @@ function parseKickoff(iso, dateFallback) {
     if (!isNaN(d2.getTime())) return d2;
   }
   return null;
+}
+
+function toLocalHourIso(d) {
+  var p = function (n) {
+    return n < 10 ? "0" + n : "" + n;
+  };
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":00";
+}
+
+function scoreGeocodeHit(hit, query) {
+  if (!hit) return -1;
+  var q = String(query || "").toLowerCase();
+  var score = 0;
+  if (hit.country_code === "AU") score += 40;
+  if (hit.admin1 === "Western Australia") score += 35;
+  if (hit.name && q.indexOf(String(hit.name).toLowerCase()) >= 0) score += 20;
+  score += Math.min(15, (hit.population || 0) / 10000);
+  return score;
 }
 
 function cToF(c) {
@@ -114,8 +137,9 @@ function fmtRainMm(mm, units) {
   return mm.toFixed(1) + " mm";
 }
 
-async function geocode(suburb, groundName) {
+async function geocode(suburb, groundName, locationLabel) {
   var candidates = [];
+  if (locationLabel) candidates.push(String(locationLabel).trim());
   if (groundName && suburb) {
     candidates.push([groundName, suburb, "Western Australia, Australia"].join(", "));
     candidates.push([groundName, suburb, "Australia"].join(", "));
@@ -137,35 +161,52 @@ async function geocode(suburb, groundName) {
     return true;
   });
 
+  var best = null;
+  var bestScore = -1;
+
   for (var i = 0; i < queries.length; i++) {
     var q = queries[i];
     var key = cacheKey(["geo", q]);
-    if (GEO_CACHE[key]) return GEO_CACHE[key];
+    if (GEO_CACHE[key]) {
+      if (GEO_CACHE[key].score > bestScore) {
+        best = GEO_CACHE[key];
+        bestScore = GEO_CACHE[key].score;
+      }
+      continue;
+    }
 
     var url =
       GEO_URL +
       "?name=" +
       encodeURIComponent(q) +
-      "&count=5&language=en&format=json&countryCode=AU";
+      "&count=8&language=en&format=json&countryCode=AU";
     try {
       var res = await fetch(url);
       if (!res.ok) continue;
       var data = await res.json();
       var results = data.results || [];
-      var hit =
-        results.find(function (r) {
-          return r.admin1 === "Western Australia";
-        }) || results[0];
+      results.sort(function (a, b) {
+        return scoreGeocodeHit(b, q) - scoreGeocodeHit(a, q);
+      });
+      var hit = results[0];
       if (hit && hit.latitude != null && hit.longitude != null) {
-        var out = { lat: hit.latitude, lon: hit.longitude, label: formatPlaceLabel(hit) };
+        var out = {
+          lat: hit.latitude,
+          lon: hit.longitude,
+          label: formatPlaceLabel(hit),
+          score: scoreGeocodeHit(hit, q),
+        };
         GEO_CACHE[key] = out;
-        return out;
+        if (out.score > bestScore) {
+          best = out;
+          bestScore = out.score;
+        }
       }
     } catch (e) {
       console.warn("[weather] geocode failed", q, e);
     }
   }
-  return null;
+  return best;
 }
 
 function formatPlaceLabel(hit) {
@@ -192,22 +233,25 @@ export async function fetchMatchWeather(match) {
 
   var lat = match && match.lat != null ? Number(match.lat) : NaN;
   var lng = match && match.lng != null ? Number(match.lng) : NaN;
+  var locationLabel = String((match && match.locationLabel) || "").trim();
   var geo = null;
   if (isFinite(lat) && isFinite(lng)) {
     geo = {
       lat: lat,
       lon: lng,
-      label: match.locationLabel || groundName || suburb || "Selected location",
+      label: locationLabel || groundName || suburb || "Selected location",
+      source: "pin",
     };
   } else {
-    if (!suburb && !groundName) {
+    if (!suburb && !groundName && !locationLabel) {
       return {
         ok: false,
         reason: "no_location",
         message: "Search for a ground location in Coach / admin (Team & Match tab).",
       };
     }
-    geo = await geocode(suburb, groundName);
+    geo = await geocode(suburb, groundName, locationLabel);
+    if (geo) geo.source = "geocode";
   }
   if (!geo) {
     var label = groundName && suburb ? groundName + ", " + suburb : groundName || suburb || "venue";
@@ -239,9 +283,9 @@ export async function fetchMatchWeather(match) {
     "&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m" +
     "&timezone=auto" +
     "&start_hour=" +
-    encodeURIComponent(start.toISOString().slice(0, 13) + ":00") +
+    encodeURIComponent(toLocalHourIso(start)) +
     "&end_hour=" +
-    encodeURIComponent(end.toISOString().slice(0, 13) + ":00");
+    encodeURIComponent(toLocalHourIso(end));
 
   try {
     var res = await fetch(url);
@@ -313,6 +357,7 @@ export async function fetchMatchWeather(match) {
     var out = {
       ok: true,
       location: geo.label,
+      locationSource: geo.source || "geocode",
       kickoffLabel: formatKickoffLocal(match.kickoff || kickoff.toISOString()),
       summary: {
         tempMin: temps.length ? Math.min.apply(null, temps) : null,
@@ -434,7 +479,9 @@ export function weatherPanelHtml(data, units) {
     weatherUnitsToggleHtml(units) +
     "</div>" +
     "<div class='lineup-weather-loc hint'>" +
-    escapeHtml(data.location || "") +
+    "Forecast for " +
+    escapeHtml(data.location || "ground") +
+    (data.locationSource === "pin" ? " (saved pin)" : "") +
     "</div>" +
     stats +
     hourly +

@@ -3,7 +3,7 @@
  * Replaces Leaflet map picker — stores lat/lng for accurate weather.
  */
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
-const SEARCH_DEBOUNCE_MS = 320;
+const SEARCH_DEBOUNCE_MS = 400;
 const MIN_QUERY_LEN = 2;
 
 var searchTimer = null;
@@ -151,7 +151,7 @@ function syncFromMatchEntry(entry) {
       e.selected.textContent = "";
       e.selected.hidden = true;
     }
-    if (e.label) e.label.value = "";
+    if (e.label && document.activeElement !== e.label) e.label.value = "";
     return;
   }
   var lat = entry.lat != null ? Number(entry.lat) : NaN;
@@ -160,22 +160,23 @@ function syncFromMatchEntry(entry) {
   var suburb = String(entry.suburb || "").trim();
   var label = String(entry.locationLabel || "").trim();
   if (!label) {
-    label = [ground, suburb, lat && lng ? "" : ""].filter(Boolean).join(", ");
     if (ground && suburb) label = ground + ", " + suburb + ", WA";
     else if (ground) label = ground + (suburb ? ", " + suburb : "") + ", WA";
     else if (suburb) label = suburb + ", WA";
   }
+  if (e.label && document.activeElement !== e.label) e.label.value = label;
+  if (e.selected) {
+    e.selected.textContent = label ? "📍 " + label : "";
+    e.selected.hidden = !label;
+  }
   if (isFinite(lat) && isFinite(lng)) {
-    setSelected(
-      { name: ground || suburb || "Location", latitude: lat, longitude: lng, admin2: suburb, country_code: "AU" },
-      label
-    );
-  } else if (label) {
-    if (e.label) e.label.value = label;
-    if (e.selected) {
-      e.selected.textContent = "📍 " + label;
-      e.selected.hidden = false;
-    }
+    if (e.lat) e.lat.value = String(lat.toFixed(6));
+    if (e.lng) e.lng.value = String(lng.toFixed(6));
+  }
+  if (e.ground && ground && document.activeElement !== e.ground) e.ground.value = ground;
+  if (e.suburb && suburb && document.activeElement !== e.suburb) e.suburb.value = suburb;
+  if (e.search && document.activeElement !== e.search && !e.search.value.trim() && (ground || label)) {
+    e.search.value = ground || label.split(",")[0] || "";
   }
 }
 
