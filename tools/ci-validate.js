@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { execFileSync } = require("child_process");
 
 const root = path.join(__dirname, "..");
 const publicDir = path.join(root, "public");
@@ -75,6 +76,17 @@ try {
   }
 } catch (e) {
   console.error("manifest.json invalid:", e.message);
+  failed = true;
+}
+
+try {
+  const appPath = path.join(publicDir, "dist", "app.min.js");
+  const tmp = path.join(root, ".tmp-ci-app.mjs");
+  fs.writeFileSync(tmp, fs.readFileSync(appPath, "utf8"));
+  execFileSync(process.execPath, ["--check", tmp], { stdio: "pipe" });
+  fs.unlinkSync(tmp);
+} catch (e) {
+  console.error("app.min.js syntax check failed");
   failed = true;
 }
 

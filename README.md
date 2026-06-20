@@ -2,7 +2,7 @@
 
 Static single-page app for team player-of-the-match voting, hosted on [Firebase Hosting](https://wembley-downs-div-8-2026.web.app/).
 
-**Current version:** v125
+**Current version:** v138
 
 ## Architecture
 
@@ -134,16 +134,25 @@ npx playwright install chromium
 
 Run against local emulator: `node tools/admin-check.js http://localhost:5000`
 
-## Release checklist (bump v125 → v126 together)
+## Release checklist (bump v138 → v139 together)
 
-When shipping a new cache-breaking version, update **all** of these to the same version (e.g. `v126`):
+When shipping a new cache-breaking version, update **all** of these to the same version (e.g. `v139`):
 
-1. `public/index.html` — HTML comment + every `?tag=vNNN` on `app.min.js`, `voter-enhancements.js`, `admin-merge-rounds.js`
+1. `public/index.html` — HTML comment + every `?tag=vNNN` on dist scripts (`app.min.js`, `voter-enhancements.js`, `admin-merge-rounds.js`, etc.)
 2. `public/sw.js` — `CACHE_VERSION = "vNNN"`
 3. `public/index.html` — `navigator.serviceWorker.register("/sw.js?v=NNN")` (numeric only, no `v` prefix)
-4. Run `node tools/ci-validate.js` — must pass
-5. Deploy hosting + rules
-6. Smoke-test live: no fatal banner, vote tab, participation pill, Coach/admin unlock, merge UI preview
+4. Every `?tag=vNNN` inside `public/dist/*.js` import paths
+5. Run `node tools/ci-validate.js` — must pass
+6. Run `node tools/rebuild-app-v138.js` if patching `app.min.js` from v136 base (see `tools/patch-app-v137.js`)
+7. Deploy hosting + rules; smoke-test live (no fatal banner, vote tab, admin unlock)
+
+## Name aliases (`NAME_ALIASES`)
+
+Manual spelling fixes live in `public/dist/name-match.js` under `NAME_ALIASES` (lowercase stripped key → canonical display name). Example: `rainey: "Rainy"`. After editing, bump the version tag on `name-match.js` imports.
+
+## Coach slots
+
+Each team has coach **slot 1** and **slot 2** (`coach1PasswordHash` / `coach2PasswordHash` in config). Coach votes are stored in `coachVotes/` with a `slot` field. Super admin can run the Chris coach-slot repair from the admin panel (v136+).
 
 ## Live site
 

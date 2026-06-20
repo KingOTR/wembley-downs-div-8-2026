@@ -60,7 +60,7 @@ const patches = [
     name: "lineup export snapshot helper",
     from: 'Dh&&Dh.addEventListener("click",function(){try{F&&Pn&&',
     to:
-      'window.__svLineupExportSnapshot=function(){try{if(F&&Pn)F.subs=String(Pn.value||"").split(/\\r?\\n/).map(function(h){return h.trim()}).filter(Boolean)}catch{}try{Wh()}catch{}var c=ie(ue),l=Lo(c);return{team:c,round:l,entry:Va(c,l)}},Dh&&Dh.addEventListener("click",function(){try{F&&Pn&&',
+      'window.__svLineupExportSnapshot=function(){try{if(F&&Pn)F.subs=String(Pn.value||"").split("\\n").map(function(h){return h.trim()}).filter(Boolean)}catch{}try{Wh()}catch{}var c=ie(ue),l=Lo(c);return{team:c,round:l,entry:Va(c,l)}},Dh&&Dh.addEventListener("click",function(){try{F&&Pn&&',
   },
 ];
 

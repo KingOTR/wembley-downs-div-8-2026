@@ -22,7 +22,7 @@ function get(url) {
 
   const html = htmlRes.body.toString("utf8");
   const tagMatch = html.match(/tag=(v\d+)/);
-  const expectedTag = tagMatch ? tagMatch[1] : "v125";
+  const expectedTag = tagMatch ? tagMatch[1] : "v138";
   const checks = {
     html200: htmlRes.status === 200,
     logo200: logoRes.status === 200,
