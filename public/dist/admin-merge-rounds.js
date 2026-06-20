@@ -11,7 +11,7 @@ import {
   nameSimilarity,
   DEFAULT_SQUAD_THRESHOLD,
   STRICT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v133";
+} from "./name-match.js?tag=v134";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -584,14 +584,36 @@ async function readHeaders() {
 }
 
 const SUPER_ADMIN_EMAIL = "sydneywilliam29@gmail.com";
-const FIRESTORE_SDK_URL = "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-let firestoreModPromise = null;
 
-async function getFirestoreModule() {
-  await waitForApp(25000);
-  if (!window.__svFirestore) throw new Error("Cloud not connected. Wait for sync or refresh.");
-  if (!firestoreModPromise) firestoreModPromise = import(FIRESTORE_SDK_URL);
-  return firestoreModPromise;
+function requireFirestoreOps() {
+  if (
+    !window.__svFirestoreBatch ||
+    !window.__svVoteDoc ||
+    !window.__svAddDoc ||
+    !window.__svCoachVotesCol
+  ) {
+    throw new Error(
+      "Firestore write API not ready. Wait for cloud sync to finish, then refresh and unlock super admin."
+    );
+  }
+}
+
+async function waitForFirestoreOps(maxMs) {
+  var deadline = Date.now() + (maxMs || 25000);
+  while (Date.now() < deadline) {
+    if (
+      window.__svFirestoreBatch &&
+      window.__svVoteDoc &&
+      window.__svAddDoc &&
+      window.__svCoachVotesCol
+    ) {
+      return;
+    }
+    await new Promise(function (r) {
+      setTimeout(r, 200);
+    });
+  }
+  requireFirestoreOps();
 }
 
 function voteDocIdFromPath(name) {
@@ -859,31 +881,31 @@ async function fetchVotesRest(teamId) {
 
 async function batchWrite(writes) {
   await ensureCloudAuth(true);
-  var mod = await getFirestoreModule();
-  var db = window.__svFirestore;
-  var writeBatch = mod.writeBatch;
-  var doc = mod.doc;
+  await waitForApp(25000);
+  await waitForFirestoreOps(25000);
+  var newBatch = window.__svFirestoreBatch;
+  var voteDoc = window.__svVoteDoc;
 
   for (var i = 0; i < writes.length; i += 400) {
     var chunk = writes.slice(i, i + 400);
-    console.log("[merge-rounds] SDK batch chunk", Math.floor(i / 400) + 1, "ops:", chunk.length);
-    var batch = writeBatch(db);
+    console.log("[merge-rounds] bundled batch chunk", Math.floor(i / 400) + 1, "ops:", chunk.length);
+    var batch = newBatch();
     chunk.forEach(function (w) {
       if (w.delete) {
         var delId = voteDocIdFromPath(w.delete);
-        batch.delete(doc(db, "votes", delId));
+        batch.delete(voteDoc(delId));
         return;
       }
       if (w.update) {
         var upId = voteDocIdFromPath(w.update.name);
         var data = w.plainData || restFieldsToObject(w.update.fields);
-        batch.set(doc(db, "votes", upId), data, { merge: true });
+        batch.set(voteDoc(upId), data, { merge: true });
       }
     });
     try {
       await batch.commit();
     } catch (e) {
-      console.error("[merge-rounds] SDK batch failed", e);
+      console.error("[merge-rounds] bundled batch failed", e);
       var code = e && e.code ? String(e.code) : "";
       if (/permission/i.test(code) || /permission/i.test(e.message || "")) {
         throw new Error(formatWriteStatus({ code: 7, message: e.message }, "batch commit"));
@@ -896,15 +918,14 @@ async function batchWrite(writes) {
 async function createCoachVotes(rows) {
   if (!rows.length) return 0;
   await ensureCloudAuth(true);
-  var mod = await getFirestoreModule();
-  var db = window.__svFirestore;
-  var addDoc = mod.addDoc;
-  var collection = mod.collection;
+  await waitForFirestoreOps(25000);
+  var addDoc = window.__svAddDoc;
+  var coachCol = window.__svCoachVotesCol;
   var created = 0;
   for (var i = 0; i < rows.length; i++) {
-    var ref = await addDoc(collection(db, "coachVotes"), rows[i]);
+    var ref = await addDoc(coachCol(), rows[i]);
     created++;
-    console.log("[merge-rounds] coach vote created", ref.id, rows[i].round, "slot", rows[i].slot);
+    console.log("[merge-rounds] coach vote created", ref && ref.id ? ref.id : "?", rows[i].round, "slot", rows[i].slot);
   }
   return created;
 }
@@ -1064,13 +1085,11 @@ async function runMergeCloud(teamId, plan) {
 async function writeMergeAuditLog(teamId, plan, mergedCount, deletedCount, deleteSource) {
   try {
     await ensureCloudAuth(true);
-    if (!window.__svFirestore) return;
-    var mod = await getFirestoreModule();
-    var addDoc = mod.addDoc;
-    var collection = mod.collection;
+    await waitForFirestoreOps(8000);
+    if (!window.__svAddDoc || !window.__svAdminLogCol) return;
     var auth = window.__svAuth;
     var adminEmail = auth && auth.currentUser ? auth.currentUser.email || "" : "";
-    await addDoc(collection(window.__svFirestore, "adminLog"), {
+    await window.__svAddDoc(window.__svAdminLogCol(), {
       action: "mergeRounds",
       teamId: teamId,
       sourceRound: plan.srcLabel,

@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v133: logo blend, merge SDK writes, Chris coach migration, Rainey→Rainy alias -->
+  <!-- v134: name suggest on focus only, bundled Firestore batch for merge -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v133" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v134" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -2757,7 +2757,6 @@
           class="vote-name-input"
           placeholder="Enter your name before voting"
           autocomplete="off"
-          list="voterNameSuggest"
           aria-autocomplete="list"
         />
         <datalist id="voterNameSuggest"></datalist>
@@ -3269,9 +3268,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v133"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v133"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v133"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v134"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v134"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v134"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3285,7 +3284,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v133").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v134").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");

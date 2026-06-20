@@ -8,7 +8,7 @@ import {
   displayPlayerName,
   canonicalPlayerName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v133";
+} from "./name-match.js?tag=v134";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -780,6 +780,50 @@ function wireThemeToggle() {
   applyTheme(saved);
 }
 
+function wireNameSuggestDeferUntilFocus() {
+  var input = document.getElementById("voterNameInput");
+  var panel = document.getElementById("voterNameSuggestPanel");
+  var datalist = document.getElementById("voterNameSuggest");
+  if (!input || input._svSuggestDefer) return;
+  input._svSuggestDefer = true;
+
+  function hideSuggestions() {
+    if (panel) {
+      panel.hidden = true;
+      panel.innerHTML = "";
+    }
+    input.removeAttribute("list");
+  }
+
+  hideSuggestions();
+
+  function showSuggestionsReady() {
+    try {
+      if (window.matchMedia && window.matchMedia("(max-width: 768px)").matches) {
+        input.setAttribute("list", "voterNameSuggest");
+      }
+    } catch (e) {}
+  }
+
+  input.addEventListener(
+    "focus",
+    function () {
+      showSuggestionsReady();
+    },
+    true
+  );
+  input.addEventListener(
+    "click",
+    function () {
+      showSuggestionsReady();
+    },
+    true
+  );
+  input.addEventListener("blur", function () {
+    setTimeout(hideSuggestions, 150);
+  });
+}
+
 function wireVoterNameListeners() {
   var input = document.getElementById("voterNameInput");
   if (!input || input._svEnhance) return;
@@ -911,6 +955,7 @@ function wireLineupNameNormalize() {
 }
 
 function init() {
+  wireNameSuggestDeferUntilFocus();
   wireVoterNameListeners();
   wireDuplicateSubmitGuard();
   wireOfflineQueue();

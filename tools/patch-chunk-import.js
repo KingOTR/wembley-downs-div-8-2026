@@ -1,8 +1,8 @@
 const fs = require("fs");
 const p = "public/dist/app.min.js";
 let s = fs.readFileSync(p, "utf8");
-const from = 'import("./chunk-HQEVIJDY.js")';
-const to = 'import("./chunk-HQEVIJDY.js?tag=v133")';
+const from = 'import("./chunk-HQEVIJDY.js?tag=v133")';
+const to = 'import("./chunk-HQEVIJDY.js?tag=v134")';
 if (s.includes(to)) {
   console.log("chunk import already patched");
 } else if (s.includes(from)) {
