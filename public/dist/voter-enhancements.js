@@ -7,7 +7,7 @@ import {
   normalizeName,
   displayPlayerName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v131";
+} from "./name-match.js?tag=v132";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";

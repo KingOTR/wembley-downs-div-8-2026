@@ -2,7 +2,7 @@
  * FotMob-style public lineup view (single team, dark pitch, circular nodes).
  * Loaded by app.min.js via chunk-HQEVIJDY.js.
  */
-import { displayPlayerName } from "./name-match.js?tag=v131";
+import { displayPlayerName } from "./name-match.js?tag=v132";
 
 const FORMATION_ROLES = {
   "4-3-3": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "CM", "LW", "ST", "RW"],
