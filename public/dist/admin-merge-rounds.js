@@ -8,6 +8,7 @@ import {
   canonicalPlayerName,
   explainSquadMismatch,
   displayPlayerName,
+  nameSimilarity,
   DEFAULT_SQUAD_THRESHOLD,
   STRICT_SQUAD_THRESHOLD,
 } from "./name-match.js?tag=v133";
@@ -583,6 +584,83 @@ async function readHeaders() {
 }
 
 const SUPER_ADMIN_EMAIL = "sydneywilliam29@gmail.com";
+const FIRESTORE_SDK_URL = "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+let firestoreModPromise = null;
+
+async function getFirestoreModule() {
+  await waitForApp(25000);
+  if (!window.__svFirestore) throw new Error("Cloud not connected. Wait for sync or refresh.");
+  if (!firestoreModPromise) firestoreModPromise = import(FIRESTORE_SDK_URL);
+  return firestoreModPromise;
+}
+
+function voteDocIdFromPath(name) {
+  var m = String(name || "").match(/\/documents\/votes\/(.+)$/);
+  return m ? decodeURIComponent(m[1]) : normalizeVoteDocId(name);
+}
+
+function restFieldsToObject(fields) {
+  var out = {};
+  Object.keys(fields || {}).forEach(function (k) {
+    out[k] = parseFsValue(fields[k]);
+  });
+  return out;
+}
+
+function buildVoteRow(v, teamId, dstLabel, dstRoundKey) {
+  var key = voterDocKey(v);
+  var picks = (Array.isArray(v.picks) ? v.picks.slice() : []).filter(Boolean);
+  if (picks.length !== 3) {
+    throw new Error(
+      "Invalid vote for " +
+        (v.voterName || "?") +
+        ": need exactly 3 picks (has " +
+        picks.length +
+        "). Fix the ballot before merging."
+    );
+  }
+  return {
+    id: "t" + teamId + "_r" + dstRoundKey + "_v" + key,
+    teamId: teamId,
+    voterName: canonicalPlayerName(v.voterName) || v.voterName,
+    voterNameKey: key,
+    round: dstLabel,
+    picks: picks.map(function (p) {
+      return canonicalPlayerName(p) || p;
+    }),
+    submittedAt: v.submittedAt || new Date().toISOString(),
+  };
+}
+
+function buildCoachVoteRow(vote, slot) {
+  var picks = (Array.isArray(vote.picks) ? vote.picks.slice() : []).filter(Boolean);
+  if (picks.length !== 3) {
+    throw new Error(
+      "Chris vote in " +
+        voteRoundLabel(vote) +
+        " needs 3 picks (has " +
+        picks.length +
+        ")."
+    );
+  }
+  return {
+    teamId: vote.teamId,
+    slot: slot,
+    round: voteRoundLabel(vote),
+    picks: picks.map(function (p) {
+      return canonicalPlayerName(p) || p;
+    }),
+    submittedAt: vote.submittedAt || new Date().toISOString(),
+  };
+}
+
+function isChrisVoterName(name) {
+  var base = displayPlayerName(name);
+  if (!base) return false;
+  var key = normalizeName(base);
+  if (key === "chris" || key.indexOf("chris") === 0) return true;
+  return nameSimilarity(base, "Chris") >= 0.88;
+}
 
 async function authHeaders() {
   await ensureCloudAuth(false);
@@ -616,17 +694,23 @@ async function ensureCloudAuth(requireSuperEmail) {
   return user;
 }
 
-function formatWriteStatus(status) {
+function formatWriteStatus(status, context) {
   if (!status) return "unknown error";
   var msg = status.message || "";
   if (status.code === 7 || /PERMISSION_DENIED/i.test(msg)) {
     return (
-      "Permission denied — unlock super admin as " +
+      "Permission denied" +
+      (context ? " (" + context + ")" : "") +
+      ". Sign in as super admin " +
       SUPER_ADMIN_EMAIL +
-      " (Firestore writes need Firebase sign-in)."
+      " (Coach/admin → Super admin → Unlock). Deletes and admin writes require Firebase auth; " +
+      "vote upserts must use doc id t{team}_r{round}_v{voter} with exactly 3 picks."
     );
   }
   if (status.code === 5 || /NOT_FOUND/i.test(msg)) return "Document not found: " + msg;
+  if (/UNAUTHENTICATED/i.test(msg)) {
+    return "Not signed in to Firebase — unlock super admin as " + SUPER_ADMIN_EMAIL + " and retry.";
+  }
   return msg || "error code " + (status.code != null ? status.code : "?");
 }
 
@@ -774,42 +858,55 @@ async function fetchVotesRest(teamId) {
 }
 
 async function batchWrite(writes) {
-  var pid = projectId();
-  if (!pid) throw new Error("Cloud not connected.");
-  var url =
-    "https://firestore.googleapis.com/v1/projects/" +
-    encodeURIComponent(pid) +
-    "/databases/(default)/documents:batchWrite";
+  await ensureCloudAuth(true);
+  var mod = await getFirestoreModule();
+  var db = window.__svFirestore;
+  var writeBatch = mod.writeBatch;
+  var doc = mod.doc;
+
   for (var i = 0; i < writes.length; i += 400) {
     var chunk = writes.slice(i, i + 400);
-    console.log("[merge-rounds] batchWrite chunk", Math.floor(i / 400) + 1, "ops:", chunk.length);
-    var res = await fetch(url, {
-      method: "POST",
-      headers: await authHeaders(),
-      body: JSON.stringify({ writes: chunk }),
-    });
-    var body = await res.json();
-    if (!res.ok) {
-      var msg = body && body.error && body.error.message ? body.error.message : "Batch write failed (" + res.status + ")";
-      console.error("[merge-rounds] batchWrite failed", body);
-      throw new Error(msg);
-    }
-    if (body.writeResults) {
-      var failures = [];
-      body.writeResults.forEach(function (wr, idx) {
-        if (wr && wr.status && wr.status.code !== 0) {
-          failures.push({ idx: idx, status: wr.status });
-          console.error("[merge-rounds] write error", idx, wr.status);
-        }
-      });
-      if (failures.length) {
-        var detail = formatWriteStatus(failures[0].status);
-        throw new Error(
-          "Batch write failed (" + failures.length + " of " + chunk.length + " ops): " + detail
-        );
+    console.log("[merge-rounds] SDK batch chunk", Math.floor(i / 400) + 1, "ops:", chunk.length);
+    var batch = writeBatch(db);
+    chunk.forEach(function (w) {
+      if (w.delete) {
+        var delId = voteDocIdFromPath(w.delete);
+        batch.delete(doc(db, "votes", delId));
+        return;
       }
+      if (w.update) {
+        var upId = voteDocIdFromPath(w.update.name);
+        var data = w.plainData || restFieldsToObject(w.update.fields);
+        batch.set(doc(db, "votes", upId), data, { merge: true });
+      }
+    });
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.error("[merge-rounds] SDK batch failed", e);
+      var code = e && e.code ? String(e.code) : "";
+      if (/permission/i.test(code) || /permission/i.test(e.message || "")) {
+        throw new Error(formatWriteStatus({ code: 7, message: e.message }, "batch commit"));
+      }
+      throw e;
     }
   }
+}
+
+async function createCoachVotes(rows) {
+  if (!rows.length) return 0;
+  await ensureCloudAuth(true);
+  var mod = await getFirestoreModule();
+  var db = window.__svFirestore;
+  var addDoc = mod.addDoc;
+  var collection = mod.collection;
+  var created = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var ref = await addDoc(collection(db, "coachVotes"), rows[i]);
+    created++;
+    console.log("[merge-rounds] coach vote created", ref.id, rows[i].round, "slot", rows[i].slot);
+  }
+  return created;
 }
 
 function docName(docId) {
@@ -943,25 +1040,20 @@ async function deleteSourceVotesCloud(teamId, srcLabel, sourceVotes) {
 
 async function runMergeCloud(teamId, plan) {
   var writes = plan.merged.map(function (v) {
-    var key = voterDocKey(v);
-    var newId = "t" + teamId + "_r" + plan.dstRoundKey + "_v" + key;
-    console.log("[merge-rounds] upsert", newId, "←", v.voterName, plan.srcLabel, "→", plan.dstLabel);
-    // No updateMask: destination docs usually don't exist yet; masked update fails with NOT_FOUND.
+    var row = buildVoteRow(v, teamId, plan.dstLabel, plan.dstRoundKey);
+    console.log("[merge-rounds] upsert", row.id, "←", v.voterName, plan.srcLabel, "→", plan.dstLabel);
     return {
       update: {
-        name: docName(newId),
-        fields: {
-          teamId: fsValue(teamId),
-          voterName: fsValue(canonicalPlayerName(v.voterName) || v.voterName),
-          voterNameKey: fsValue(key),
-          round: fsValue(plan.dstLabel),
-          picks: fsValue(
-            (Array.isArray(v.picks) ? v.picks.slice() : []).map(function (p) {
-              return canonicalPlayerName(p) || p;
-            })
-          ),
-          submittedAt: fsValue(v.submittedAt || new Date().toISOString()),
-        },
+        name: docName(row.id),
+        fields: {},
+      },
+      plainData: {
+        teamId: row.teamId,
+        voterName: row.voterName,
+        voterNameKey: row.voterNameKey,
+        round: row.round,
+        picks: row.picks,
+        submittedAt: row.submittedAt,
       },
     };
   });
@@ -971,47 +1063,143 @@ async function runMergeCloud(teamId, plan) {
 
 async function writeMergeAuditLog(teamId, plan, mergedCount, deletedCount, deleteSource) {
   try {
+    await ensureCloudAuth(true);
+    if (!window.__svFirestore) return;
+    var mod = await getFirestoreModule();
+    var addDoc = mod.addDoc;
+    var collection = mod.collection;
     var auth = window.__svAuth;
-    if (!auth || !auth.currentUser) return;
-    var pid = projectId();
-    if (!pid) return;
-    var logId = "merge_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-    var url =
-      "https://firestore.googleapis.com/v1/projects/" +
-      encodeURIComponent(pid) +
-      "/databases/(default)/documents/adminLog/" +
-      encodeURIComponent(logId);
-    var adminEmail = auth.currentUser.email || "";
-    var body = {
-      fields: {
-        action: fsValue("mergeRounds"),
-        teamId: fsValue(teamId),
-        sourceRound: fsValue(plan.srcLabel),
-        destRound: fsValue(plan.dstLabel),
-        mergedCount: fsValue(mergedCount),
-        deletedSourceCount: fsValue(deleteSource ? deletedCount : 0),
-        skippedDup: fsValue(plan.skippedDup.length),
-        invalid: fsValue(plan.invalid.length),
-        adminEmail: fsValue(adminEmail),
-        timestamp: fsValue(new Date().toISOString()),
-      },
-    };
-    var res = await fetch(url, {
-      method: "PATCH",
-      headers: await authHeaders(),
-      body: JSON.stringify(body),
+    var adminEmail = auth && auth.currentUser ? auth.currentUser.email || "" : "";
+    await addDoc(collection(window.__svFirestore, "adminLog"), {
+      action: "mergeRounds",
+      teamId: teamId,
+      sourceRound: plan.srcLabel,
+      destRound: plan.dstLabel,
+      mergedCount: mergedCount,
+      deletedSourceCount: deleteSource ? deletedCount : 0,
+      skippedDup: plan.skippedDup.length,
+      invalid: plan.invalid.length,
+      adminEmail: adminEmail,
+      timestamp: new Date().toISOString(),
     });
-    if (!res.ok) {
-      var row = await res.json().catch(function () {
-        return {};
-      });
-      console.warn("[merge-rounds] audit log failed", row.error || res.status);
-    } else {
-      console.log("[merge-rounds] audit log written", logId);
-    }
+    console.log("[merge-rounds] audit log written");
   } catch (e) {
     console.warn("[merge-rounds] audit log error", e);
   }
+}
+
+function findChrisPlayerVotes(votes, teamId) {
+  return (votes || []).filter(function (v) {
+    return v && teamIdStr(v.teamId) === teamIdStr(teamId) && isChrisVoterName(v.voterName);
+  });
+}
+
+function applyChrisMigrationLocal(teamId, slot, chrisVotes) {
+  var data = loadLocalData();
+  data.votes = data.votes || [];
+  data.coachVotes = data.coachVotes || [];
+  var removed = 0;
+  var added = 0;
+  chrisVotes.forEach(function (v) {
+    var coachRow = buildCoachVoteRow(v, slot);
+    coachRow.id = "local_chris_" + teamId + "_s" + slot + "_r" + roundDocKey(coachRow.round);
+    data.coachVotes.push(coachRow);
+    added++;
+  });
+  data.votes = data.votes.filter(function (v) {
+    if (!v || teamIdStr(v.teamId) !== teamIdStr(teamId) || !isChrisVoterName(v.voterName)) return true;
+    removed++;
+    return false;
+  });
+  saveLocalData(data);
+  return { removed: removed, added: added, coachVotes: data.coachVotes };
+}
+
+async function migrateChrisVotesCloud(teamId, slot) {
+  await ensureCloudAuth(true);
+  var votes = await fetchVotesRest(teamId);
+  var chrisVotes = findChrisPlayerVotes(votes, teamId);
+  if (!chrisVotes.length) return { moved: 0, removed: 0, rounds: [] };
+
+  var coachRows = chrisVotes.map(function (v) {
+    return buildCoachVoteRow(v, slot);
+  });
+  var created = await createCoachVotes(coachRows);
+
+  var deletes = chrisVotes
+    .filter(function (v) {
+      return v && v.id;
+    })
+    .map(function (v) {
+      return { delete: docName(v.id) };
+    });
+  if (deletes.length) await batchWrite(deletes);
+
+  var rounds = chrisVotes.map(function (v) {
+    return voteRoundLabel(v);
+  });
+  return { moved: created, removed: deletes.length, rounds: rounds };
+}
+
+async function runMigrateChrisCoachVotes(teamId, slot) {
+  if (!isSuperAdminUnlocked()) {
+    throw new Error("Unlock super admin first (Coach / admin → Super admin).");
+  }
+  var localData = loadLocalData();
+  var localChris = findChrisPlayerVotes(localData.votes, teamId);
+  var localOnly = !window.__svFirebaseApp;
+
+  if (localOnly) {
+    if (!localChris.length) {
+      return { moved: 0, removed: 0, rounds: [], localOnly: true, message: "No Chris player votes in local cache." };
+    }
+    var localRes = applyChrisMigrationLocal(teamId, slot, localChris);
+    notifyVotesMerged(teamId, loadLocalData().votes.filter(function (v) {
+      return v && teamIdStr(v.teamId) === teamIdStr(teamId);
+    }));
+    return {
+      moved: localRes.added,
+      removed: localRes.removed,
+      rounds: localChris.map(function (v) {
+        return voteRoundLabel(v);
+      }),
+      localOnly: true,
+      message:
+        "Moved " +
+        localRes.added +
+        " Chris ballot(s) to coach slot " +
+        slot +
+        " in this browser (local only).",
+    };
+  }
+
+  await ensureCloudAuth(true);
+  var cloudRes = await migrateChrisVotesCloud(teamId, slot);
+  if (localChris.length) applyChrisMigrationLocal(teamId, slot, localChris);
+  var freshVotes = await fetchVotesRest(teamId);
+  notifyVotesMerged(teamId, freshVotes);
+  if (!cloudRes.moved && !localChris.length) {
+    return {
+      moved: 0,
+      removed: 0,
+      rounds: [],
+      message: "No player votes found for Chris on team " + teamId + ".",
+    };
+  }
+  return {
+    moved: cloudRes.moved,
+    removed: cloudRes.removed,
+    rounds: cloudRes.rounds,
+    message:
+      "Moved " +
+      cloudRes.moved +
+      " Chris player ballot(s) to coach slot " +
+      slot +
+      (cloudRes.rounds.length ? " (" + cloudRes.rounds.join(", ") + ")" : "") +
+      ". Removed " +
+      cloudRes.removed +
+      " from public votes.",
+  };
 }
 
 function applyMergedVotesLocal(teamId, plan, deleteSource) {
@@ -1357,6 +1545,44 @@ function wireMergeUi() {
     unlockObs.observe(superContent, { attributes: true, attributeFilter: ["style"] });
   }
   scheduleUnlockRefresh();
+
+  var migrateChrisBtn = document.getElementById("migrateChrisCoachVotes");
+  if (migrateChrisBtn && !migrateChrisBtn._svBound) {
+    migrateChrisBtn._svBound = true;
+    migrateChrisBtn.addEventListener("click", async function () {
+      var hintEl = document.getElementById("migrateChrisHint");
+      var errElChris = document.getElementById("migrateChrisErr");
+      if (hintEl) hintEl.textContent = "";
+      if (errElChris) errElChris.textContent = "";
+      migrateChrisBtn.disabled = true;
+      try {
+        if (!isSuperAdminUnlocked()) {
+          throw new Error("Unlock super admin first (Coach / admin → Super admin).");
+        }
+        var teamId = getAdminTeamId();
+        var slotSel = document.getElementById("chrisCoachSlot");
+        var slot = slotSel && slotSel.value ? parseInt(slotSel.value, 10) : 1;
+        if (
+          !confirm(
+            "Move all Chris player votes to coach slot " + slot + "? Public votes will be removed from the player pool."
+          )
+        ) {
+          return;
+        }
+        var result = await runMigrateChrisCoachVotes(teamId, slot);
+        if (hintEl) hintEl.textContent = result.message || "Done.";
+        if (errElChris && !result.moved && !result.removed) {
+          errElChris.textContent = result.message || "Nothing to move.";
+        }
+        scheduleRefreshRoundSelects(true);
+      } catch (e) {
+        console.error("[merge-rounds] Chris migration failed", e);
+        if (errElChris) errElChris.textContent = e.message || String(e);
+      } finally {
+        migrateChrisBtn.disabled = false;
+      }
+    });
+  }
 
   previewBtn.addEventListener("click", async function () {
     if (errEl) errEl.textContent = "";

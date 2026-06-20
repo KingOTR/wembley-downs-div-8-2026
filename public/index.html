@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v133: name aliases (Rainey→Rainy) + merge dropdown fix -->
+  <!-- v133: logo blend, merge SDK writes, Chris coach migration, Rainey→Rainy alias -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -2468,25 +2468,43 @@
 
     .brand-logo {
       flex: 0 0 auto;
+      width: 72px;
+      height: 72px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: none;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--gray);
       border: none;
       box-shadow: none;
-      border-radius: 0;
-      overflow: visible;
+      line-height: 0;
     }
 
     .brand-logo img {
-      width: 72px;
-      height: 72px;
-      object-fit: contain;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
       display: block;
       padding: 0;
       border: none;
       box-shadow: none;
-      background: none;
+      border-radius: 50%;
+      background: var(--gray);
+      transform: scale(1.06);
+      mix-blend-mode: multiply;
+    }
+
+    html[data-theme="dark"] .brand-logo img {
+      mix-blend-mode: normal;
+      filter: brightness(0.98) contrast(1.04);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme="light"]) .brand-logo img {
+        mix-blend-mode: normal;
+        filter: brightness(0.98) contrast(1.04);
+      }
     }
 
     @media (max-width: 400px) {
@@ -2494,14 +2512,14 @@
         flex-direction: column;
         gap: 0.45rem;
       }
-      .brand-logo img {
+      .brand-logo {
         width: 64px;
         height: 64px;
       }
     }
 
     @media (min-width: 520px) {
-      .brand-logo img {
+      .brand-logo {
         width: 80px;
         height: 80px;
       }
@@ -3081,6 +3099,22 @@
             <input type="checkbox" id="mergeDeleteSource" checked />
             Delete source round votes after merge
           </label>
+          <div class="subcard" style="margin-top: 0.65rem; padding: 0.65rem; border: 1px solid var(--border); border-radius: 10px">
+            <div style="font-weight: 800; font-size: 0.92rem; color: var(--red-dark)">Coach vote cleanup</div>
+            <p class="hint" style="margin: 0.35rem 0">
+              Chris is a coach — ballots he cast in the player pool are moved to coach votes and removed from public votes.
+            </p>
+            <label class="field" for="chrisCoachSlot">Chris coach slot</label>
+            <select id="chrisCoachSlot" aria-label="Chris coach slot">
+              <option value="1">Coach 1</option>
+              <option value="2">Coach 2</option>
+            </select>
+            <div class="actions" style="margin-top: 0.5rem">
+              <button type="button" class="ghost" id="migrateChrisCoachVotes">Move Chris player votes → coach votes</button>
+            </div>
+            <p class="hint" id="migrateChrisHint" style="margin: 0.35rem 0 0"></p>
+            <p class="err" id="migrateChrisErr" style="margin: 0.25rem 0 0"></p>
+          </div>
           <div class="actions" style="margin-top: 0.65rem">
             <button type="button" class="primary" id="mergeRoundsPreview">Preview merge</button>
             <button type="button" class="ghost" id="mergeRoundsRun" disabled>Run merge</button>
