@@ -2,8 +2,8 @@
  * FotMob-style public lineup view (single team, dark pitch, circular nodes).
  * Shared display logic for public tab + PNG export.
  */
-import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v137";
-import { fetchMatchWeather, weatherPanelHtml } from "./weather-forecast.js?tag=v137";
+import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v138";
+import { fetchMatchWeather, weatherPanelHtml } from "./weather-forecast.js?tag=v138";
 
 export const FORMATION_ROLES = {
   "4-3-3": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "CM", "LW", "ST", "RW"],

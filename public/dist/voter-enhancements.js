@@ -9,7 +9,7 @@ import {
   canonicalPlayerName,
   nameSimilarity,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v137";
+} from "./name-match.js?tag=v138";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -911,7 +911,7 @@ function wireLineupExportOverride() {
     function (ev) {
       ev.stopImmediatePropagation();
       ev.preventDefault();
-      import("./lineup-export.js?tag=v137")
+      import("./lineup-export.js?tag=v138")
         .then(function (mod) {
           var snap =
             typeof window.__svLineupExportSnapshot === "function"
@@ -974,7 +974,7 @@ async function updateMatchCardWeather() {
 
   mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
   try {
-    var mod = await import("./weather-forecast.js?tag=v137");
+    var mod = await import("./weather-forecast.js?tag=v138");
     var data = await mod.fetchMatchWeather({
       suburb: entry.suburb,
       groundName: entry.groundName || entry.venue,

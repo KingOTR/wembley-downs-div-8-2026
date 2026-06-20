@@ -1,15 +1,13 @@
 /**
- * v137 patches for app.min.js:
- * - Name suggestions: focus guard in pI/bp, no eu() on resize unless focused
- * - Game metadata fields (suburb, kickoff, ground, pitch) in admin save/load/display
+ * Rebuild app.min.js from v136 + v137/v138 patches with safe replacements.
  */
+const { execSync, execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
 const appPath = path.join(__dirname, "../public/dist/app.min.js");
-let s = fs.readFileSync(appPath, "utf8");
 
-const patches = [
+const PATCHES = [
   {
     name: "pI focus guard",
     from: 'function pI(){var c=document.getElementById("voterNameSuggestPanel");if(!(!c||!et)){if(wp()){xo();return}',
@@ -59,42 +57,42 @@ const patches = [
   {
     name: "lineup export snapshot helper",
     from: 'Dh&&Dh.addEventListener("click",function(){try{F&&Pn&&',
-    to:
-      'window.__svLineupExportSnapshot=function(){try{if(F&&Pn)F.subs=String(Pn.value||"").split(/\\r?\\n/).map(function(h){return h.trim()}).filter(Boolean)}catch{}try{Wh()}catch{}var c=ie(ue),l=Lo(c);return{team:c,round:l,entry:Va(c,l)}},Dh&&Dh.addEventListener("click",function(){try{F&&Pn&&',
+    to: 'window.__svLineupExportSnapshot=function(){try{if(F&&Pn)F.subs=String(Pn.value||"").split("\\n").map(function(h){return h.trim()}).filter(Boolean)}catch{}try{Wh()}catch{}var c=ie(ue),l=Lo(c);return{team:c,round:l,entry:Va(c,l)}},Dh&&Dh.addEventListener("click",function(){try{F&&Pn&&',
   },
 ];
 
-function replaceOnce(str, from, to) {
-  var i = str.indexOf(from);
-  if (i === -1) return null;
-  return str.slice(0, i) + to + str.slice(i + from.length);
+function checkSyntax(code) {
+  const tmp = path.join(__dirname, "../.tmp-rebuild.mjs");
+  fs.writeFileSync(tmp, code);
+  execFileSync(process.execPath, ["--check", tmp], { stdio: "pipe" });
 }
 
-let failed = false;
-patches.forEach(function (p) {
-  if (!s.includes(p.from)) {
-    console.error("MISSING patch target:", p.name);
-    failed = true;
-    return;
-  }
-  if (p.to && s.includes(p.to) && p.from !== p.to) {
-    console.log("SKIP (already applied):", p.name);
-    return;
-  }
-  if (p.once) {
-    var next = replaceOnce(s, p.from, p.to);
-    if (next == null) {
-      console.error("replaceOnce failed:", p.name);
-      failed = true;
-      return;
-    }
-    s = next;
-  } else {
-    s = s.replace(p.from, p.to);
-  }
-  console.log("OK:", p.name);
+function replaceOnce(s, from, to) {
+  const i = s.indexOf(from);
+  if (i === -1) return null;
+  return s.slice(0, i) + to + s.slice(i + from.length);
+}
+
+let s = execSync("git show b055f7c:public/dist/app.min.js", {
+  encoding: "utf8",
+  maxBuffer: 10 * 1024 * 1024,
 });
 
-if (failed) process.exit(1);
+PATCHES.forEach((p) => {
+  if (!s.includes(p.from)) {
+    console.error("MISSING:", p.name);
+    process.exit(1);
+  }
+  s = p.once ? replaceOnce(s, p.from, p.to) : s.replace(p.from, p.to);
+  try {
+    checkSyntax(s);
+    console.log("OK:", p.name);
+  } catch (e) {
+    console.error("SYNTAX FAIL after:", p.name);
+    console.error((e.stderr || e.stdout || "").toString().split("\n").slice(0, 3).join(" "));
+    process.exit(1);
+  }
+});
+
 fs.writeFileSync(appPath, s);
-console.log("app.min.js v137 patches applied");
+console.log("Wrote", appPath, "bytes", s.length);

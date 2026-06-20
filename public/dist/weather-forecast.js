@@ -66,11 +66,26 @@ function parseKickoff(iso, dateFallback) {
 }
 
 async function geocode(suburb, groundName) {
-  var queries = [
-    [groundName, suburb, "Western Australia"].filter(Boolean).join(", "),
-    [suburb, "Western Australia, Australia"].filter(Boolean).join(", "),
-    [groundName, "Perth, Western Australia"].filter(Boolean).join(", "),
-  ].filter(Boolean);
+  var candidates = [];
+  if (groundName && suburb) {
+    candidates.push([groundName, suburb, "Western Australia, Australia"].join(", "));
+    candidates.push([groundName, suburb, "Australia"].join(", "));
+  }
+  if (groundName) {
+    candidates.push([groundName, "Perth, Western Australia, Australia"].join(", "));
+    candidates.push([groundName, "Western Australia, Australia"].join(", "));
+  }
+  if (suburb) {
+    candidates.push([suburb, "Western Australia, Australia"].join(", "));
+    candidates.push([suburb, "Australia"].join(", "));
+  }
+  var seen = Object.create(null);
+  var queries = candidates.filter(function (q) {
+    q = String(q || "").trim();
+    if (!q || seen[q]) return false;
+    seen[q] = true;
+    return true;
+  });
 
   for (var i = 0; i < queries.length; i++) {
     var q = queries[i];
@@ -118,7 +133,7 @@ export async function fetchMatchWeather(match) {
 
   var geo = await geocode(suburb, groundName);
   if (!geo) {
-    return { ok: false, reason: "geocode_failed", message: "Could not locate " + (groundName || suburb) + "." };
+    return { ok: false, reason: "geocode_failed", message: "Could not locate " + (groundName && suburb ? groundName + ", " + suburb : groundName || suburb || "venue") + "." };
   }
 
   var start = new Date(kickoff.getTime());
