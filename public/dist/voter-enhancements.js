@@ -10,7 +10,7 @@ import {
   nameSimilarity,
   findAmbiguousByFirstName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v144";
+} from "./name-match.js?tag=v145";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -912,7 +912,7 @@ function syncAdminLocationFromStore() {
     window.__svSyncLocationFromMatch(entry);
     return;
   }
-  import("./location-autocomplete.js?tag=v144")
+  import("./location-autocomplete.js?tag=v145")
     .then(function (mod) {
       if (mod.syncLocationFromMatch) mod.syncLocationFromMatch(entry);
       else mod.syncLocationFromInputs();
@@ -950,7 +950,7 @@ function wireLineupExportOverride() {
     function (ev) {
       ev.stopImmediatePropagation();
       ev.preventDefault();
-      import("./lineup-export.js?tag=v144")
+      import("./lineup-export.js?tag=v145")
         .then(function (mod) {
           var snap =
             typeof window.__svLineupExportSnapshot === "function"
@@ -1013,7 +1013,7 @@ async function updateMatchCardWeather() {
 
   mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
   try {
-    var mod = await import("./weather-forecast.js?tag=v144");
+    var mod = await import("./weather-forecast.js?tag=v145");
     var units = mod.getWeatherUnits();
     var data = await mod.fetchMatchWeather({
       suburb: entry.suburb,
@@ -1200,7 +1200,7 @@ function wireLineupPublicTabs() {
       advBtn.setAttribute("aria-pressed", advOn ? "true" : "false");
       advBtn.classList.toggle("lineup-tab-overlay-active", advOn);
     }
-    import("./lineup-fotmob.js?tag=v144")
+    import("./lineup-fotmob.js?tag=v145")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1255,7 +1255,7 @@ function wireLineupPublicTabs() {
   }
 
   window.addEventListener("sv-lineup-rendered", function () {
-    import("./lineup-fotmob.js?tag=v144")
+    import("./lineup-fotmob.js?tag=v145")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1527,7 +1527,7 @@ function wireAdminSectionTabs() {
       p.hidden = p.getAttribute("data-admin-panel") !== tab;
     });
     if (tab === "team") {
-      import("./location-autocomplete.js?tag=v144")
+      import("./location-autocomplete.js?tag=v145")
         .then(function (mod) {
           mod.initLocationAutocomplete();
           syncAdminLocationFromStore();
@@ -1549,7 +1549,7 @@ function wireLocationOnRoundChange() {
   roundSel._svLocWire = true;
   roundSel.addEventListener("change", function () {
     setTimeout(function () {
-      import("./location-autocomplete.js?tag=v144")
+      import("./location-autocomplete.js?tag=v145")
         .then(function (mod) {
           mod.initLocationAutocomplete();
           syncAdminLocationFromStore();
