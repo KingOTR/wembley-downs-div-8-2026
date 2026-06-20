@@ -4,6 +4,9 @@
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const MATCH_MINUTES = 90;
+/** WA games — kickoff stored as Perth wall time; forecasts use same zone. */
+const MATCH_TZ = "Australia/Perth";
+const PERTH_OFFSET_MS = 8 * 60 * 60 * 1000;
 const UNITS_KEY = "svWeatherUnits";
 const GEO_CACHE = Object.create(null);
 const FORECAST_CACHE = Object.create(null);
@@ -78,12 +81,36 @@ function windDir(deg) {
   return dirs[Math.round(d / 45) % 8];
 }
 
-function formatKickoffLocal(iso) {
-  if (!iso) return "";
+/** Parse YYYY-MM-DDTHH:mm as Perth wall time (v147 datetime-local storage). */
+function parsePerthWallIso(s) {
+  var m = String(s || "")
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 8, +m[5], +(m[6] || 0)));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function formatKickoffLocal(kickoffStr, parsedDate) {
+  var s = String(kickoffStr || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) {
+    var parts = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+    var dt = new Date(+parts[1], +parts[2] - 1, +parts[3]);
+    var dayLabel = dt.toLocaleDateString("en-AU", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+    var h = +parts[4];
+    var mi = parts[5];
+    var hr12 = h % 12 || 12;
+    var ampm = h < 12 ? "am" : "pm";
+    return dayLabel + ", " + hr12 + ":" + mi + " " + ampm;
+  }
+  if (!parsedDate || isNaN(parsedDate.getTime())) return "";
   try {
-    var d = new Date(iso);
-    if (isNaN(d.getTime())) return "";
-    return d.toLocaleString(undefined, {
+    return parsedDate.toLocaleString("en-AU", {
+      timeZone: MATCH_TZ,
       weekday: "short",
       day: "numeric",
       month: "short",
@@ -98,25 +125,42 @@ function formatKickoffLocal(iso) {
 function parseKickoff(iso, dateFallback) {
   if (iso) {
     var s = String(iso).trim();
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)) {
-      var dl = new Date(s);
-      if (!isNaN(dl.getTime())) return dl;
-    }
+    var wall = parsePerthWallIso(s);
+    if (wall) return wall;
     var d = new Date(iso);
     if (!isNaN(d.getTime())) return d;
   }
   if (dateFallback) {
-    var d2 = new Date(dateFallback + "T10:00:00");
-    if (!isNaN(d2.getTime())) return d2;
+    var d2 = parsePerthWallIso(String(dateFallback).trim() + "T10:00");
+    if (d2) return d2;
   }
   return null;
 }
 
-function toLocalHourIso(d) {
+/** Hour bucket YYYY-MM-DDTHH:00 in Perth for Open-Meteo start_hour/end_hour. */
+function toPerthHourIso(d) {
+  var t = d.getTime() + PERTH_OFFSET_MS;
+  var u = new Date(t);
   var p = function (n) {
     return n < 10 ? "0" + n : "" + n;
   };
-  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":00";
+  return u.getUTCFullYear() + "-" + p(u.getUTCMonth() + 1) + "-" + p(u.getUTCDate()) + "T" + p(u.getUTCHours()) + ":00";
+}
+
+function parseApiHour(isoStr) {
+  return parsePerthWallIso(isoStr);
+}
+
+function formatPerthTime(d) {
+  try {
+    return d.toLocaleTimeString("en-AU", {
+      timeZone: MATCH_TZ,
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
 }
 
 function scoreGeocodeHit(hit, query) {
@@ -285,15 +329,15 @@ export async function fetchMatchWeather(match) {
     };
   }
 
-  var start = new Date(kickoff.getTime() - 30 * 60 * 1000);
+  var start = kickoff;
   var end = new Date(kickoff.getTime() + MATCH_MINUTES * 60 * 1000);
 
   var fKey = cacheKey([
-    "fc2",
+    "fc3",
     geo.lat,
     geo.lon,
-    start.toISOString().slice(0, 13),
-    end.toISOString().slice(0, 13),
+    toPerthHourIso(start),
+    toPerthHourIso(end),
   ]);
   if (FORECAST_CACHE[fKey]) return FORECAST_CACHE[fKey];
 
@@ -304,11 +348,12 @@ export async function fetchMatchWeather(match) {
     "&longitude=" +
     encodeURIComponent(geo.lon) +
     "&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m" +
-    "&timezone=auto" +
+    "&timezone=" +
+    encodeURIComponent(MATCH_TZ) +
     "&start_hour=" +
-    encodeURIComponent(toLocalHourIso(start)) +
+    encodeURIComponent(toPerthHourIso(start)) +
     "&end_hour=" +
-    encodeURIComponent(toLocalHourIso(end));
+    encodeURIComponent(toPerthHourIso(end));
 
   try {
     var res = await fetch(url);
@@ -321,8 +366,10 @@ export async function fetchMatchWeather(match) {
     var slots = [];
 
     for (var i = 0; i < times.length; i++) {
-      var t = new Date(times[i]).getTime();
-      if (t >= kickMs - 15 * 60 * 1000 && t <= endMs) {
+      var slotDate = parseApiHour(times[i]);
+      if (!slotDate) continue;
+      var t = slotDate.getTime();
+      if (t >= kickMs && t <= endMs) {
         slots.push({
           time: times[i],
           temp: hourly.temperature_2m ? hourly.temperature_2m[i] : null,
@@ -372,16 +419,21 @@ export async function fetchMatchWeather(match) {
       return v != null;
     });
     var mid = slots[Math.floor(slots.length / 2)] || slots[0];
-    var htSlot = slots.find(function (s) {
-      var t = new Date(s.time).getTime();
-      return t >= kickMs + 45 * 60 * 1000 - 30 * 60 * 1000 && t <= kickMs + 45 * 60 * 1000 + 30 * 60 * 1000;
-    });
+    var htTarget = kickMs + 45 * 60 * 1000;
+    var htSlot = slots.reduce(function (best, s) {
+      var t = parseApiHour(s.time);
+      if (!t) return best;
+      var diff = Math.abs(t.getTime() - htTarget);
+      if (!best || diff < best.diff) return { slot: s, diff: diff };
+      return best;
+    }, null);
+    htSlot = htSlot ? htSlot.slot : null;
 
     var out = {
       ok: true,
       location: geo.label,
       locationSource: geo.source || "geocode",
-      kickoffLabel: formatKickoffLocal(match.kickoff || kickoff.toISOString()),
+      kickoffLabel: formatKickoffLocal(match.kickoff, kickoff),
       summary: {
         tempMin: temps.length ? Math.min.apply(null, temps) : null,
         tempMax: temps.length ? Math.max.apply(null, temps) : null,
@@ -474,8 +526,8 @@ export function weatherPanelHtml(data, units) {
       data.slots
         .slice(0, 12)
         .map(function (slot) {
-          var t = new Date(slot.time);
-          var label = t.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+          var t = parseApiHour(slot.time);
+          var label = t ? formatPerthTime(t) : String(slot.time || "").slice(11, 16);
           return (
             "<span class='lineup-weather-hour-chip'>" +
             "<span class='lineup-weather-hour-chip-time'>" +
