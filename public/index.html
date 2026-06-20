@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v122: fix voter-enhancements MutationObserver crash + logo branding -->
+  <!-- v123: disconnect admin MutationObservers after first wire -->
   <title>Team Player Vote</title>
   <link rel="icon" href="/wembley-downs-logo.png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/wembley-downs-logo.png" sizes="180x180" />
@@ -17,7 +17,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v122" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v123" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -2935,25 +2935,38 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v122"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v122"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v123"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v123"></script>
   <script>
     (function () {
       var loaded = false;
+      var mergeObs = null;
       function loadMergeRounds() {
         if (loaded) return;
         loaded = true;
-        import("./dist/admin-merge-rounds.js?tag=v122").catch(function (e) {
+        if (mergeObs) {
+          try {
+            mergeObs.disconnect();
+          } catch (e) {}
+          mergeObs = null;
+        }
+        import("./dist/admin-merge-rounds.js?tag=v123").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
         });
       }
       function hook() {
         var btn = document.getElementById("showAdminBtn");
-        if (btn) btn.addEventListener("click", loadMergeRounds);
+        if (btn && !btn._svMergeHook) {
+          btn._svMergeHook = true;
+          btn.addEventListener("click", loadMergeRounds);
+        }
         var mount = document.getElementById("adminDeferredMount");
-        if (mount) {
-          new MutationObserver(loadMergeRounds).observe(mount, { childList: true, subtree: true });
+        if (mount && !mergeObs) {
+          mergeObs = new MutationObserver(function () {
+            if (document.getElementById("mergeSourceRound")) loadMergeRounds();
+          });
+          mergeObs.observe(mount, { childList: true, subtree: true });
         }
       }
       if (document.readyState === "loading") {
@@ -2977,7 +2990,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=122").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=123").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}

@@ -871,17 +871,19 @@ function wireMergeUi() {
 function observeAdminMount() {
   var mount = document.getElementById("adminDeferredMount");
   if (!mount) return;
-  var obs = new MutationObserver(function () {
-    if (document.getElementById("mergeSourceRound")) {
-      wireMergeUi();
-      refreshRoundSelects().catch(function () {});
-    }
-  });
-  obs.observe(mount, { childList: true, subtree: true });
-  if (document.getElementById("mergeSourceRound")) {
+  var wired = false;
+  function wireOnce() {
+    if (wired || !document.getElementById("mergeSourceRound")) return;
+    wired = true;
+    try {
+      obs.disconnect();
+    } catch (e) {}
     wireMergeUi();
     refreshRoundSelects().catch(function () {});
   }
+  var obs = new MutationObserver(wireOnce);
+  obs.observe(mount, { childList: true, subtree: true });
+  wireOnce();
 }
 
 try {
