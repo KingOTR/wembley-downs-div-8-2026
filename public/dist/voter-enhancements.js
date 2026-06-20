@@ -642,7 +642,12 @@ async function updateWhoHasntVoted() {
   hints.push(squad.length + " on squad");
   hints.push(isSuperAdminUnlocked() ? "cloud refresh" : "local + public cloud read");
   if (matched.possible.length) hints.push("fuzzy: " + matched.possible.join("; "));
-  if (matched.extraVoters.length) hints.push("not on squad: " + matched.extraVoters.join(", "));
+  if (matched.extraVoters.length) {
+    var extras = matched.extraVoters.filter(function (n) {
+      return displayPlayerName(n);
+    });
+    if (extras.length) hints.push("not on squad: " + extras.join(", "));
+  }
   if (matched.extraDetails && matched.extraDetails.length) {
     hints.push(
       "mismatch detail: " +
@@ -886,18 +891,22 @@ function normalizeLineupNameEl(el) {
 }
 
 function wireLineupNameNormalize() {
-  var card = document.getElementById("lineupCard");
-  if (!card || card._svNameNormObs) return;
-  card._svNameNormObs = true;
-  var sel = "#lineupCard .nm, #lineupCard .lineup-xi-name, #lineupCard .lineup-mini-row .name, #lineupCard .player-chip .nm";
-  card.querySelectorAll(sel).forEach(normalizeLineupNameEl);
-  var obs = new MutationObserver(function () {
-    card.querySelectorAll(sel).forEach(function (el) {
-      el._svNameNorm = false;
-      normalizeLineupNameEl(el);
+  var roots = [document.getElementById("lineupCard"), document.getElementById("lineupEditorGrid")].filter(Boolean);
+  if (!roots.length) return;
+  var sel =
+    ".nm, .lineup-xi-name, .lineup-mini-row .name, .player-chip .nm, #lineupEditorGrid .player-chip .nm, .lineup-modal-body .player-chip .nm";
+  roots.forEach(function (root) {
+    if (root._svNameNormObs) return;
+    root._svNameNormObs = true;
+    root.querySelectorAll(sel).forEach(normalizeLineupNameEl);
+    var obs = new MutationObserver(function () {
+      root.querySelectorAll(sel).forEach(function (el) {
+        el._svNameNorm = false;
+        normalizeLineupNameEl(el);
+      });
     });
+    obs.observe(root, { childList: true, subtree: true, characterData: true });
   });
-  obs.observe(card, { childList: true, subtree: true, characterData: true });
 }
 
 function init() {

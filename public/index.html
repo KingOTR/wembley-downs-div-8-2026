@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v126: lineup names, logo, manual merge, loose squad match -->
+  <!-- v127: parenthetical name matching, editor chip overlap, empty voter filter -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v126" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v127" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -1285,6 +1285,54 @@
     .player-chip.is-selected {
       border-color: rgba(185, 28, 28, 0.45);
       box-shadow: 0 16px 32px rgba(185, 28, 28, 0.18), 0 10px 24px rgba(15, 23, 42, 0.12);
+    }
+
+    /* Admin lineup editor: smaller chips, less overlap on mobile */
+    #lineupEditorGrid .pitch .player-chip,
+    .lineup-modal-body .player-chip {
+      max-width: 46%;
+      font-size: 0.74rem;
+      padding: 0.24rem 0.42rem;
+      gap: 0.22rem;
+      z-index: 2;
+      line-height: 1.15;
+    }
+
+    #lineupEditorGrid .pitch .player-chip:hover,
+    #lineupEditorGrid .pitch .player-chip.is-selected,
+    .lineup-modal-body .player-chip:hover,
+    .lineup-modal-body .player-chip.is-selected {
+      z-index: 12;
+    }
+
+    #lineupEditorGrid .player-chip .nm,
+    .lineup-modal-body .player-chip .nm {
+      max-width: 8.5ch;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
+    #lineupEditorGrid .player-chip .num,
+    .lineup-modal-body .player-chip .num {
+      width: 1.15rem;
+      height: 1.15rem;
+      font-size: 0.68rem;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 520px) {
+      #lineupEditorGrid .pitch .player-chip,
+      .lineup-modal-body .player-chip {
+        max-width: 52%;
+        font-size: 0.68rem;
+        padding: 0.2rem 0.36rem;
+      }
+      #lineupEditorGrid .player-chip .nm,
+      .lineup-modal-body .player-chip .nm {
+        max-width: 7.5ch;
+      }
     }
 
     .lineup-side .subcard {
@@ -3050,8 +3098,8 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v126"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v126"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v127"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v127"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3065,7 +3113,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v126").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v127").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
         });
@@ -3105,7 +3153,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=126").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=127").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}

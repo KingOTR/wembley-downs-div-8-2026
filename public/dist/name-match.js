@@ -11,8 +11,17 @@ export function displayPlayerName(name) {
     .trim();
 }
 
+/** Strip (C), (tall), Goalkeeper suffixes etc. before fuzzy matching. */
+export function stripNameQualifiers(name) {
+  return displayPlayerName(name)
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/\s+(goalkeeper|gk|captain|capt|c)\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function normalizeName(c) {
-  return displayPlayerName(c).toLowerCase();
+  return stripNameQualifiers(c).toLowerCase();
 }
 
 export function nameParts(name) {
@@ -50,6 +59,9 @@ var NICKNAME_ALIASES = {
   steve: ["stephen", "steven"],
   tom: ["thomas", "tommy"],
   will: ["william", "willy"],
+  uli: ["ulrika"],
+  ulrika: ["uli"],
+  jane: ["janet"],
 };
 
 function nicknameMatch(a, b) {
@@ -99,6 +111,7 @@ export function nameSimilarity(a, b) {
       if (pa.initial && pb.initial && pa.initial === pb.initial) return 0.9;
     }
     if (!pa.last || !pb.last) return 0.88;
+    if (pa.last && pb.last && pa.last.charAt(0) === pb.last.charAt(0)) return 0.86;
   }
 
   if (pa.last && pb.last && pa.last === pb.last) {
@@ -112,6 +125,7 @@ export function nameSimilarity(a, b) {
   var nick = nicknameMatch(a, b);
   if (nick >= 0.86 && pa.initial && pb.initial && pa.initial === pb.initial) return nick;
   if (nick >= 0.9 && (!pa.last || !pb.last || pa.initial === pb.initial)) return nick;
+  if (nick >= 0.86 && (!pa.last || !pb.last)) return nick;
 
   var dist = levenshtein(na, nb);
   var maxLen = Math.max(na.length, nb.length);
@@ -216,8 +230,8 @@ export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLa
     (votes || []).forEach(function (v) {
       if (!v || String(v.teamId) !== String(teamId)) return;
       if (voteRoundLabelFn(v) !== voteRoundLabelFn({ round: roundLabel })) return;
-      var vn = v.voterName || "";
-      if (usedVoters[normalizeName(vn)]) return;
+      var vn = displayPlayerName(v.voterName || "");
+      if (!vn || usedVoters[normalizeName(vn)]) return;
       var m = findSquadMatch(vn, [player], th);
       if (m) hit = { voterName: vn, squadName: player, exact: m.exact, similarity: m.similarity };
     });
@@ -233,7 +247,8 @@ export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLa
   (votes || []).forEach(function (v) {
     if (!v || String(v.teamId) !== String(teamId)) return;
     if (voteRoundLabelFn(v) !== voteRoundLabelFn({ round: roundLabel })) return;
-    var vn = v.voterName || "";
+    var vn = displayPlayerName(v.voterName || "");
+    if (!vn) return;
     if (usedVoters[normalizeName(vn)]) return;
     var onSquad = findSquadMatch(vn, squad, th);
     if (onSquad) {
