@@ -7,8 +7,9 @@ import {
   normalizeName,
   displayPlayerName,
   canonicalPlayerName,
+  nameSimilarity,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v135";
+} from "./name-match.js?tag=v136";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -163,6 +164,38 @@ function firestoreUrl(path, query) {
   return url;
 }
 
+function getTeamCoachNames(teamId) {
+  var data = loadLocalData();
+  var team = (data.teams || []).find(function (t) {
+    return String(t.id) === String(teamId);
+  });
+  return {
+    coach1: (team && team.coach1Name) || "Coach 1",
+    coach2: (team && team.coach2Name) || "Coach 2",
+  };
+}
+
+function isCoachVoterName(name, teamId) {
+  var base = displayPlayerName(name);
+  if (!base) return false;
+  var key = qo(base);
+  if (key === "chris" || key.indexOf("chris") === 0) return true;
+  var coaches = getTeamCoachNames(teamId);
+  if (nameSimilarity(base, coaches.coach1) >= 0.88) return true;
+  if (nameSimilarity(base, coaches.coach2) >= 0.88) return true;
+  return false;
+}
+
+function coachVoteRedirectMessage(teamId) {
+  var coaches = getTeamCoachNames(teamId);
+  return (
+    coaches.coach1 +
+    " and " +
+    coaches.coach2 +
+    " vote as coaches (Coach / admin tab), not in the player pool."
+  );
+}
+
 function findExistingVote(teamId, voterName, roundLabel) {
   var key = nameKey(voterName);
   var round = voteRoundLabel({ round: roundLabel });
@@ -246,6 +279,15 @@ function wireDuplicateSubmitGuard() {
       var name = nameInput ? nameInput.value.trim() : "";
       if (!name) return;
       var teamId = getCurrentTeamId();
+      if (isCoachVoterName(name, teamId)) {
+        var msgEl = document.getElementById("voteMsg");
+        var redirectMsg = coachVoteRedirectMessage(teamId);
+        if (msgEl) msgEl.textContent = redirectMsg;
+        alert(redirectMsg);
+        ev.stopImmediatePropagation();
+        ev.preventDefault();
+        return;
+      }
       var round = getCurrentRound(teamId);
       var existing = findExistingVote(teamId, name, round);
       if (!existing) return;
@@ -871,6 +913,9 @@ async function updateParticipationCounter() {
   var round = getCurrentRound(teamId);
   var data = loadLocalData();
   var squad = await resolveTeamSquad(teamId, data.teams || []);
+  squad = squad.filter(function (player) {
+    return !isCoachVoterName(player, teamId);
+  });
   if (!squad.length) {
     el.classList.remove("is-visible");
     return;

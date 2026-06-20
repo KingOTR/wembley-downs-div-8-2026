@@ -11,9 +11,11 @@ import {
   nameSimilarity,
   DEFAULT_SQUAD_THRESHOLD,
   STRICT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v135";
+} from "./name-match.js?tag=v136";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
+const CHRIS_COACH_SLOT = 2;
+const WILL_COACH_SLOT = 1;
 const PREFS_KEY = STORAGE_KEY + "_cache";
 const ADMIN_SESSION_KEY = "soccerVoteAdminUnlock";
 
@@ -589,6 +591,7 @@ function requireFirestoreOps() {
   if (
     !window.__svFirestoreBatch ||
     !window.__svVoteDoc ||
+    !window.__svCoachVoteDoc ||
     !window.__svAddDoc ||
     !window.__svCoachVotesCol
   ) {
@@ -604,6 +607,7 @@ async function waitForFirestoreOps(maxMs) {
     if (
       window.__svFirestoreBatch &&
       window.__svVoteDoc &&
+      window.__svCoachVoteDoc &&
       window.__svAddDoc &&
       window.__svCoachVotesCol
     ) {
@@ -1161,6 +1165,7 @@ async function migrateChrisVotesCloud(teamId, slot) {
 }
 
 async function runMigrateChrisCoachVotes(teamId, slot) {
+  if (slot == null || !isFinite(slot)) slot = CHRIS_COACH_SLOT;
   if (!isSuperAdminUnlocked()) {
     throw new Error("Unlock super admin first (Coach / admin → Super admin).");
   }
@@ -1220,6 +1225,434 @@ async function runMigrateChrisCoachVotes(teamId, slot) {
       " from public votes.",
   };
 }
+
+function coachDocName(docId) {
+  return (
+    "projects/" +
+    projectId() +
+    "/databases/(default)/documents/coachVotes/" +
+    encodeURIComponent(String(docId || "")).replace(/%2F/g, "/")
+  );
+}
+
+function coachDocIdFromPath(name) {
+  var m = String(name || "").match(/\/documents\/coachVotes\/(.+)$/);
+  return m ? decodeURIComponent(m[1]) : String(name || "");
+}
+
+function coachDocPathFromName(name) {
+  var m = String(name || "").match(/\/documents\/coachVotes\/(.+)$/);
+  if (m) return decodeURIComponent(m[1]);
+  return coachDocIdFromPath(name);
+}
+
+function ingestCoachVoteRows(rows, byId) {
+  rows.forEach(function (row) {
+    if (!row || !row.document) return;
+    var id = coachDocPathFromName(row.document.name);
+    if (!id || byId[id]) return;
+    var data = {};
+    var fields = row.document.fields || {};
+    Object.keys(fields).forEach(function (k) {
+      data[k] = parseFsValue(fields[k]);
+    });
+    byId[id] = Object.assign({ id: id }, data);
+  });
+}
+
+async function fetchCoachVotesRest(teamId) {
+  var byId = Object.create(null);
+  for (var i = 0; i < 2; i++) {
+    var tid = i === 0 ? teamId : String(teamId);
+    var structuredQuery = {
+      from: [{ collectionId: "coachVotes" }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: "teamId" },
+          op: "EQUAL",
+          value: fsValue(tid),
+        },
+      },
+      orderBy: [{ field: { fieldPath: "__name__" }, direction: "ASCENDING" }],
+    };
+    var startAt = null;
+    for (var page = 0; page < 50; page++) {
+      var query = structuredQuery;
+      if (startAt) query = Object.assign({}, structuredQuery, { startAt: startAt });
+      var rows = await runQuery(query);
+      if (!rows.length) break;
+      var lastDoc = null;
+      var gotDoc = false;
+      rows.forEach(function (row) {
+        if (row && row.document) {
+          lastDoc = row.document;
+          gotDoc = true;
+        }
+      });
+      ingestCoachVoteRows(rows, byId);
+      if (!gotDoc || !lastDoc) break;
+      startAt = {
+        values: [{ referenceValue: lastDoc.name }],
+        before: false,
+      };
+      if (rows.length < 300) break;
+    }
+  }
+  return Object.keys(byId).map(function (id) {
+    return byId[id];
+  });
+}
+
+function teamCoachLabels(team) {
+  var coach1 = (team && team.coach1Name) || "Coach 1";
+  var coach2 = (team && team.coach2Name) || "Coach 2";
+  return {
+    coach1: coach1,
+    coach2: coach2,
+    slot1Label: "Coach 1 (" + coach1 + ")",
+    slot2Label: "Coach 2 (" + coach2 + ")",
+  };
+}
+
+function resolveChrisCoachSlot(team) {
+  if (!team) return CHRIS_COACH_SLOT;
+  var labels = teamCoachLabels(team);
+  if (isChrisVoterName(labels.coach2)) return CHRIS_COACH_SLOT;
+  if (isChrisVoterName(labels.coach1)) return WILL_COACH_SLOT;
+  return CHRIS_COACH_SLOT;
+}
+
+function picksSignature(picks) {
+  return (Array.isArray(picks) ? picks : [])
+    .map(function (p) {
+      return canonicalPlayerName(p) || p;
+    })
+    .filter(Boolean)
+    .join("|");
+}
+
+function buildChrisPlayerRoundMap(teamId, localData) {
+  var map = Object.create(null);
+  findChrisPlayerVotes(localData.votes || [], teamId).forEach(function (v) {
+    map[voteRoundLabel(v)] = v;
+  });
+  (localData.coachVotes || []).forEach(function (v) {
+    if (!v || teamIdStr(v.teamId) !== teamIdStr(teamId)) return;
+    if (v.id && String(v.id).indexOf("local_chris_") === 0) {
+      map[voteRoundLabel(v)] = v;
+    }
+  });
+  return map;
+}
+
+function looksLikeChrisMigrationDoc(coachDoc, chrisRoundMap) {
+  var round = voteRoundLabel(coachDoc);
+  var chrisVote = chrisRoundMap[round];
+  if (!chrisVote) return false;
+  return picksSignature(chrisVote.picks) === picksSignature(coachDoc.picks);
+}
+
+function planCoachSlotRepair(teamId, coachVotes, team, localData) {
+  localData = localData || loadLocalData();
+  var labels = teamCoachLabels(team);
+  var chrisSlot = resolveChrisCoachSlot(team);
+  var chrisRoundMap = buildChrisPlayerRoundMap(teamId, localData);
+  var byRound = Object.create(null);
+  var moves = [];
+  var keeps = [];
+
+  (coachVotes || [])
+    .filter(function (v) {
+      return v && teamIdStr(v.teamId) === teamIdStr(teamId);
+    })
+    .forEach(function (v) {
+      var round = voteRoundLabel(v);
+      if (!byRound[round]) byRound[round] = { slot1: [], slot2: [] };
+      if (parseInt(v.slot, 10) === 2) byRound[round].slot2.push(v);
+      else byRound[round].slot1.push(v);
+    });
+
+  Object.keys(byRound)
+    .sort(function (a, b) {
+      return roundSortKey(a) - roundSortKey(b) || String(a).localeCompare(String(b));
+    })
+    .forEach(function (round) {
+      var group = byRound[round];
+      group.slot1.sort(function (a, b) {
+        return String(a.submittedAt || "").localeCompare(String(b.submittedAt || ""));
+      });
+      group.slot2.sort(function (a, b) {
+        return String(a.submittedAt || "").localeCompare(String(b.submittedAt || ""));
+      });
+
+      if (group.slot1.length > 1) {
+        keeps.push({
+          doc: group.slot1[0],
+          round: round,
+          slot: WILL_COACH_SLOT,
+          reason: "Keep as " + labels.slot1Label + " (earliest slot 1 ballot)",
+        });
+        for (var i = 1; i < group.slot1.length; i++) {
+          moves.push({
+            doc: group.slot1[i],
+            round: round,
+            fromSlot: WILL_COACH_SLOT,
+            toSlot: chrisSlot,
+            reason: "Duplicate slot 1 — move to " + labels.slot2Label,
+          });
+        }
+        return;
+      }
+
+      if (group.slot1.length === 1 && !group.slot2.length) {
+        var lone = group.slot1[0];
+        if (looksLikeChrisMigrationDoc(lone, chrisRoundMap)) {
+          moves.push({
+            doc: lone,
+            round: round,
+            fromSlot: WILL_COACH_SLOT,
+            toSlot: chrisSlot,
+            reason: "Chris player vote migrated to slot 1 — move to " + labels.slot2Label,
+          });
+        } else {
+          keeps.push({
+            doc: lone,
+            round: round,
+            slot: WILL_COACH_SLOT,
+            reason: "Only slot 1 ballot — keep as " + labels.slot1Label,
+          });
+        }
+      }
+    });
+
+  return {
+    teamId: teamId,
+    labels: labels,
+    chrisSlot: chrisSlot,
+    moves: moves,
+    keeps: keeps,
+    byRound: byRound,
+    coachVotes: coachVotes || [],
+  };
+}
+
+function renderCoachSlotRepairPreview(el, plan) {
+  if (!el) return;
+  el.style.display = "block";
+  var lines = [
+    "<div style='font-weight:800;color:var(--red-dark);margin-bottom:0.35rem'>Coach slot repair preview</div>",
+    "<div style='font-size:0.88rem;color:#52525b'>" +
+      escapeHtml(plan.labels.slot1Label) +
+      " stays slot " +
+      WILL_COACH_SLOT +
+      " · " +
+      escapeHtml(plan.labels.slot2Label) +
+      " → slot " +
+      plan.chrisSlot +
+      "</div>",
+  ];
+  if (!plan.moves.length) {
+    lines.push("<p class='hint' style='margin:0.45rem 0 0'>No slot fixes needed for this team.</p>");
+  } else {
+    lines.push(
+      "<div style='margin-top:0.5rem;font-weight:750'>" +
+        plan.moves.length +
+        " ballot(s) to reassign</div>"
+    );
+    plan.moves.forEach(function (move) {
+      var picks = (move.doc.picks || []).map(function (p) {
+        return displayPlayerName(p);
+      }).join(" · ");
+      lines.push(
+        "<div style='margin-top:0.35rem;padding:0.45rem 0.55rem;border:1px solid var(--border);border-radius:10px;font-size:0.88rem'>" +
+          "<strong>" +
+          escapeHtml(move.round) +
+          "</strong> slot " +
+          move.fromSlot +
+          " → " +
+          move.toSlot +
+          "<br><span class='hint'>" +
+          escapeHtml(move.reason) +
+          "</span><br><span style='font-size:0.82rem'>" +
+          escapeHtml(picks) +
+          "</span></div>"
+      );
+    });
+  }
+  if (plan.keeps.length) {
+    lines.push(
+      "<details style='margin-top:0.45rem'><summary>Unchanged (" +
+        plan.keeps.length +
+        ")</summary><p class='hint' style='margin:0.35rem 0 0'>" +
+        escapeHtml(
+          plan.keeps
+            .map(function (k) {
+              return k.round + " — " + k.reason;
+            })
+            .join("; ")
+        ) +
+        "</p></details>"
+    );
+  }
+  el.innerHTML = lines.join("");
+}
+
+async function batchWriteCoach(writes) {
+  if (!writes.length) return;
+  await ensureCloudAuth(true);
+  await waitForFirestoreOps(25000);
+  var coachDocFn = window.__svCoachVoteDoc;
+  var newBatch = window.__svFirestoreBatch;
+  for (var i = 0; i < writes.length; i += 400) {
+    var chunk = writes.slice(i, i + 400);
+    var batch = newBatch();
+    chunk.forEach(function (w) {
+      if (w.delete) {
+        batch.delete(coachDocFn(w.docId));
+        return;
+      }
+      batch.set(coachDocFn(w.docId), w.data, { merge: true });
+    });
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.error("[merge-rounds] coach batch failed", e);
+      throw e;
+    }
+  }
+}
+
+function applyCoachSlotRepairLocal(teamId, plan) {
+  var data = loadLocalData();
+  data.coachVotes = data.coachVotes || [];
+  var touched = 0;
+  plan.moves.forEach(function (move) {
+    if (!move.doc || !move.doc.id) return;
+    for (var i = 0; i < data.coachVotes.length; i++) {
+      var row = data.coachVotes[i];
+      if (!row || row.id !== move.doc.id) continue;
+      data.coachVotes[i] = Object.assign({}, row, { slot: move.toSlot });
+      touched++;
+      break;
+    }
+  });
+  saveLocalData(data);
+  return touched;
+}
+
+async function runCoachSlotRepair(teamId, plan) {
+  if (!plan || !plan.moves.length) {
+    return { updated: 0, message: "No coach slot changes needed." };
+  }
+  if (!isSuperAdminUnlocked()) {
+    throw new Error("Unlock super admin first (Coach / admin → Super admin).");
+  }
+
+  var localUpdated = applyCoachSlotRepairLocal(teamId, plan);
+  if (!window.__svFirebaseApp) {
+    return {
+      updated: localUpdated,
+      localOnly: true,
+      message: "Updated " + localUpdated + " coach ballot(s) in this browser (local only).",
+    };
+  }
+
+  await ensureCloudAuth(true);
+  var writes = plan.moves
+    .filter(function (move) {
+      return move.doc && move.doc.id;
+    })
+    .map(function (move) {
+      return {
+        docId: move.doc.id,
+        data: { slot: move.toSlot },
+      };
+    });
+  await batchWriteCoach(writes);
+
+  try {
+    if (window.__svAddDoc && window.__svAdminLogCol) {
+      var auth = window.__svAuth;
+      await window.__svAddDoc(window.__svAdminLogCol(), {
+        action: "coachSlotRepair",
+        teamId: teamId,
+        movedCount: writes.length,
+        rounds: plan.moves.map(function (m) {
+          return m.round;
+        }),
+        adminEmail: auth && auth.currentUser ? auth.currentUser.email || "" : "",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (e) {
+    console.warn("[merge-rounds] coach slot repair audit log failed", e);
+  }
+
+  return {
+    updated: writes.length,
+    message:
+      "Reassigned " +
+      writes.length +
+      " coach ballot(s) to " +
+      plan.labels.slot2Label +
+      ". " +
+      plan.labels.slot1Label +
+      " unchanged.",
+  };
+}
+
+async function previewCoachSlotRepairForTeam(teamId) {
+  var data = await loadData(teamId);
+  var team = (data.teams || []).find(function (t) {
+    return teamIdStr(t.id) === teamIdStr(teamId);
+  });
+  var coachVotes = [];
+  if (window.__svFirebaseApp) {
+    try {
+      coachVotes = await fetchCoachVotesRest(teamId);
+    } catch (e) {
+      console.warn("[merge-rounds] coachVotes fetch failed", e);
+    }
+  }
+  var localData = loadLocalData();
+  var localCoach = (localData.coachVotes || []).filter(function (v) {
+    return v && teamIdStr(v.teamId) === teamIdStr(teamId);
+  });
+  var byId = Object.create(null);
+  coachVotes.concat(localCoach).forEach(function (v) {
+    if (!v) return;
+    var id = v.id || teamId + "|s" + v.slot + "|" + voteRoundLabel(v);
+    byId[id] = v;
+  });
+  return planCoachSlotRepair(
+    teamId,
+    Object.keys(byId).map(function (id) {
+      return byId[id];
+    }),
+    team,
+    localData
+  );
+}
+
+function refreshChrisCoachSlotLabels() {
+  var slotSel = document.getElementById("chrisCoachSlot");
+  if (!slotSel) return;
+  var teamId = getAdminTeamId();
+  var data = loadLocalData();
+  var team = (data.teams || []).find(function (t) {
+    return teamIdStr(t.id) === teamIdStr(teamId);
+  });
+  var labels = teamCoachLabels(team);
+  var opt1 = slotSel.querySelector('option[value="1"]');
+  var opt2 = slotSel.querySelector('option[value="2"]');
+  if (opt1) opt1.textContent = labels.slot1Label;
+  if (opt2) opt2.textContent = labels.slot2Label;
+  if (!slotSel.dataset.userPicked) {
+    slotSel.value = String(resolveChrisCoachSlot(team));
+  }
+}
+
+var lastCoachSlotPlan = null;
 
 function applyMergedVotesLocal(teamId, plan, deleteSource) {
   var data = loadLocalData();
@@ -1453,6 +1886,7 @@ function scheduleUnlockRefresh() {
 }
 
 function triggerUnlockRefresh() {
+  refreshChrisCoachSlotLabels();
   if (shouldSkipPassiveRefresh()) return;
   scheduleRefreshRoundSelects();
 }
@@ -1473,6 +1907,7 @@ async function refreshRoundSelects() {
     roundsLoadedSuccessfully = false;
   }
   lastRefreshTeamId = teamId;
+  refreshChrisCoachSlotLabels();
   var unlocked = isSuperAdminUnlocked();
   lastUnlockState = unlocked;
 
@@ -1580,10 +2015,14 @@ function wireMergeUi() {
         }
         var teamId = getAdminTeamId();
         var slotSel = document.getElementById("chrisCoachSlot");
-        var slot = slotSel && slotSel.value ? parseInt(slotSel.value, 10) : 1;
+        var slot = slotSel && slotSel.value ? parseInt(slotSel.value, 10) : CHRIS_COACH_SLOT;
         if (
           !confirm(
-            "Move all Chris player votes to coach slot " + slot + "? Public votes will be removed from the player pool."
+            "Move all Chris player votes to " +
+              (slotSel && slotSel.options[slotSel.selectedIndex]
+                ? slotSel.options[slotSel.selectedIndex].textContent
+                : "coach slot " + slot) +
+              "? Public votes will be removed from the player pool."
           )
         ) {
           return;
@@ -1599,6 +2038,100 @@ function wireMergeUi() {
         if (errElChris) errElChris.textContent = e.message || String(e);
       } finally {
         migrateChrisBtn.disabled = false;
+      }
+    });
+  }
+
+  var chrisSlotSel = document.getElementById("chrisCoachSlot");
+  if (chrisSlotSel && !chrisSlotSel._svBound) {
+    chrisSlotSel._svBound = true;
+    chrisSlotSel.addEventListener("change", function () {
+      chrisSlotSel.dataset.userPicked = "1";
+    });
+    refreshChrisCoachSlotLabels();
+  }
+
+  var coachRepairPreviewBtn = document.getElementById("coachSlotRepairPreview");
+  var coachRepairRunBtn = document.getElementById("coachSlotRepairRun");
+  if (coachRepairPreviewBtn && !coachRepairPreviewBtn._svBound) {
+    coachRepairPreviewBtn._svBound = true;
+    coachRepairPreviewBtn.addEventListener("click", async function () {
+      var previewEl = document.getElementById("coachSlotRepairPreviewPanel");
+      var hintEl = document.getElementById("coachSlotRepairHint");
+      var errEl = document.getElementById("coachSlotRepairErr");
+      if (hintEl) hintEl.textContent = "";
+      if (errEl) errEl.textContent = "";
+      coachRepairPreviewBtn.disabled = true;
+      if (coachRepairRunBtn) coachRepairRunBtn.disabled = true;
+      lastCoachSlotPlan = null;
+      try {
+        if (!isSuperAdminUnlocked()) {
+          throw new Error("Unlock super admin first (Coach / admin → Super admin).");
+        }
+        var teamId = getAdminTeamId();
+        lastCoachSlotPlan = await previewCoachSlotRepairForTeam(teamId);
+        renderCoachSlotRepairPreview(previewEl, lastCoachSlotPlan);
+        if (coachRepairRunBtn) coachRepairRunBtn.disabled = !lastCoachSlotPlan.moves.length;
+        if (hintEl) {
+          hintEl.textContent = lastCoachSlotPlan.moves.length
+            ? lastCoachSlotPlan.moves.length + " ballot(s) ready to reassign."
+            : "No mistaken slot 1 Chris ballots found.";
+        }
+      } catch (e) {
+        console.error("[merge-rounds] coach slot preview failed", e);
+        if (errEl) errEl.textContent = e.message || String(e);
+        if (previewEl) previewEl.style.display = "none";
+      } finally {
+        coachRepairPreviewBtn.disabled = false;
+      }
+    });
+  }
+
+  if (coachRepairRunBtn && !coachRepairRunBtn._svBound) {
+    coachRepairRunBtn._svBound = true;
+    coachRepairRunBtn.addEventListener("click", async function () {
+      var hintEl = document.getElementById("coachSlotRepairHint");
+      var errEl = document.getElementById("coachSlotRepairErr");
+      if (hintEl) hintEl.textContent = "";
+      if (errEl) errEl.textContent = "";
+      coachRepairRunBtn.disabled = true;
+      try {
+        if (!isSuperAdminUnlocked()) {
+          throw new Error("Unlock super admin first (Coach / admin → Super admin).");
+        }
+        if (!lastCoachSlotPlan || !lastCoachSlotPlan.moves.length) {
+          throw new Error("Run preview first — nothing to repair.");
+        }
+        var labels = lastCoachSlotPlan.labels;
+        if (
+          !confirm(
+            "Reassign " +
+              lastCoachSlotPlan.moves.length +
+              " ballot(s) to " +
+              labels.slot2Label +
+              "? " +
+              labels.slot1Label +
+              " stays on slot " +
+              WILL_COACH_SLOT +
+              "."
+          )
+        ) {
+          return;
+        }
+        var teamId = getAdminTeamId();
+        var result = await runCoachSlotRepair(teamId, lastCoachSlotPlan);
+        if (hintEl) hintEl.textContent = result.message || "Done.";
+        lastCoachSlotPlan = await previewCoachSlotRepairForTeam(teamId);
+        renderCoachSlotRepairPreview(
+          document.getElementById("coachSlotRepairPreviewPanel"),
+          lastCoachSlotPlan
+        );
+        coachRepairRunBtn.disabled = !lastCoachSlotPlan.moves.length;
+      } catch (e) {
+        console.error("[merge-rounds] coach slot repair failed", e);
+        if (errEl) errEl.textContent = e.message || String(e);
+      } finally {
+        coachRepairRunBtn.disabled = !lastCoachSlotPlan || !lastCoachSlotPlan.moves.length;
       }
     });
   }

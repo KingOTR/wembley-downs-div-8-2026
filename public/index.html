@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v135: FotMob lineup units, row spacing, GK safe-area -->
+  <!-- v136: Chris coach slot 2 default, slot repair tool -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v135" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v136" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -3157,14 +3157,26 @@
             </p>
             <label class="field" for="chrisCoachSlot">Chris coach slot</label>
             <select id="chrisCoachSlot" aria-label="Chris coach slot">
-              <option value="1">Coach 1</option>
-              <option value="2">Coach 2</option>
+              <option value="1">Coach 1 (Will)</option>
+              <option value="2" selected>Coach 2 (Chris)</option>
             </select>
             <div class="actions" style="margin-top: 0.5rem">
               <button type="button" class="ghost" id="migrateChrisCoachVotes">Move Chris player votes → coach votes</button>
             </div>
             <p class="hint" id="migrateChrisHint" style="margin: 0.35rem 0 0"></p>
             <p class="err" id="migrateChrisErr" style="margin: 0.25rem 0 0"></p>
+            <div style="margin-top: 0.65rem; padding-top: 0.65rem; border-top: 1px dashed var(--border)">
+              <p class="hint" style="margin: 0 0 0.45rem">
+                Fix mistaken Chris → Coach 1 migration: preview then reassign Chris ballots to Coach 2; Will keeps Coach 1.
+              </p>
+              <div class="actions">
+                <button type="button" class="ghost" id="coachSlotRepairPreview">Preview fix Chris → Coach 2 / Will → Coach 1</button>
+                <button type="button" class="ghost" id="coachSlotRepairRun" disabled>Run slot repair</button>
+              </div>
+              <div id="coachSlotRepairPreviewPanel" class="subcard" style="padding: 0.65rem; margin-top: 0.5rem; display: none"></div>
+              <p class="hint" id="coachSlotRepairHint" style="margin: 0.35rem 0 0"></p>
+              <p class="err" id="coachSlotRepairErr" style="margin: 0.25rem 0 0"></p>
+            </div>
           </div>
           <div class="actions" style="margin-top: 0.65rem">
             <button type="button" class="primary" id="mergeRoundsPreview">Preview merge</button>
@@ -3320,9 +3332,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v135"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v135"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v135"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v136"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v136"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v136"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3336,7 +3348,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v135").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v136").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
