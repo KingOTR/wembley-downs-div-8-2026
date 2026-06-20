@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v125: PWA manifest, participation counter, UI polish, observer fixes -->
+  <!-- v126: lineup names, logo, manual merge, loose squad match -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v125" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v126" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -1142,10 +1142,13 @@
     #lineupCard .player-chip .nm {
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
-      min-width: 0;
-      max-width: 12.5ch;
+      white-space: normal;
+      word-break: break-word;
+      line-height: 1.25;
+      min-width: 3.5ch;
+      max-width: min(26ch, 92vw);
       display: inline-block;
+      padding: 0.05rem 0.1rem;
     }
 
     /* Public pitch: keep consistent scaling (do not distort positions) */
@@ -1190,22 +1193,25 @@
       left: 50%;
       top: calc(100% + 6px);
       transform: translateX(-50%);
-      max-width: min(22ch, 44vw);
-      padding: 0.2rem 0.45rem;
+      max-width: min(28ch, 48vw);
+      min-width: 4.5ch;
+      padding: 0.22rem 0.55rem;
       border-radius: 999px;
       border: 1px solid rgba(185, 28, 28, 0.18);
-      background: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.96);
       color: rgba(17, 24, 39, 0.92);
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 850;
       letter-spacing: -0.01em;
-      line-height: 1.1;
-      white-space: nowrap;
+      line-height: 1.25;
+      white-space: normal;
+      word-break: break-word;
       overflow: hidden;
       text-overflow: ellipsis;
       pointer-events: none;
       box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
       z-index: 6;
+      text-align: center;
     }
 
     /* GK: put name above the dot so it doesn't cover the small box lines */
@@ -1241,9 +1247,21 @@
     @media (max-width: 520px) {
       #lineupCard .player-chip--public-circle .nm {
         top: calc(100% + 5px);
-        font-size: 0.74rem;
-        max-width: min(18ch, 56vw);
+        font-size: 0.76rem;
+        max-width: min(24ch, 58vw);
+        padding: 0.2rem 0.5rem;
       }
+    }
+
+    #lineupCard .lineup-xi-name,
+    #lineupCard .lineup-mini-row .name {
+      white-space: normal;
+      word-break: break-word;
+      line-height: 1.3;
+      overflow: visible;
+      text-overflow: unset;
+      min-width: 0;
+      flex: 1 1 auto;
     }
 
     .player-chip:active {
@@ -2256,22 +2274,39 @@
     }
 
     .brand-logo {
-      width: 60px;
-      height: 60px;
-      flex: 0 0 60px;
+      width: 76px;
+      height: 76px;
+      flex: 0 0 76px;
       border-radius: 999px;
-      box-shadow: var(--shadow);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18), 0 0 0 3px rgba(255, 255, 255, 0.95);
       overflow: hidden;
-      border: 1px solid rgba(0,0,0,0.08);
-      background: rgba(255,255,255,0.35);
+      border: 2px solid rgba(238, 43, 51, 0.35);
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .brand-logo img {
-      width: 100%;
-      height: 100%;
+      width: 88%;
+      height: 88%;
       object-fit: contain;
       display: block;
-      padding: 4px;
+      padding: 0;
+    }
+
+    html[data-theme="dark"] .brand-logo {
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.92);
+      border-color: rgba(238, 43, 51, 0.55);
+      background: #ffffff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .brand-logo {
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.92);
+        border-color: rgba(238, 43, 51, 0.55);
+        background: #ffffff;
+      }
     }
 
     @media (max-width: 400px) {
@@ -2280,17 +2315,17 @@
         gap: 0.45rem;
       }
       .brand-logo {
-        width: 56px;
-        height: 56px;
-        flex-basis: 56px;
+        width: 68px;
+        height: 68px;
+        flex-basis: 68px;
       }
     }
 
     @media (min-width: 520px) {
       .brand-logo {
-        width: 72px;
-        height: 72px;
-        flex-basis: 72px;
+        width: 92px;
+        height: 92px;
+        flex-basis: 92px;
       }
     }
 
@@ -2842,14 +2877,22 @@
         <div class="subcard" id="mergeRoundsBlock">
           <h3>Merge round votes</h3>
           <p class="hint" style="margin-top: 0">
-            Move team votes from a mistaken round into the correct one (e.g. Round 9 → Round 8). Voters already in the destination round are skipped. Names not on the squad list are flagged and not merged. Super admin only.
+            Move team votes from a mistaken round into the correct one (e.g. Round 9 → Round 8). Use manual pick when auto-merge skips valid voters. Super admin only.
           </p>
           <p class="hint" id="mergeRoundsHint" style="margin-top: 0.35rem"></p>
           <label class="field" for="mergeSourceRound">Source round (votes to move)</label>
           <select id="mergeSourceRound" aria-label="Source round for merge"></select>
+          <label class="field" for="mergeSourceRoundManual" style="margin-top: 0.35rem">Or type source round</label>
+          <input type="text" id="mergeSourceRoundManual" placeholder="e.g. Round 9" aria-label="Manual source round label" />
           <label class="field" for="mergeDestRound" style="margin-top: 0.5rem">Destination round (merge into)</label>
           <select id="mergeDestRound" aria-label="Destination round for merge"></select>
+          <label class="field" for="mergeDestRoundManual" style="margin-top: 0.35rem">Or type destination round</label>
+          <input type="text" id="mergeDestRoundManual" placeholder="e.g. Round 8" aria-label="Manual destination round label" />
           <label class="field" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.65rem">
+            <input type="checkbox" id="mergeStrictSquad" />
+            Strict squad check (tighter name matching — off by default)
+          </label>
+          <label class="field" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.45rem">
             <input type="checkbox" id="mergeDeleteSource" checked />
             Delete source round votes after merge
           </label>
@@ -3007,8 +3050,8 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v125"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v125"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v126"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v126"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3022,7 +3065,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v125").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v126").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
         });
@@ -3062,7 +3105,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=125").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=126").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}

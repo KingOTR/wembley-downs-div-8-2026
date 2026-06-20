@@ -2,7 +2,12 @@
  * Voter UX enhancements — companion to app.min.js (no Firebase CDN imports).
  * Features: already-voted banner, duplicate warn, offline queue, who hasn't voted, lineup share pack, dark mode.
  */
-import { matchSquadToVoters, normalizeName } from "./name-match.js";
+import {
+  matchSquadToVoters,
+  normalizeName,
+  displayPlayerName,
+  DEFAULT_SQUAD_THRESHOLD,
+} from "./name-match.js";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -603,7 +608,7 @@ async function updateWhoHasntVoted() {
   var roundVotes = votes.filter(function (v) {
     return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === voteRoundLabel({ round: round });
   });
-  var matched = matchSquadToVoters(squad, votes, teamId, round, voteRoundLabel);
+  var matched = matchSquadToVoters(squad, votes, teamId, round, voteRoundLabel, DEFAULT_SQUAD_THRESHOLD);
 
   if (votedEl) {
     if (matched.voted.length) {
@@ -638,6 +643,16 @@ async function updateWhoHasntVoted() {
   hints.push(isSuperAdminUnlocked() ? "cloud refresh" : "local + public cloud read");
   if (matched.possible.length) hints.push("fuzzy: " + matched.possible.join("; "));
   if (matched.extraVoters.length) hints.push("not on squad: " + matched.extraVoters.join(", "));
+  if (matched.extraDetails && matched.extraDetails.length) {
+    hints.push(
+      "mismatch detail: " +
+        matched.extraDetails
+          .map(function (d) {
+            return d.voterName + " (" + d.reason + ")";
+          })
+          .join("; ")
+    );
+  }
   if (cloudErr) hints.push("cloud error: " + cloudErr);
   if (statusEl) statusEl.textContent = hints.join(" · ");
 }
@@ -824,7 +839,7 @@ async function updateParticipationCounter() {
     console.warn("[participation]", e);
   }
   var votes = mergeVotesLists(localVotes, cloudVotes);
-  var matched = matchSquadToVoters(squad, votes, teamId, round, voteRoundLabel);
+  var matched = matchSquadToVoters(squad, votes, teamId, round, voteRoundLabel, DEFAULT_SQUAD_THRESHOLD);
   var voted = matched.voted.length;
   var total = squad.length;
   var pct = total ? Math.round((voted / total) * 100) : 0;
@@ -862,12 +877,36 @@ function wireParticipationCounter() {
   refresh();
 }
 
+function normalizeLineupNameEl(el) {
+  if (!el || el._svNameNorm) return;
+  var raw = el.textContent || "";
+  var norm = displayPlayerName(raw);
+  if (norm && norm !== raw) el.textContent = norm;
+  el._svNameNorm = true;
+}
+
+function wireLineupNameNormalize() {
+  var card = document.getElementById("lineupCard");
+  if (!card || card._svNameNormObs) return;
+  card._svNameNormObs = true;
+  var sel = "#lineupCard .nm, #lineupCard .lineup-xi-name, #lineupCard .lineup-mini-row .name, #lineupCard .player-chip .nm";
+  card.querySelectorAll(sel).forEach(normalizeLineupNameEl);
+  var obs = new MutationObserver(function () {
+    card.querySelectorAll(sel).forEach(function (el) {
+      el._svNameNorm = false;
+      normalizeLineupNameEl(el);
+    });
+  });
+  obs.observe(card, { childList: true, subtree: true, characterData: true });
+}
+
 function init() {
   wireVoterNameListeners();
   wireDuplicateSubmitGuard();
   wireOfflineQueue();
   wireThemeToggle();
   wireParticipationCounter();
+  wireLineupNameNormalize();
 }
 
 function safeInit() {

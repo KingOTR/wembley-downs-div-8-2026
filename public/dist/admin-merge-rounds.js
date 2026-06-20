@@ -2,7 +2,14 @@
  * Admin: merge team votes from one round into another (super admin).
  * Lazy-loaded alongside app.min.js; uses window.__svFirebaseApp / __svAuth (no CDN Firebase imports).
  */
-import { findSquadMatch, normalizeName } from "./name-match.js";
+import {
+  findSquadMatch,
+  normalizeName,
+  explainSquadMismatch,
+  displayPlayerName,
+  DEFAULT_SQUAD_THRESHOLD,
+  STRICT_SQUAD_THRESHOLD,
+} from "./name-match.js";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -164,11 +171,67 @@ function buildPlayerKeySet(players) {
   return set;
 }
 
-function isOnSquad(voterName, players) {
-  return !!findSquadMatch(voterName, players);
+function squadThreshold(strict) {
+  return strict ? STRICT_SQUAD_THRESHOLD : DEFAULT_SQUAD_THRESHOLD;
 }
 
-function planMerge(teamId, teams, votes, srcRound, dstRound) {
+function getRoundFromUi(selectId, manualId) {
+  var manualEl = document.getElementById(manualId);
+  var manualVal = manualEl && manualEl.value ? manualEl.value.trim() : "";
+  if (manualVal) return validateRoundLabel(manualVal);
+  var sel = document.getElementById(selectId);
+  if (!sel || !sel.value) return null;
+  return validateRoundLabel(sel.value);
+}
+
+function analyzeSourceVote(v, players, destKeys, th, forceInclude) {
+  var key = v.voterNameKey || nameKey(v.voterName);
+  var voterLabel = displayPlayerName(v.voterName) || "(unnamed)";
+  var forced = forceInclude && forceInclude[key];
+  var squadHit = findSquadMatch(v.voterName, players, th);
+  var isDup = !!destKeys[key];
+  var status = "ok";
+  var reason = squadHit ? squadHit.reason || "on squad" : explainSquadMismatch(v.voterName, players, th);
+
+  if (isDup) {
+    status = "dup";
+    reason = "already voted in destination round";
+  } else if (!squadHit && !forced) {
+    status = "invalid";
+  } else if (squadHit && !squadHit.exact && !forced) {
+    status = "fuzzy";
+    reason = (squadHit.reason || "fuzzy") + " → " + displayPlayerName(squadHit.match);
+  } else if (forced && !squadHit) {
+    status = "forced";
+    reason = "manual override (not on squad)";
+  } else if (forced) {
+    status = "forced";
+    reason = "manual override";
+  }
+
+  var includeDefault = status === "ok" || status === "fuzzy" || status === "forced";
+  if (status === "invalid" || status === "dup") includeDefault = false;
+
+  return {
+    vote: v,
+    key: key,
+    voterLabel: voterLabel,
+    squadHit: squadHit,
+    status: status,
+    reason: reason,
+    isDup: isDup,
+    includeDefault: includeDefault,
+  };
+}
+
+function planMerge(teamId, teams, votes, srcRound, dstRound, opts) {
+  opts = opts || {};
+  var strict = !!opts.strictSquadCheck;
+  var th = squadThreshold(strict);
+  var forceInclude = opts.forceInclude || Object.create(null);
+  var manualInclude = opts.manualInclude || Object.create(null);
+  var manualExclude = opts.manualExclude || Object.create(null);
+
   var srcLabel = voteRoundLabel({ round: srcRound });
   var dstLabel = voteRoundLabel({ round: dstRound });
   var team = (teams || []).find(function (t) {
@@ -183,30 +246,48 @@ function planMerge(teamId, teams, votes, srcRound, dstRound) {
     destKeys[v.voterNameKey || nameKey(v.voterName)] = true;
   });
 
-  var merged = [];
-  var skippedDup = [];
-  var invalid = [];
-  var possibleMatch = [];
   var sourceVotes = (votes || []).filter(function (v) {
     return v && teamIdStr(v.teamId) === teamIdStr(teamId) && voteRoundLabel(v) === srcLabel;
   });
 
-  sourceVotes.forEach(function (v) {
-    var key = v.voterNameKey || nameKey(v.voterName);
-    var squadHit = findSquadMatch(v.voterName, players);
-    if (!squadHit) {
-      invalid.push(v.voterName || "(unnamed)");
+  var items = sourceVotes.map(function (v) {
+    return analyzeSourceVote(v, players, destKeys, th, forceInclude);
+  });
+
+  var merged = [];
+  var skippedDup = [];
+  var invalid = [];
+  var possibleMatch = [];
+  var forced = [];
+
+  items.forEach(function (item) {
+    var included = manualInclude[item.key] === true;
+    var excluded = manualExclude[item.key] === true;
+    if (excluded) return;
+    if (!included) {
+      if (item.status === "dup") {
+        skippedDup.push(item.voterLabel);
+        return;
+      }
+      if (item.status === "invalid") {
+        invalid.push(item.voterLabel);
+        return;
+      }
+      if (!item.includeDefault) return;
+    }
+
+    if (item.isDup && !included) {
+      skippedDup.push(item.voterLabel);
       return;
     }
-    if (!squadHit.exact) {
-      possibleMatch.push((v.voterName || "(unnamed)") + " ≈ " + squadHit.match);
+
+    if (item.status === "fuzzy" && item.squadHit) {
+      possibleMatch.push(item.voterLabel + " ≈ " + displayPlayerName(item.squadHit.match));
     }
-    if (destKeys[key]) {
-      skippedDup.push(v.voterName || key);
-      return;
+    if (item.status === "forced" || (included && item.status === "invalid")) {
+      forced.push(item.voterLabel);
     }
-    destKeys[key] = true;
-    merged.push(v);
+    merged.push(item.vote);
   });
 
   return {
@@ -214,11 +295,74 @@ function planMerge(teamId, teams, votes, srcRound, dstRound) {
     dstLabel: dstLabel,
     dstRoundKey: roundDocKey(dstLabel),
     sourceVotes: sourceVotes,
+    items: items,
     merged: merged,
     skippedDup: skippedDup,
     invalid: invalid,
     possibleMatch: possibleMatch,
+    forced: forced,
+    strictSquadCheck: strict,
+    players: players,
   };
+}
+
+function rebuildPlanFromUi(basePlan) {
+  if (!basePlan) return null;
+  var forceInclude = Object.create(null);
+  var manualInclude = Object.create(null);
+  var manualExclude = Object.create(null);
+  var summaryEl = document.getElementById("mergeRoundsSummary");
+  if (summaryEl) {
+    summaryEl.querySelectorAll("[data-merge-key]").forEach(function (row) {
+      var key = row.getAttribute("data-merge-key");
+      var includeCb = row.querySelector(".merge-include-cb");
+      var forceCb = row.querySelector(".merge-force-cb");
+      if (forceCb && forceCb.checked) forceInclude[key] = true;
+      if (includeCb && includeCb.checked) manualInclude[key] = true;
+      if (includeCb && !includeCb.checked) manualExclude[key] = true;
+    });
+  }
+  return planMerge(
+    basePlan.teamId,
+    basePlan.teams,
+    basePlan.votes,
+    basePlan.srcRound,
+    basePlan.dstRound,
+    {
+      strictSquadCheck: !!document.getElementById("mergeStrictSquad")?.checked,
+      forceInclude: forceInclude,
+      manualInclude: manualInclude,
+      manualExclude: manualExclude,
+    }
+  );
+}
+
+function statusBadge(status) {
+  var colors = {
+    ok: "#15803d",
+    fuzzy: "#a16207",
+    invalid: "var(--red-dark)",
+    dup: "#52525b",
+    forced: "#7c3aed",
+  };
+  var labels = {
+    ok: "OK",
+    fuzzy: "Fuzzy",
+    invalid: "Not on squad",
+    dup: "Duplicate",
+    forced: "Forced",
+  };
+  var c = colors[status] || "#52525b";
+  var l = labels[status] || status;
+  return (
+    "<span style='font-size:0.75rem;font-weight:800;padding:0.12rem 0.4rem;border-radius:999px;background:" +
+    c +
+    "18;color:" +
+    c +
+    "'>" +
+    escapeHtml(l) +
+    "</span>"
+  );
 }
 
 function renderSummary(el, plan, teamName) {
@@ -232,53 +376,128 @@ function renderSummary(el, plan, teamName) {
       plan.merged.length +
       "</strong> vote" +
       (plan.merged.length === 1 ? "" : "s") +
-      " will merge from <em>" +
+      " selected from <em>" +
       escapeHtml(plan.srcLabel) +
       "</em> → <em>" +
       escapeHtml(plan.dstLabel) +
       "</em></div>",
-    "<div style='margin-top:0.35rem'><strong>" +
-      plan.skippedDup.length +
-      "</strong> skipped (already voted in destination)</div>",
-    "<div style='margin-top:0.35rem'><strong>" +
-      plan.invalid.length +
-      "</strong> invalid (not on squad list)</div>",
+    "<div style='margin-top:0.35rem;font-size:0.88rem;color:#52525b'>" +
+      (plan.strictSquadCheck ? "Strict squad check ON" : "Loose squad check (default)") +
+      " · tick rows to include/exclude · use Force include for flagged names</div>",
   ];
+
+  if (plan.items && plan.items.length) {
+    lines.push(
+      "<div style='margin-top:0.65rem;font-weight:750'>Source votes (" +
+        plan.items.length +
+        ")</div>" +
+        "<div class='merge-voter-list' style='margin-top:0.35rem;display:flex;flex-direction:column;gap:0.35rem'>"
+    );
+    plan.items.forEach(function (item) {
+      var checked = item.includeDefault && item.status !== "dup" ? " checked" : "";
+      var forceChecked = item.status === "forced" ? " checked" : "";
+      var disabledDup = item.status === "dup" ? " disabled" : "";
+      lines.push(
+        "<label class='merge-voter-row' data-merge-key='" +
+          escapeHtml(item.key) +
+          "' style='display:flex;align-items:flex-start;gap:0.45rem;padding:0.45rem 0.55rem;border:1px solid var(--border);border-radius:10px;cursor:pointer'>" +
+          "<input type='checkbox' class='merge-include-cb'" +
+          checked +
+          disabledDup +
+          " style='margin-top:0.2rem' />" +
+          "<span style='flex:1;min-width:0'>" +
+          "<span style='font-weight:750'>" +
+          escapeHtml(item.voterLabel) +
+          "</span> " +
+          statusBadge(item.status) +
+          "<br><span class='hint' style='font-size:0.82rem;line-height:1.35'>" +
+          escapeHtml(item.reason) +
+          "</span></span>" +
+          (item.status === "invalid" || item.status === "dup"
+            ? "<label style='font-size:0.78rem;white-space:nowrap;display:flex;align-items:center;gap:0.25rem;color:var(--red-dark)'>" +
+              "<input type='checkbox' class='merge-force-cb'" +
+              forceChecked +
+              " /> Force</label>"
+            : "") +
+          "</label>"
+      );
+    });
+    lines.push("</div>");
+  }
+
   if (plan.skippedDup.length) {
     lines.push(
-      "<details style='margin-top:0.45rem'><summary>Skipped duplicates</summary><p class='hint' style='margin:0.35rem 0 0'>" +
+      "<details style='margin-top:0.45rem'><summary>Skipped duplicates (" +
+        plan.skippedDup.length +
+        ")</summary><p class='hint' style='margin:0.35rem 0 0'>" +
         escapeHtml(plan.skippedDup.join(", ")) +
         "</p></details>"
     );
   }
   if (plan.possibleMatch && plan.possibleMatch.length) {
     lines.push(
-      "<details style='margin-top:0.45rem'><summary>Possible name matches (fuzzy)</summary><p class='hint' style='margin:0.35rem 0 0'>" +
+      "<details style='margin-top:0.45rem'><summary>Possible name matches (" +
+        plan.possibleMatch.length +
+        ")</summary><p class='hint' style='margin:0.35rem 0 0'>" +
         escapeHtml(plan.possibleMatch.join(", ")) +
+        "</p></details>"
+    );
+  }
+  if (plan.forced && plan.forced.length) {
+    lines.push(
+      "<details open style='margin-top:0.45rem'><summary>Manual overrides (" +
+        plan.forced.length +
+        ")</summary><p class='hint' style='margin:0.35rem 0 0'>" +
+        escapeHtml(plan.forced.join(", ")) +
         "</p></details>"
     );
   }
   if (plan.invalid.length) {
     lines.push(
-      "<details style='margin-top:0.45rem'><summary>Invalid names (not on squad)</summary><p class='hint' style='margin:0.35rem 0 0'>" +
+      "<details style='margin-top:0.45rem'><summary>Excluded / invalid (" +
+        plan.invalid.length +
+        ") — tick Include + Force to merge anyway</summary><p class='hint' style='margin:0.35rem 0 0'>" +
         escapeHtml(plan.invalid.join(", ")) +
         "</p></details>"
     );
   }
-  if (plan.merged.length) {
-    lines.push(
-      "<details style='margin-top:0.45rem'><summary>Votes to merge</summary><p class='hint' style='margin:0.35rem 0 0'>" +
-        escapeHtml(
-          plan.merged
-            .map(function (v) {
-              return v.voterName;
-            })
-            .join(", ")
-        ) +
-        "</p></details>"
-    );
-  }
+
   el.innerHTML = lines.join("");
+
+  el.querySelectorAll(".merge-include-cb, .merge-force-cb").forEach(function (cb) {
+    cb.addEventListener("change", function () {
+      if (cb.classList.contains("merge-force-cb") && cb.checked) {
+        var row = cb.closest("[data-merge-key]");
+        var inc = row && row.querySelector(".merge-include-cb");
+        if (inc) inc.checked = true;
+      }
+      if (!lastPlan) return;
+      var updated = rebuildPlanFromUi(lastPlan);
+      if (!updated) return;
+      updated.teamId = lastPlan.teamId;
+      updated.teams = lastPlan.teams;
+      updated.votes = lastPlan.votes;
+      updated.srcRound = lastPlan.srcRound;
+      updated.dstRound = lastPlan.dstRound;
+      updated.localOnly = lastPlan.localOnly;
+      lastPlan = updated;
+      var runBtn = document.getElementById("mergeRoundsRun");
+      if (runBtn) runBtn.disabled = !lastPlan.merged.length;
+      var countEl = el.querySelector("div:nth-child(2)");
+      if (countEl) {
+        countEl.innerHTML =
+          "<strong>" +
+          lastPlan.merged.length +
+          "</strong> vote" +
+          (lastPlan.merged.length === 1 ? "" : "s") +
+          " selected from <em>" +
+          escapeHtml(lastPlan.srcLabel) +
+          "</em> → <em>" +
+          escapeHtml(lastPlan.dstLabel) +
+          "</em>";
+      }
+    });
+  });
 }
 
 function escapeHtml(s) {
@@ -896,9 +1115,9 @@ function wireMergeUi() {
         throw new Error("Unlock super admin first (Coach / admin → Super admin).");
       }
       var teamId = getAdminTeamId();
-      var srcRound = validateRoundLabel(document.getElementById("mergeSourceRound")?.value);
-      var dstRound = validateRoundLabel(document.getElementById("mergeDestRound")?.value);
-      if (!srcRound || !dstRound) throw new Error("Select valid source and destination rounds.");
+      var srcRound = getRoundFromUi("mergeSourceRound", "mergeSourceRoundManual");
+      var dstRound = getRoundFromUi("mergeDestRound", "mergeDestRoundManual");
+      if (!srcRound || !dstRound) throw new Error("Select or type valid source and destination rounds.");
       if (voteRoundLabel({ round: srcRound }) === voteRoundLabel({ round: dstRound })) {
         throw new Error("Source and destination rounds must be different.");
       }
@@ -906,13 +1125,21 @@ function wireMergeUi() {
       var team = (data.teams || []).find(function (t) {
         return teamIdStr(t.id) === teamIdStr(teamId);
       });
-      lastPlan = planMerge(teamId, data.teams, data.votes, srcRound, dstRound);
+      var strict = !!document.getElementById("mergeStrictSquad")?.checked;
+      lastPlan = planMerge(teamId, data.teams, data.votes, srcRound, dstRound, {
+        strictSquadCheck: strict,
+      });
       lastPlan.teamId = teamId;
+      lastPlan.teams = data.teams;
+      lastPlan.votes = data.votes;
+      lastPlan.srcRound = srcRound;
+      lastPlan.dstRound = dstRound;
       lastPlan.localOnly = !!data.localOnly;
       renderSummary(summaryEl, lastPlan, (team && team.name) || "Team " + teamId);
       runBtn.disabled = !lastPlan.merged.length;
       if (!lastPlan.merged.length && errEl) {
-        errEl.textContent = "Nothing to merge — check duplicates, invalid names, or empty source round.";
+        errEl.textContent =
+          "Nothing selected — tick voters to include, or use Force include for flagged names.";
       }
     } catch (e) {
       console.error(e);
@@ -922,6 +1149,18 @@ function wireMergeUi() {
 
   runBtn.addEventListener("click", async function () {
     if (errEl) errEl.textContent = "";
+    if (lastPlan) {
+      var refreshed = rebuildPlanFromUi(lastPlan);
+      if (refreshed) {
+        refreshed.teamId = lastPlan.teamId;
+        refreshed.teams = lastPlan.teams;
+        refreshed.votes = lastPlan.votes;
+        refreshed.srcRound = lastPlan.srcRound;
+        refreshed.dstRound = lastPlan.dstRound;
+        refreshed.localOnly = lastPlan.localOnly;
+        lastPlan = refreshed;
+      }
+    }
     if (!lastPlan || !lastPlan.merged.length) {
       if (errEl) errEl.textContent = "Run preview first.";
       return;
