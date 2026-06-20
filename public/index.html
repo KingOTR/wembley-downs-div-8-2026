@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v149: mobile immersive lineup + voting UI -->
+  <!-- v150: lineup admin/public parity — exact pitch coordinates -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v149" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v150" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -4037,9 +4037,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v149"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v149"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v149"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v150"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v150"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v150"></script>
   <script>
     (function () {
       var loaded = false;
@@ -4053,7 +4053,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v149").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v150").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
@@ -4100,7 +4100,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=149").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=150").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}

@@ -1,11 +1,11 @@
 /**
- * PNG lineup export aligned with public FotMob view (same setup + row spacing + chips).
+ * PNG lineup export aligned with public FotMob view (same setup + coordinates + chips).
  */
 import {
   prepareLineupDisplay,
   clamp01,
   pitchMarkup,
-} from "./lineup-fotmob.js?tag=v149";
+} from "./lineup-fotmob.js?tag=v150";
 
 function roundRect(ctx, x, y, w, h, r) {
   var rad = Math.min(r, w / 2, h / 2);
