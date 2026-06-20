@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v136: Chris coach slot 2 default, slot repair tool -->
+  <!-- v137: lineup consistency, game metadata, weather, name suggest fix -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v136" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v137" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -1283,6 +1283,7 @@
 
     #lineupCard .lineup-pitch-fotmob {
       --pitch-max-h: 720px;
+      --pitch-inset: clamp(12px, 3.2cqw, 20px);
       background:
         linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, transparent 18%, transparent 82%, rgba(0, 0, 0, 0.1) 100%),
         linear-gradient(180deg, #1b5e38 0%, #174a2e 48%, #1b5e38 100%);
@@ -1290,7 +1291,7 @@
       --pitch-line-soft: rgba(255, 255, 255, 0.24);
       --pitch-line-strong: rgba(255, 255, 255, 0.38);
       --pitch-outline: rgba(0, 0, 0, 0.22);
-      overflow: visible;
+      overflow: hidden;
       margin-bottom: max(0.85rem, env(safe-area-inset-bottom, 0px));
     }
 
@@ -1355,19 +1356,9 @@
       pointer-events: none;
     }
 
-    /* GK: name above ring, anchor shifted so label clears pitch bottom */
+    /* Names always below the position circle (GK included) */
     #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit.is-gk {
-      flex-direction: column-reverse;
-      transform: translate(-50%, calc(0.5 * var(--fotmob-ring)));
       z-index: 6;
-    }
-
-    #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit.is-gk .fotmob-unit__name {
-      margin-top: 0;
-      margin-bottom: -2px;
-      border-radius: 9px 9px 0 0;
-      border-top: 1px solid rgba(255, 255, 255, 0.4);
-      border-bottom: none;
     }
 
     .lineup-fotmob-subs {
@@ -1393,10 +1384,89 @@
       gap: 0.35rem 0.5rem;
     }
 
-    .lineup-fotmob-sub {
-      font-size: 0.82rem;
-      font-weight: 650;
+    .lineup-fotmob-sub-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.28rem 0.62rem;
+      border-radius: 999px;
+      border: 1px solid rgba(185, 28, 28, 0.18);
+      background: rgba(255, 255, 255, 0.92);
+      font-size: 0.8rem;
+      font-weight: 700;
       color: var(--text);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .lineup-weather-mount {
+      margin: 0 0 0.55rem;
+    }
+
+    .lineup-weather {
+      padding: 0.55rem 0.65rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .lineup-weather-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: rgba(127, 29, 29, 0.82);
+      margin-bottom: 0.25rem;
+    }
+
+    .lineup-weather-loc {
+      margin: 0 0 0.35rem;
+      font-size: 0.82rem;
+    }
+
+    .lineup-weather-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .lineup-weather-chip {
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      background: rgba(185, 28, 28, 0.08);
+      color: var(--text);
+    }
+
+    .lineup-weather-hourly {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .lineup-weather-hour {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 3.2rem;
+      padding: 0.25rem 0.35rem;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.04);
+      font-size: 0.72rem;
+    }
+
+    .lineup-weather-hour-time {
+      font-weight: 700;
+      opacity: 0.75;
+    }
+
+    .lineup-weather-hour-temp {
+      font-weight: 900;
+      font-size: 0.85rem;
+    }
+
+    .lineup-weather-hour-rain {
+      opacity: 0.7;
     }
 
     @media (max-width: 520px) {
@@ -1447,6 +1517,16 @@
     }
 
     html[data-theme="dark"] .lineup-fotmob-subs {
+      background: rgba(15, 23, 42, 0.55);
+    }
+
+    html[data-theme="dark"] .lineup-fotmob-sub-chip {
+      background: rgba(15, 23, 42, 0.72);
+      border-color: rgba(239, 68, 68, 0.22);
+      color: rgba(248, 250, 252, 0.95);
+    }
+
+    html[data-theme="dark"] .lineup-weather {
       background: rgba(15, 23, 42, 0.55);
     }
 
@@ -2929,8 +3009,16 @@
           <select id="adminMatchRoundSelect"></select>
           <label class="field" for="matchDateInput">Date</label>
           <input type="date" id="matchDateInput" />
-          <label class="field" for="matchVenueInput">Venue</label>
-          <input type="text" id="matchVenueInput" placeholder="e.g. Wembley Downs Reserve" />
+          <label class="field" for="matchSuburbInput">Suburb (where game is played)</label>
+          <input type="text" id="matchSuburbInput" placeholder="e.g. Wembley Downs" />
+          <label class="field" for="matchKickoffInput">Kick off (date &amp; time)</label>
+          <input type="datetime-local" id="matchKickoffInput" />
+          <label class="field" for="matchGroundInput">Ground name</label>
+          <input type="text" id="matchGroundInput" placeholder="e.g. Butlers Reserve" />
+          <label class="field" for="matchPitchInput">Pitch number (optional)</label>
+          <input type="text" id="matchPitchInput" placeholder="e.g. 3" inputmode="numeric" />
+          <label class="field" for="matchVenueInput">Venue (legacy / override)</label>
+          <input type="text" id="matchVenueInput" placeholder="Optional — ground name above is preferred" />
           <label class="field" for="matchOpponentInput">Opponent</label>
           <input type="text" id="matchOpponentInput" placeholder="e.g. Rivals FC" />
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.6rem">
@@ -3332,9 +3420,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v136"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v136"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v136"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v137"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v137"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v137"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3348,7 +3436,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v136").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v137").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");

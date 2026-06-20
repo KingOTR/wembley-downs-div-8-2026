@@ -1,38 +1,31 @@
 /**
  * FotMob-style public lineup view (single team, dark pitch, circular nodes).
- * Loaded by app.min.js via chunk-HQEVIJDY.js.
+ * Shared display logic for public tab + PNG export.
  */
-import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v136";
+import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v137";
+import { fetchMatchWeather, weatherPanelHtml } from "./weather-forecast.js?tag=v137";
 
-const FORMATION_ROLES = {
+export const FORMATION_ROLES = {
   "4-3-3": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "CM", "LW", "ST", "RW"],
   "4-4-2": ["GK", "LB", "CB", "CB", "RB", "LM", "CM", "CM", "RM", "ST", "ST"],
   "3-5-2": ["GK", "CB", "CB", "CB", "LWB", "CM", "CM", "CM", "RWB", "ST", "ST"],
   "4-2-3-1": ["GK", "LB", "CB", "CB", "RB", "CDM", "CDM", "LM", "CAM", "RM", "ST"],
 };
 
-const FORMATION_SPLITS = {
+export const FORMATION_SPLITS = {
   "4-3-3": [1, 4, 3, 3],
   "4-4-2": [1, 4, 4, 2],
   "3-5-2": [1, 3, 5, 2],
   "4-2-3-1": [1, 4, 2, 3, 1],
 };
 
-const ROW_ROLE_TEMPLATES = [
-  ["GK"],
-  ["LB", "CB", "CB", "RB"],
-  ["LM", "CM", "CM", "RM"],
-  ["LW", "ST", "RW"],
-  ["ST"],
-];
-
-function clamp01(v) {
+export function clamp01(v) {
   var n = Number(v);
   if (!isFinite(n)) return 0.5;
   return Math.max(0.05, Math.min(0.95, n));
 }
 
-function escapeHtml(s) {
+export function escapeHtml(s) {
   return String(s || "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -41,7 +34,7 @@ function escapeHtml(s) {
 }
 
 /** Number + surname (trimmed, no double spaces). */
-function lineupLabel(name, number) {
+export function lineupLabel(name, number) {
   var clean = canonicalPlayerName(displayPlayerName(name));
   var parts = clean.split(/\s+/).filter(Boolean);
   var surname = parts.length > 1 ? parts[parts.length - 1] : clean;
@@ -65,7 +58,7 @@ function sortedIndices(starters, clamp) {
     });
 }
 
-function assignRoles(starters, formation, clamp) {
+export function assignRoles(starters, formation, clamp) {
   var roles = FORMATION_ROLES[formation];
   var splits = FORMATION_SPLITS[formation] || [1, 4, 3, 3];
   var indices = sortedIndices(starters, clamp);
@@ -100,9 +93,35 @@ function assignRoles(starters, formation, clamp) {
   return result;
 }
 
-function pitchMarkup() {
+const ROW_ROLE_TEMPLATES = [
+  ["GK"],
+  ["LB", "CB", "CB", "RB"],
+  ["LM", "CM", "CM", "RM"],
+  ["LW", "ST", "RW"],
+  ["ST"],
+];
+
+const GUIDES_MARKUP =
+  "<div class='pitch-guides' aria-hidden='true'>" +
+  "<div class='pitch-guide' style='left:20%'></div>" +
+  "<div class='pitch-guide' style='left:36.55%'></div>" +
+  "<div class='pitch-guide' style='left:63.45%'></div>" +
+  "<div class='pitch-guide' style='left:80%'></div></div>" +
+  "<div class='pitch-adv-guides' aria-hidden='true'>" +
+  "<div class='pitch-adv-line v' style='left:20.35%'></div>" +
+  "<div class='pitch-adv-line v seg-between-boxes' style='left:36.55%'></div>" +
+  "<div class='pitch-adv-line v seg-between-boxes' style='left:63.45%'></div>" +
+  "<div class='pitch-adv-line v' style='left:79.65%'></div>" +
+  "<div class='pitch-adv-line h' style='top:50%'></div>" +
+  "<div class='pitch-adv-line h' style='top:15.7%; left:0; right:79.65%'></div>" +
+  "<div class='pitch-adv-line h' style='top:84.3%; left:0; right:79.65%'></div>" +
+  "<div class='pitch-adv-line v seg-top' style='left:50%'></div>" +
+  "<div class='pitch-adv-line v seg-bot' style='left:50%'></div></div>";
+
+export function pitchMarkup() {
   return (
     "<div class='pitch-lines' aria-hidden='true'>" +
+    GUIDES_MARKUP +
     "<div class='pitch-halfway'></div>" +
     "<div class='pitch-centre-circle'></div>" +
     "<div class='pitch-centre-spot'></div>" +
@@ -122,7 +141,7 @@ function pitchMarkup() {
   );
 }
 
-function applySetup(lineup, setupKey, clamp) {
+export function applySetup(lineup, setupKey, clamp) {
   var formation = String(lineup.formation || "4-3-3").trim() || "4-3-3";
   var starters = (lineup.starters || []).slice(0, 11).map(function (s) {
     return {
@@ -154,7 +173,7 @@ function applySetup(lineup, setupKey, clamp) {
   };
 }
 
-function subName(sub) {
+export function subName(sub) {
   if (!sub) return "";
   if (typeof sub === "string") return canonicalPlayerName(displayPlayerName(sub));
   return canonicalPlayerName(displayPlayerName(sub.name || ""));
@@ -164,7 +183,6 @@ var DISPLAY_GK_Y = 0.8;
 var DISPLAY_TOP_Y = 0.13;
 var DISPLAY_BOTTOM_Y = 0.8;
 
-/** Spread stored y coords into display bands (custom formations). */
 function spreadDataY(starters, playerIdx, gkIdx, clamp) {
   var ys = [];
   starters.forEach(function (p, i) {
@@ -179,7 +197,7 @@ function spreadDataY(starters, playerIdx, gkIdx, clamp) {
 }
 
 /** Even row spacing for public pitch (does not mutate stored coords). */
-function displayRowY(starters, formation, playerIdx, gkIdx, clamp) {
+export function displayRowY(starters, formation, playerIdx, gkIdx, clamp) {
   if (playerIdx === gkIdx) return DISPLAY_GK_Y;
 
   var splits = FORMATION_SPLITS[formation];
@@ -208,6 +226,93 @@ function displayRowY(starters, formation, playerIdx, gkIdx, clamp) {
   return DISPLAY_TOP_Y + (rowFromTop / steps) * (DISPLAY_BOTTOM_Y - DISPLAY_TOP_Y);
 }
 
+export function findGkIndex(starters, clamp) {
+  var gkIdx = 0;
+  var maxY = -1;
+  starters.forEach(function (p, i) {
+    var y = clamp(p.y);
+    if (y > maxY) {
+      maxY = y;
+      gkIdx = i;
+    }
+  });
+  return gkIdx;
+}
+
+/** Unified lineup view model for public tab + export. */
+export function prepareLineupDisplay(lineup, setupKey, clamp) {
+  var applied = applySetup(lineup, setupKey, clamp);
+  var formation = applied.formation;
+  var starters = applied.starters;
+  var roles = assignRoles(starters, formation, clamp);
+  var gkIdx = findGkIndex(starters, clamp);
+  var setupLabel = setupKey === "att" ? "Attacking" : "Defensive";
+  var formLabel = formation === "custom" ? "Custom" : formation;
+
+  var units = starters.map(function (p, i) {
+    var role = (p.role && String(p.role).trim()) || roles[i] || "";
+    return {
+      index: i,
+      name: p.name,
+      number: p.number,
+      role: role,
+      label: lineupLabel(p.name, p.number),
+      leftPct: clamp(p.x) * 100,
+      topPct: displayRowY(starters, formation, i, gkIdx, clamp) * 100,
+      ringText: String(p.number || "").trim() || role || "—",
+      isGk: role === "GK" || i === gkIdx,
+    };
+  });
+
+  var subList = (applied.subs || []).map(subName).filter(Boolean);
+
+  return {
+    setupLabel: setupLabel,
+    formLabel: formLabel,
+    formation: formation,
+    starters: starters,
+    units: units,
+    subs: subList,
+  };
+}
+
+function subsMarkup(subList, esc) {
+  if (!subList.length) return "";
+  return (
+    "<div class='lineup-fotmob-subs'>" +
+    "<div class='lineup-fotmob-subs-title'>Substitutes</div>" +
+    "<div class='lineup-fotmob-subs-list'>" +
+    subList
+      .map(function (name) {
+        return "<span class='lineup-fotmob-sub-chip'>" + esc(name) + "</span>";
+      })
+      .join("") +
+    "</div></div>"
+  );
+}
+
+function chipsMarkup(units, esc) {
+  return units
+    .map(function (u) {
+      return (
+        "<div class='player-chip player-chip--fotmob-unit' style='left:" +
+        u.leftPct.toFixed(2) +
+        "%;top:" +
+        u.topPct.toFixed(2) +
+        "%' data-idx='" +
+        u.index +
+        "'>" +
+        "<span class='fotmob-unit__ring'>" +
+        esc(u.ringText) +
+        "</span>" +
+        "<span class='fotmob-unit__name'>" +
+        esc(u.label) +
+        "</span></div>"
+      );
+    })
+    .join("");
+}
+
 /**
  * @param {object} ctx - deps from app.min.js Bo()
  * @param {number|string} teamId
@@ -230,80 +335,45 @@ export function renderLineupTab(ctx, teamId) {
     return;
   }
 
-  var applied = applySetup(lineup, setupKey, clamp);
-  var formation = applied.formation;
-  var starters = applied.starters;
-  var roles = assignRoles(starters, formation, clamp);
-  var setupLabel = setupKey === "att" ? "Attacking" : "Defensive";
-  var formLabel = formation === "custom" ? "Custom" : formation;
-
-  var gkIdx = 0;
-  var maxY = -1;
-  starters.forEach(function (p, i) {
-    var y = clamp(p.y);
-    if (y > maxY) {
-      maxY = y;
-      gkIdx = i;
-    }
-  });
-
-  var chips = "";
-  starters.forEach(function (p, i) {
-    var role = (p.role && String(p.role).trim()) || roles[i] || "";
-    var num = String(p.number || "").trim();
-    var inner = num ? esc(num) : esc(role || "—");
-    var isGk = role === "GK" || i === gkIdx;
-    var cls = "player-chip player-chip--fotmob-unit" + (isGk ? " is-gk" : "");
-    var left = (clamp(p.x) * 100).toFixed(2);
-    var top = (displayRowY(starters, formation, i, gkIdx, clamp) * 100).toFixed(2);
-    chips +=
-      "<div class='" +
-      cls +
-      "' style='left:" +
-      left +
-      "%;top:" +
-      top +
-      "%' data-idx='" +
-      i +
-      "'>" +
-      "<span class='fotmob-unit__ring'>" +
-      inner +
-      "</span>" +
-      "<span class='fotmob-unit__name'>" +
-      esc(lineupLabel(p.name, p.number)) +
-      "</span>" +
-      "</div>";
-  });
-
-  var subsHtml = "";
-  var subList = (applied.subs || []).map(subName).filter(Boolean);
-  if (subList.length) {
-    subsHtml =
-      "<div class='lineup-fotmob-subs'>" +
-      "<div class='lineup-fotmob-subs-title'>Substitutes</div>" +
-      "<div class='lineup-fotmob-subs-list'>" +
-      subList
-        .map(function (name) {
-          return "<span class='lineup-fotmob-sub'>" + esc(name) + "</span>";
-        })
-        .join("") +
-      "</div></div>";
-  }
+  var view = prepareLineupDisplay(lineup, setupKey, clamp);
 
   wrap.innerHTML =
     "<div class='lineup-fotmob'>" +
     "<div class='lineup-fotmob-header'>" +
     "<div class='lineup-fotmob-setup'>" +
-    esc(setupLabel) +
+    esc(view.setupLabel) +
     "</div>" +
     "<div class='lineup-fotmob-formation'>" +
-    esc(formLabel) +
+    esc(view.formLabel) +
     "</div>" +
     "</div>" +
+    "<div id='lineupWeatherMount' class='lineup-weather-mount' aria-live='polite'></div>" +
     "<div class='pitch pitch--public lineup-pitch-fotmob' aria-label='Starting lineup'>" +
     pitchMarkup() +
-    chips +
+    chipsMarkup(view.units, esc) +
     "</div>" +
-    subsHtml +
+    subsMarkup(view.subs, esc) +
     "</div>";
+
+  var weatherMount = document.getElementById("lineupWeatherMount");
+  if (weatherMount && entry) {
+    weatherMount.innerHTML =
+      "<p class='hint' style='margin:0'>Loading weather…</p>";
+    fetchMatchWeather({
+      suburb: entry.suburb,
+      groundName: entry.groundName || entry.venue,
+      kickoff: entry.kickoff,
+      date: entry.date,
+      venue: entry.venue,
+    })
+      .then(function (data) {
+        if (weatherMount.parentNode) weatherMount.outerHTML = weatherPanelHtml(data);
+      })
+      .catch(function () {
+        if (weatherMount.parentNode) {
+          weatherMount.innerHTML =
+            "<div class='lineup-weather lineup-weather--empty'><p class='hint' style='margin:0'>Weather unavailable.</p></div>";
+        }
+      });
+  }
 }

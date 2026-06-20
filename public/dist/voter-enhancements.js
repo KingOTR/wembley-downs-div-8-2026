@@ -9,7 +9,7 @@ import {
   canonicalPlayerName,
   nameSimilarity,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v136";
+} from "./name-match.js?tag=v137";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -825,7 +825,6 @@ function wireThemeToggle() {
 function wireNameSuggestDeferUntilFocus() {
   var input = document.getElementById("voterNameInput");
   var panel = document.getElementById("voterNameSuggestPanel");
-  var datalist = document.getElementById("voterNameSuggest");
   if (!input || input._svSuggestDefer) return;
   input._svSuggestDefer = true;
 
@@ -840,6 +839,7 @@ function wireNameSuggestDeferUntilFocus() {
   hideSuggestions();
 
   function showSuggestionsReady() {
+    if (document.activeElement !== input) return;
     try {
       if (window.matchMedia && window.matchMedia("(max-width: 768px)").matches) {
         input.setAttribute("list", "voterNameSuggest");
@@ -864,6 +864,149 @@ function wireNameSuggestDeferUntilFocus() {
   input.addEventListener("blur", function () {
     setTimeout(hideSuggestions, 150);
   });
+
+  if (panel && !panel._svSuggestObs) {
+    panel._svSuggestObs = true;
+    var obs = new MutationObserver(function () {
+      if (document.activeElement !== input && !panel.hidden) hideSuggestions();
+    });
+    obs.observe(panel, { attributes: true, childList: true, attributeFilter: ["hidden"] });
+  }
+
+  var guardEvents = ["sv-votes-merged", "sv-lineup-rendered"];
+  guardEvents.forEach(function (evName) {
+    window.addEventListener(evName, function () {
+      if (document.activeElement !== input) hideSuggestions();
+    });
+  });
+}
+
+function loadLocalTeamMatch(teamId, round) {
+  var data = loadLocalData();
+  var team = (data.teams || []).find(function (t) {
+    return String(t.id) === String(teamId);
+  });
+  if (!team || !team.matchesByRound) return null;
+  var key = normalizeRoundLabel(round) || round;
+  if (team.matchesByRound[key]) return team.matchesByRound[key];
+  var keys = Object.keys(team.matchesByRound);
+  for (var i = 0; i < keys.length; i++) {
+    if (normalizeRoundLabel(keys[i]) === key) return team.matchesByRound[keys[i]];
+  }
+  return null;
+}
+
+function getPublicLineupSetupKey() {
+  var att = document.getElementById("lineupPublicAtt");
+  if (att && att.getAttribute("aria-pressed") === "true") return "att";
+  return "def";
+}
+
+function wireLineupExportOverride() {
+  var btn = document.getElementById("lineupExportPng");
+  if (!btn || btn._svExportOverride) return;
+  btn._svExportOverride = true;
+  btn.addEventListener(
+    "click",
+    function (ev) {
+      ev.stopImmediatePropagation();
+      ev.preventDefault();
+      import("./lineup-export.js?tag=v137")
+        .then(function (mod) {
+          var snap =
+            typeof window.__svLineupExportSnapshot === "function"
+              ? window.__svLineupExportSnapshot()
+              : null;
+          var teamId = getCurrentTeamId();
+          var round = getCurrentRound(teamId);
+          var data = loadLocalData();
+          var team =
+            (snap && snap.team) ||
+            (data.teams || []).find(function (t) {
+              return String(t.id) === String(teamId);
+            });
+          var entry = (snap && snap.entry) || loadLocalTeamMatch(teamId, round) || {};
+          if (snap && snap.round) round = snap.round;
+          return mod.exportLineupPng({
+            team: team || { id: teamId, name: "Team " + teamId },
+            round: round,
+            entry: entry,
+            setupKey: getPublicLineupSetupKey(),
+          });
+        })
+        .then(function () {
+          var msg = document.getElementById("lineupEditorMsg");
+          if (msg) {
+            msg.style.color = "#15803d";
+            msg.textContent = "PNG exported (matches public lineup view).";
+          }
+        })
+        .catch(function (e) {
+          console.error("[lineup-export]", e);
+          var msg = document.getElementById("lineupEditorMsg");
+          if (msg) msg.textContent = e.message || "Could not export PNG.";
+        });
+    },
+    true
+  );
+}
+
+async function updateMatchCardWeather() {
+  var mount = document.getElementById("matchWeatherBlock");
+  if (!mount) {
+    var card = document.getElementById("matchCard");
+    if (!card) return;
+    mount = document.createElement("div");
+    mount.id = "matchWeatherBlock";
+    mount.className = "lineup-weather-mount";
+    var line = document.getElementById("matchLine");
+    if (line && line.parentNode) line.parentNode.insertBefore(mount, line.nextSibling);
+    else card.appendChild(mount);
+  }
+
+  var teamId = getCurrentTeamId();
+  var round = getCurrentRound(teamId);
+  var entry = loadLocalTeamMatch(teamId, round);
+  if (!entry) {
+    mount.innerHTML = "";
+    return;
+  }
+
+  mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
+  try {
+    var mod = await import("./weather-forecast.js?tag=v137");
+    var data = await mod.fetchMatchWeather({
+      suburb: entry.suburb,
+      groundName: entry.groundName || entry.venue,
+      kickoff: entry.kickoff,
+      date: entry.date,
+      venue: entry.venue,
+    });
+    mount.innerHTML = mod.weatherPanelHtml(data);
+  } catch (e) {
+    console.warn("[match-weather]", e);
+    mount.innerHTML = "";
+  }
+}
+
+function wireMatchWeather() {
+  var teamSel = document.getElementById("publicTeamSelect");
+  var roundSel = document.getElementById("publicRoundSelect");
+  var refresh = function () {
+    updateMatchCardWeather().catch(function () {});
+  };
+  if (teamSel && !teamSel._svWeather) {
+    teamSel._svWeather = true;
+    teamSel.addEventListener("change", refresh);
+  }
+  if (roundSel && !roundSel._svWeather) {
+    roundSel._svWeather = true;
+    roundSel.addEventListener("change", refresh);
+  }
+  window.addEventListener("storage", function (ev) {
+    if (ev.key === STORAGE_KEY) refresh();
+  });
+  refresh();
 }
 
 function wireVoterNameListeners() {
@@ -1007,6 +1150,8 @@ function init() {
   wireThemeToggle();
   wireParticipationCounter();
   wireLineupNameNormalize();
+  wireLineupExportOverride();
+  wireMatchWeather();
 }
 
 function safeInit() {
