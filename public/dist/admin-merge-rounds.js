@@ -570,16 +570,52 @@ async function readHeaders() {
   return headers;
 }
 
+const SUPER_ADMIN_EMAIL = "sydneywilliam29@gmail.com";
+
 async function authHeaders() {
+  await ensureCloudAuth(false);
   var auth = window.__svAuth;
-  if (!auth || !auth.currentUser) {
-    throw new Error("Sign in as super admin first (Coach / admin → Super admin → Unlock).");
-  }
   var token = await auth.currentUser.getIdToken();
   return {
     Authorization: "Bearer " + token,
     "Content-Type": "application/json",
   };
+}
+
+async function ensureCloudAuth(requireSuperEmail) {
+  var user = await waitForAuth(requireSuperEmail ? 15000 : 8000);
+  if (!user) {
+    throw new Error(
+      "Firebase sign-in required for cloud merge. Coach / admin → Super admin → Unlock, then try again."
+    );
+  }
+  if (requireSuperEmail) {
+    var email = (user.email || "").toLowerCase();
+    if (email !== SUPER_ADMIN_EMAIL) {
+      throw new Error(
+        "Signed in as " +
+          (user.email || "?") +
+          ". Cloud merge requires super admin (" +
+          SUPER_ADMIN_EMAIL +
+          ")."
+      );
+    }
+  }
+  return user;
+}
+
+function formatWriteStatus(status) {
+  if (!status) return "unknown error";
+  var msg = status.message || "";
+  if (status.code === 7 || /PERMISSION_DENIED/i.test(msg)) {
+    return (
+      "Permission denied — unlock super admin as " +
+      SUPER_ADMIN_EMAIL +
+      " (Firestore writes need Firebase sign-in)."
+    );
+  }
+  if (status.code === 5 || /NOT_FOUND/i.test(msg)) return "Document not found: " + msg;
+  return msg || "error code " + (status.code != null ? status.code : "?");
 }
 
 function fsValue(val) {
@@ -623,8 +659,17 @@ function parseFsValue(v) {
 }
 
 function docPath(name) {
-  var m = String(name || "").match(/documents\/(.+)$/);
+  var m = String(name || "").match(/\/documents\/votes\/(.+)$/);
+  if (m) return decodeURIComponent(m[1]);
+  m = String(name || "").match(/documents\/(?:votes\/)?(.+)$/);
   return m ? m[1] : "";
+}
+
+function normalizeVoteDocId(id) {
+  var s = String(id || "").trim();
+  if (!s) return "";
+  if (s.indexOf("votes/") === 0) s = s.slice(6);
+  return s;
 }
 
 async function runQuery(structuredQuery) {
@@ -738,16 +783,25 @@ async function batchWrite(writes) {
       throw new Error(msg);
     }
     if (body.writeResults) {
+      var failures = [];
       body.writeResults.forEach(function (wr, idx) {
         if (wr && wr.status && wr.status.code !== 0) {
+          failures.push({ idx: idx, status: wr.status });
           console.error("[merge-rounds] write error", idx, wr.status);
         }
       });
+      if (failures.length) {
+        var detail = formatWriteStatus(failures[0].status);
+        throw new Error(
+          "Batch write failed (" + failures.length + " of " + chunk.length + " ops): " + detail
+        );
+      }
     }
   }
 }
 
 function docName(docId) {
+  docId = normalizeVoteDocId(docId);
   return (
     "projects/" +
     projectId() +
@@ -1203,6 +1257,10 @@ function wireMergeUi() {
       lastPlan.localOnly = !!data.localOnly;
       renderSummary(summaryEl, lastPlan, (team && team.name) || "Team " + teamId);
       runBtn.disabled = !lastPlan.merged.length;
+      if (data.localOnly && errEl) {
+        errEl.textContent =
+          "Using local cache only — cloud votes may be incomplete. Refresh after unlock if preview looks wrong.";
+      }
       if (!lastPlan.merged.length && errEl) {
         errEl.textContent =
           "Nothing selected — tick voters to include, or use Force include for flagged names.";
@@ -1251,6 +1309,9 @@ function wireMergeUi() {
     runBtn.disabled = true;
     previewBtn.disabled = true;
     try {
+      if (!isSuperAdminUnlocked()) {
+        throw new Error("Unlock super admin first (Coach / admin → Super admin).");
+      }
       lastMergeRunAt = Date.now();
       var mergedCount = 0;
       var deletedCount = 0;
@@ -1259,6 +1320,7 @@ function wireMergeUi() {
         mergedCount = res.merged;
         deletedCount = res.removed;
       } else {
+        await ensureCloudAuth(true);
         mergedCount = await runMergeCloud(lastPlan.teamId, lastPlan);
         if (deleteSource) {
           deletedCount = await deleteSourceVotesCloud(
@@ -1306,9 +1368,9 @@ function wireMergeUi() {
       lastPlan = null;
       setTimeout(refreshRoundSelects, 500);
     } catch (e) {
-      console.error(e);
+      console.error("[merge-rounds] run merge failed", e);
       if (errEl) errEl.textContent = e.message || String(e);
-      runBtn.disabled = false;
+      runBtn.disabled = !!(lastPlan && lastPlan.merged.length);
     } finally {
       previewBtn.disabled = false;
     }
