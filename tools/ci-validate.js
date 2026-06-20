@@ -9,6 +9,7 @@ const sw = fs.readFileSync(path.join(publicDir, "sw.js"), "utf8");
 const required = [
   "public/index.html",
   "public/sw.js",
+  "public/wembley-downs-logo.png",
   "public/dist/app.min.js",
   "public/dist/voter-enhancements.js",
   "public/dist/admin-merge-rounds.js",

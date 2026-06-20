@@ -573,23 +573,24 @@ async function updateWhoHasntVoted() {
   listEl.textContent = missing.join(", ") + " (" + missing.length + "/" + squad.length + " missing)";
 }
 
+var whoHasntVotedWired = false;
+
 function wireWhoHasntVoted() {
-  ensureWhoHasntVotedBlock();
   var teamSel = document.getElementById("resultsTeamSelect");
   var roundSel = document.getElementById("resultsRoundSelect");
-  if (teamSel) teamSel.addEventListener("change", updateWhoHasntVoted);
-  if (roundSel) roundSel.addEventListener("change", updateWhoHasntVoted);
-  window.addEventListener("sv-votes-merged", function () {
-    Object.keys(cloudVotesCache).forEach(function (k) {
-      delete cloudVotesCache[k];
+  if (!teamSel || !roundSel) return;
+  ensureWhoHasntVotedBlock();
+  if (!whoHasntVotedWired) {
+    whoHasntVotedWired = true;
+    teamSel.addEventListener("change", updateWhoHasntVoted);
+    roundSel.addEventListener("change", updateWhoHasntVoted);
+    window.addEventListener("sv-votes-merged", function () {
+      Object.keys(cloudVotesCache).forEach(function (k) {
+        delete cloudVotesCache[k];
+      });
+      setTimeout(updateWhoHasntVoted, 300);
     });
-    setTimeout(updateWhoHasntVoted, 300);
-  });
-  var obs = new MutationObserver(function () {
-    if (document.getElementById("resultsTeamSelect")) updateWhoHasntVoted();
-  });
-  var mount = document.getElementById("adminDeferredMount");
-  if (mount) obs.observe(mount, { childList: true, subtree: true });
+  }
   updateWhoHasntVoted();
 }
 
@@ -712,20 +713,38 @@ function init() {
   wireVoterNameListeners();
   wireDuplicateSubmitGuard();
   wireOfflineQueue();
-  wireWhoHasntVoted();
-  ensureLineupSharePackButton();
   wireThemeToggle();
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init, { once: true });
-} else {
-  init();
+function safeInit() {
+  try {
+    init();
+  } catch (e) {
+    console.warn("[voter-enhancements] init failed (non-fatal)", e);
+  }
 }
 
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", safeInit, { once: true });
+} else {
+  safeInit();
+}
+
+var adminEnhanceWired = false;
 var adminObs = new MutationObserver(function () {
-  wireWhoHasntVoted();
-  ensureLineupSharePackButton();
+  if (adminEnhanceWired) return;
+  if (!document.getElementById("resultsTeamSelect")) return;
+  adminEnhanceWired = true;
+  try {
+    adminObs.disconnect();
+  } catch (e) {}
+  try {
+    wireWhoHasntVoted();
+    ensureLineupSharePackButton();
+  } catch (e) {
+    adminEnhanceWired = false;
+    console.warn("[voter-enhancements] admin wire failed", e);
+  }
 });
 var adminMount = document.getElementById("adminDeferredMount");
 if (adminMount) adminObs.observe(adminMount, { childList: true, subtree: true });

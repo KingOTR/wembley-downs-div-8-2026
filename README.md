@@ -62,9 +62,29 @@ npx -y firebase-tools@latest deploy --only hosting,firestore:rules
 
 Deploy Firestore rules whenever vote/config access changes.
 
-## Release checklist (bump v119 → v120 together)
+## Smoke test
 
-When shipping a new cache-breaking version, update **all** of these to the same version (e.g. `v120`):
+Quick manual check after deploy (or against production):
+
+1. Open https://wembley-downs-div-8-2026.web.app/ (hard-refresh if you recently deployed).
+2. **No fatal banner** — red sticky bar at the top should stay hidden.
+3. **Logo** — Wembley Downs club crest visible in the header beside the title; browser tab shows the club icon.
+4. **Coach / admin** — tap **Coach / admin** at the bottom; panel opens with Super admin / Team coach sign-in options.
+5. **Vote section** — **Voting** tab shows “Your vote”, name field, and player list (or empty state while config loads).
+
+Automated (requires Playwright):
+
+```bash
+npm install playwright
+npx playwright install chromium
+node tools/browser-test.js
+```
+
+Exits `0` when all checks pass; prints JSON with `pass`, logo, admin, and vote details.
+
+## Release checklist (bump v121 → v122 together)
+
+When shipping a new cache-breaking version, update **all** of these to the same version (e.g. `v122`):
 
 1. `public/index.html` — HTML comment + every `?tag=vNNN` on `app.min.js`, `voter-enhancements.js`, `admin-merge-rounds.js`
 2. `public/sw.js` — `CACHE_VERSION = "vNNN"`
