@@ -5,7 +5,7 @@ import {
   prepareLineupDisplay,
   clamp01,
   pitchMarkup,
-} from "./lineup-fotmob.js?tag=v142";
+} from "./lineup-fotmob.js?tag=v143";
 
 function roundRect(ctx, x, y, w, h, r) {
   var rad = Math.min(r, w / 2, h / 2);
