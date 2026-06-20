@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v148: Perth timezone weather fix; v148 kickoff + match review save -->
+  <!-- v149: mobile immersive lineup + voting UI -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v148" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v149" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -116,12 +116,14 @@
       margin-right: auto;
     }
 
-    /* When viewing the lineup tab, let the layout go full-width */
-    body.main-tab-lineup .wrap {
+    /* When viewing lineup or voting, let the layout go full-width */
+    body.main-tab-lineup .wrap,
+    body.main-tab-vote .wrap {
       max-width: 100%;
     }
 
-    body.main-tab-lineup #lineupCard {
+    body.main-tab-lineup #lineupCard,
+    body.main-tab-vote #voteSection {
       margin-left: 0;
       margin-right: 0;
     }
@@ -371,9 +373,9 @@
         padding: 0.65rem;
       }
       #voteSection .player-btn {
-        padding: 0.95rem 1rem;
-        min-height: 3.25rem;
-        font-size: 1.05rem;
+        padding: 1rem 1.05rem;
+        min-height: 3.35rem;
+        font-size: 1.06rem;
         border-radius: 14px;
       }
       #voteSection .player-btn .rank-badge {
@@ -1196,12 +1198,59 @@
       }
     }
 
-    /* Let lineup card go wider on mobile */
+    /* Mobile immersive: edge-to-edge lineup + voting within safe areas */
     @media (max-width: 520px) {
-      #lineupCard {
-        margin-left: -0.75rem;
-        margin-right: -0.75rem;
-        border-radius: 16px;
+      body.main-tab-lineup .wrap,
+      body.main-tab-vote .wrap {
+        padding-left: max(0.35rem, env(safe-area-inset-left, 0px));
+        padding-right: max(0.35rem, env(safe-area-inset-right, 0px));
+      }
+
+      body.main-tab-lineup #lineupCard,
+      body.main-tab-vote #voteSection {
+        margin-left: calc(-1 * max(0.35rem, env(safe-area-inset-left, 0px)));
+        margin-right: calc(-1 * max(0.35rem, env(safe-area-inset-right, 0px)));
+        border-left: none;
+        border-right: none;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      body.main-tab-lineup #lineupCard {
+        padding: 0.5rem max(0.35rem, env(safe-area-inset-right, 0px)) 0.45rem max(0.35rem, env(safe-area-inset-left, 0px));
+      }
+
+      body.main-tab-vote #voteSection {
+        padding: 0.85rem max(0.4rem, env(safe-area-inset-right, 0px)) 1rem max(0.4rem, env(safe-area-inset-left, 0px));
+      }
+
+      #lineupCard .lineup-pitch-fotmob {
+        --pitch-max-h: min(80dvh, calc((100vw - max(0.7rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px))) * 105 / 68));
+        inline-size: 100%;
+        max-inline-size: 100%;
+        margin-inline: 0;
+        margin-bottom: 0.45rem;
+      }
+
+      .lineup-fotmob {
+        padding-bottom: 0.1rem;
+      }
+
+      .lineup-fotmob-subs {
+        margin-top: 0.3rem;
+        padding: 0.45rem 0.5rem 0.35rem;
+      }
+
+      #voteSection .player-list {
+        margin-left: 0;
+        margin-right: 0;
+        padding: 0.4rem 0.3rem;
+        border-radius: 10px;
+      }
+
+      #voteSection .vote-name-input,
+      #voteSection .vote-search {
+        width: 100%;
       }
     }
 
@@ -1424,12 +1473,12 @@
       align-items: center;
       padding: 0.28rem 0.62rem;
       border-radius: 999px;
-      border: 1px solid rgba(185, 28, 28, 0.18);
-      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(185, 28, 28, 0.22);
+      background: #ffffff;
       font-size: 0.8rem;
       font-weight: 700;
-      color: var(--text);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      color: #0f172a;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 
     /* FotMob pitch: white tactical guides above markings, below chips */
@@ -1749,7 +1798,7 @@
 
     @media (max-width: 520px) {
       #lineupCard .lineup-pitch-fotmob {
-        --pitch-max-h: 920px;
+        --pitch-max-h: min(80dvh, calc((100vw - max(0.7rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px))) * 105 / 68));
       }
 
       #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit {
@@ -1783,6 +1832,12 @@
         color: rgba(226, 232, 240, 0.62);
       }
 
+      .lineup-fotmob-sub-chip {
+        background: rgba(30, 41, 59, 0.94);
+        border-color: rgba(239, 68, 68, 0.28);
+        color: #f8fafc;
+      }
+
       #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit .fotmob-unit__ring,
       #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit .fotmob-unit__name {
         background: rgba(255, 255, 255, 0.94);
@@ -1799,9 +1854,15 @@
     }
 
     html[data-theme="dark"] .lineup-fotmob-sub-chip {
-      background: rgba(15, 23, 42, 0.72);
-      border-color: rgba(239, 68, 68, 0.22);
-      color: rgba(248, 250, 252, 0.95);
+      background: rgba(30, 41, 59, 0.94);
+      border-color: rgba(239, 68, 68, 0.28);
+      color: #f8fafc;
+    }
+
+    html[data-theme="light"] .lineup-fotmob-sub-chip {
+      background: #ffffff;
+      border-color: rgba(185, 28, 28, 0.22);
+      color: #0f172a;
     }
 
     html[data-theme="dark"] .lineup-weather {
@@ -3976,9 +4037,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v148"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v148"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v148"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v149"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v149"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v149"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3992,7 +4053,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v148").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v149").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
@@ -4039,7 +4100,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=148").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=149").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}
@@ -4072,6 +4133,7 @@
         var isVote = tab === "vote";
         try {
           document.body.classList.toggle("main-tab-lineup", !isVote);
+          document.body.classList.toggle("main-tab-vote", isVote);
         } catch (e) {}
         voteBtn.classList.toggle("active", isVote);
         lineupBtn.classList.toggle("active", !isVote);
