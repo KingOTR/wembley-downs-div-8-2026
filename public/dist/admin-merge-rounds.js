@@ -2,15 +2,14 @@
  * Admin: merge team votes from one round into another (super admin).
  * Lazy-loaded alongside app.min.js; uses window.__svFirebaseApp / __svAuth (no CDN Firebase imports).
  */
+import { findSquadMatch, normalizeName } from "./name-match.js";
+
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
 const ADMIN_SESSION_KEY = "soccerVoteAdminUnlock";
 
 function qo(c) {
-  return String(c || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
+  return normalizeName(c);
 }
 
 function nameKey(c) {
@@ -92,6 +91,17 @@ function loadRoundByTeamPrefs() {
   }
 }
 
+function roundsFromResultsSelect() {
+  var sel = document.getElementById("resultsRoundSelect");
+  if (!sel) return [];
+  var out = [];
+  for (var i = 0; i < sel.options.length; i++) {
+    var n = normalizeRoundLabel(sel.options[i].value) || sel.options[i].value;
+    if (n) out.push(n);
+  }
+  return out;
+}
+
 function collectRounds(teamId, teams, votes) {
   var map = Object.create(null);
   var team = (teams || []).find(function (t) {
@@ -117,6 +127,13 @@ function collectRounds(teamId, teams, votes) {
     var rl = voteRoundLabel(v);
     if (rl) map[rl] = true;
   });
+  roundsFromResultsSelect().forEach(function (r) {
+    if (r) map[r] = true;
+  });
+  if (!Object.keys(map).length && team && team.round) {
+    map[normalizeRoundLabel(team.round) || "Round 1"] = true;
+  }
+  if (!Object.keys(map).length) map["Round 1"] = true;
   return Object.keys(map).sort(function (a, b) {
     var da = roundSortKey(a);
     var db = roundSortKey(b);
@@ -147,8 +164,8 @@ function buildPlayerKeySet(players) {
   return set;
 }
 
-function isOnSquad(voterName, playerKeys) {
-  return !!playerKeys[qo(voterName)];
+function isOnSquad(voterName, players) {
+  return !!findSquadMatch(voterName, players);
 }
 
 function planMerge(teamId, teams, votes, srcRound, dstRound) {
@@ -157,7 +174,7 @@ function planMerge(teamId, teams, votes, srcRound, dstRound) {
   var team = (teams || []).find(function (t) {
     return teamIdStr(t.id) === teamIdStr(teamId);
   });
-  var playerKeys = buildPlayerKeySet(team && team.players);
+  var players = (team && team.players) || [];
 
   var destKeys = Object.create(null);
   (votes || []).forEach(function (v) {
@@ -169,15 +186,20 @@ function planMerge(teamId, teams, votes, srcRound, dstRound) {
   var merged = [];
   var skippedDup = [];
   var invalid = [];
+  var possibleMatch = [];
   var sourceVotes = (votes || []).filter(function (v) {
     return v && teamIdStr(v.teamId) === teamIdStr(teamId) && voteRoundLabel(v) === srcLabel;
   });
 
   sourceVotes.forEach(function (v) {
     var key = v.voterNameKey || nameKey(v.voterName);
-    if (!isOnSquad(v.voterName, playerKeys)) {
+    var squadHit = findSquadMatch(v.voterName, players);
+    if (!squadHit) {
       invalid.push(v.voterName || "(unnamed)");
       return;
+    }
+    if (!squadHit.exact) {
+      possibleMatch.push((v.voterName || "(unnamed)") + " ≈ " + squadHit.match);
     }
     if (destKeys[key]) {
       skippedDup.push(v.voterName || key);
@@ -195,6 +217,7 @@ function planMerge(teamId, teams, votes, srcRound, dstRound) {
     merged: merged,
     skippedDup: skippedDup,
     invalid: invalid,
+    possibleMatch: possibleMatch,
   };
 }
 
@@ -228,9 +251,16 @@ function renderSummary(el, plan, teamName) {
         "</p></details>"
     );
   }
+  if (plan.possibleMatch && plan.possibleMatch.length) {
+    lines.push(
+      "<details style='margin-top:0.45rem'><summary>Possible name matches (fuzzy)</summary><p class='hint' style='margin:0.35rem 0 0'>" +
+        escapeHtml(plan.possibleMatch.join(", ")) +
+        "</p></details>"
+    );
+  }
   if (plan.invalid.length) {
     lines.push(
-      "<details style='margin-top:0.45rem'><summary>Invalid names</summary><p class='hint' style='margin:0.35rem 0 0'>" +
+      "<details style='margin-top:0.45rem'><summary>Invalid names (not on squad)</summary><p class='hint' style='margin:0.35rem 0 0'>" +
         escapeHtml(plan.invalid.join(", ")) +
         "</p></details>"
     );
@@ -284,6 +314,41 @@ async function waitForAuth(maxMs) {
 function projectId() {
   var app = window.__svFirebaseApp;
   return app && app.options && app.options.projectId ? app.options.projectId : "";
+}
+
+function apiKey() {
+  var app = window.__svFirebaseApp;
+  return app && app.options && app.options.apiKey ? app.options.apiKey : "";
+}
+
+function firestoreUrl(path, query) {
+  var pid = projectId();
+  if (!pid) return "";
+  var url =
+    "https://firestore.googleapis.com/v1/projects/" +
+    encodeURIComponent(pid) +
+    "/databases/(default)/documents/" +
+    path;
+  var params = [];
+  var key = apiKey();
+  if (key) params.push("key=" + encodeURIComponent(key));
+  if (query) params.push(query);
+  if (params.length) url += "?" + params.join("&");
+  return url;
+}
+
+async function readHeaders() {
+  var headers = { "Content-Type": "application/json" };
+  var auth = window.__svAuth;
+  if (auth && auth.currentUser) {
+    try {
+      var token = await auth.currentUser.getIdToken();
+      headers.Authorization = "Bearer " + token;
+    } catch (e) {
+      console.warn("[merge-rounds] auth token unavailable for read", e);
+    }
+  }
+  return headers;
 }
 
 async function authHeaders() {
@@ -346,13 +411,11 @@ function docPath(name) {
 async function runQuery(structuredQuery) {
   var pid = projectId();
   if (!pid) throw new Error("Cloud not connected.");
-  var url =
-    "https://firestore.googleapis.com/v1/projects/" +
-    encodeURIComponent(pid) +
-    "/databases/(default)/documents:runQuery";
+  var url = firestoreUrl(":runQuery");
+  if (!url) throw new Error("Cloud not connected.");
   var res = await fetch(url, {
     method: "POST",
-    headers: await authHeaders(),
+    headers: await readHeaders(),
     body: JSON.stringify({ structuredQuery: structuredQuery }),
   });
   var rows = await res.json();
@@ -364,13 +427,9 @@ async function runQuery(structuredQuery) {
 }
 
 async function getConfigTeams() {
-  var pid = projectId();
-  if (!pid) throw new Error("Cloud not connected.");
-  var url =
-    "https://firestore.googleapis.com/v1/projects/" +
-    encodeURIComponent(pid) +
-    "/databases/(default)/documents/config/main";
-  var res = await fetch(url, { headers: await authHeaders() });
+  var url = firestoreUrl("config/main");
+  if (!url) throw new Error("Cloud not connected.");
+  var res = await fetch(url, { headers: await readHeaders() });
   if (res.status === 404) return [];
   var row = await res.json();
   if (!res.ok) {
@@ -481,12 +540,23 @@ function docName(docId) {
 async function loadCloudData(teamId) {
   var app = await waitForApp(25000);
   if (!app) throw new Error("Cloud not connected. Wait for sync or refresh.");
-  if (!window.__svAuth || !window.__svAuth.currentUser) {
-    throw new Error("Sign in as super admin first (Coach / admin → Super admin → Unlock).");
+  var teams = [];
+  var votes = [];
+  var errors = [];
+  try {
+    teams = await getConfigTeams();
+  } catch (e) {
+    errors.push("config: " + (e.message || String(e)));
   }
-  var teams = await getConfigTeams();
-  var votes = await fetchVotesRest(teamId);
-  return { teams: teams, votes: votes, cloudRest: true };
+  try {
+    votes = await fetchVotesRest(teamId);
+  } catch (e) {
+    errors.push("votes: " + (e.message || String(e)));
+  }
+  if (!teams.length && !votes.length && errors.length) {
+    throw new Error(errors.join("; "));
+  }
+  return { teams: teams, votes: votes, cloudRest: true, loadWarnings: errors };
 }
 
 function loadLocalData() {
@@ -526,27 +596,47 @@ async function loadData(teamId) {
   await waitForApp(25000);
   if (isSuperAdminUnlocked()) await waitForAuth(20000);
   var localData = loadLocalData();
+  var localTeams = localData.teams || [];
   var localVotes = (localData.votes || []).filter(function (v) {
     return v && teamIdStr(v.teamId) === teamIdStr(teamId);
   });
-  if (window.__svFirebaseApp && window.__svAuth && window.__svAuth.currentUser) {
+  var warnings = [];
+
+  if (window.__svFirebaseApp) {
     try {
       var cloud = await loadCloudData(teamId);
+      if (cloud.loadWarnings && cloud.loadWarnings.length) warnings = cloud.loadWarnings;
+      var teams = cloud.teams && cloud.teams.length ? cloud.teams : localTeams;
       cloud.votes = mergeVoteLists(cloud.votes, localVotes);
+      cloud.teams = teams;
+      cloud.warnings = warnings;
       return cloud;
     } catch (e) {
-      if (isSuperAdminUnlocked()) {
+      warnings.push(e.message || String(e));
+      if (isSuperAdminUnlocked() && (localTeams.length || localVotes.length)) {
         return {
-          teams: localData.teams || [],
+          teams: localTeams,
           votes: localVotes,
           localOnly: true,
+          warnings: warnings,
+        };
+      }
+      if (localTeams.length || localVotes.length) {
+        return {
+          teams: localTeams,
+          votes: localVotes,
+          localOnly: true,
+          warnings: warnings,
         };
       }
       throw e;
     }
   }
-  if (!isSuperAdminUnlocked()) throw new Error("Unlock super admin first.");
-  return { teams: localData.teams || [], votes: localVotes, localOnly: true };
+
+  if (!localTeams.length && !localVotes.length && isSuperAdminUnlocked()) {
+    throw new Error("Cloud not connected and no local data. Refresh and unlock super admin.");
+  }
+  return { teams: localTeams, votes: localVotes, localOnly: true, warnings: warnings };
 }
 
 async function deleteSourceVotesCloud(teamId, srcLabel, sourceVotes) {
@@ -706,11 +796,24 @@ function validateRoundLabel(label) {
   return n;
 }
 
+function setMergeHint(text, isErr) {
+  var hint = document.getElementById("mergeRoundsHint");
+  if (!hint) return;
+  hint.textContent = text || "";
+  hint.style.color = isErr ? "var(--red-dark)" : "";
+}
+
 async function refreshRoundSelects() {
-  if (!isSuperAdminUnlocked()) return;
+  if (!isSuperAdminUnlocked()) {
+    setMergeHint("Unlock super admin to load rounds.", true);
+    return;
+  }
   var srcSel = document.getElementById("mergeSourceRound");
   var dstSel = document.getElementById("mergeDestRound");
+  var errEl = document.getElementById("mergeRoundsErr");
   if (!srcSel || !dstSel) return;
+  setMergeHint("Loading rounds…");
+  if (errEl) errEl.textContent = "";
   try {
     var teamId = getAdminTeamId();
     var data = await loadData(teamId);
@@ -721,8 +824,22 @@ async function refreshRoundSelects() {
     var current = team && team.round ? normalizeRoundLabel(team.round) || team.round : "";
     fillSelect(srcSel, rounds, rounds.length > 1 ? rounds[rounds.length - 1] : current);
     fillSelect(dstSel, rounds, current || (rounds.length ? rounds[0] : ""));
+    var authReady = !!(window.__svAuth && window.__svAuth.currentUser);
+    var parts = [
+      rounds.length + " round(s)",
+      (data.votes || []).length + " vote(s) loaded",
+      data.localOnly ? "local fallback" : "cloud",
+      authReady ? "auth OK" : "auth pending (reads still work)",
+    ];
+    if (data.warnings && data.warnings.length) parts.push("warn: " + data.warnings.join("; "));
+    setMergeHint(parts.join(" · "), !!(data.warnings && data.warnings.length));
+    if (!rounds.length) {
+      if (errEl) errEl.textContent = "No rounds found — check team config, votes, or refresh after unlock.";
+    }
   } catch (e) {
     console.warn("merge rounds: could not refresh selects", e);
+    setMergeHint("Could not load rounds: " + (e.message || String(e)), true);
+    if (errEl) errEl.textContent = e.message || String(e);
   }
 }
 
@@ -742,6 +859,27 @@ function wireMergeUi() {
         refreshRoundSelects().catch(function () {});
       }, 80);
     });
+  }
+  var resultsTeamSel = document.getElementById("resultsTeamSelect");
+  if (resultsTeamSel) {
+    resultsTeamSel.addEventListener("change", function () {
+      refreshRoundSelects().catch(function () {});
+    });
+  }
+  var unlockBtn = document.getElementById("unlockAdmin");
+  if (unlockBtn) {
+    unlockBtn.addEventListener("click", function () {
+      setTimeout(function () {
+        refreshRoundSelects().catch(function () {});
+      }, 2000);
+    });
+  }
+  var superContent = document.getElementById("superAdminContent");
+  if (superContent) {
+    var unlockObs = new MutationObserver(function () {
+      if (isSuperAdminUnlocked()) refreshRoundSelects().catch(function () {});
+    });
+    unlockObs.observe(superContent, { attributes: true, attributeFilter: ["style"] });
   }
 
   previewBtn.addEventListener("click", async function () {

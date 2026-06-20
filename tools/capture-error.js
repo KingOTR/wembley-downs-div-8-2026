@@ -25,14 +25,18 @@ const { chromium } = require("playwright");
     .evaluate((el) => window.getComputedStyle(el).display !== "none");
 
   await page.click("#showAdminBtn").catch((e) => errors.push("click fail: " + e.message));
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(2000);
 
-  const panelVisible = await page
-    .locator("#adminPanel")
-    .evaluate((el) => el.classList.contains("visible"))
-    .catch(() => false);
+  const adminState = await page.evaluate(() => ({
+    panelVisible: !!document.getElementById("adminPanel")?.classList.contains("visible"),
+    mergeRoundCount: document.getElementById("mergeSourceRound")?.options?.length || 0,
+    firebaseApp: !!window.__svFirebaseApp,
+    authUser: !!(window.__svAuth && window.__svAuth.currentUser),
+  }));
 
-  console.log(JSON.stringify({ fatal, fatalMsg: fatalMsg.trim(), panelVisible, errors }, null, 2));
+  console.log(
+    JSON.stringify({ fatal, fatalMsg: fatalMsg.trim(), adminState, errors }, null, 2)
+  );
   await browser.close();
 })().catch((e) => {
   console.error("FAIL", e.message);

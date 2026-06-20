@@ -2,6 +2,8 @@
  * Voter UX enhancements — companion to app.min.js (no Firebase CDN imports).
  * Features: already-voted banner, duplicate warn, offline queue, who hasn't voted, lineup share pack, dark mode.
  */
+import { matchSquadToVoters, normalizeName } from "./name-match.js";
+
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
 const PUBLIC_PREFS = STORAGE_KEY + "_public_prefs";
@@ -9,10 +11,7 @@ const OFFLINE_QUEUE_KEY = STORAGE_KEY + "_offline_vote_queue";
 const THEME_KEY = STORAGE_KEY + "_theme";
 
 function qo(c) {
-  return String(c || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
+  return normalizeName(c);
 }
 
 function nameKey(c) {
@@ -40,6 +39,44 @@ function voteRoundLabel(vote) {
   var l = vote && vote.round;
   if (l == null || l === "") return "Round 1";
   return normalizeRoundLabel(l) || "Round 1";
+}
+
+const ADMIN_SESSION_KEY = "soccerVoteAdminUnlock";
+
+function isSuperAdminUnlocked() {
+  try {
+    return sessionStorage.getItem(ADMIN_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+async function fetchConfigTeams() {
+  if (!window.__svFirebaseApp || !projectId()) return [];
+  var url = firestoreUrl("config/main");
+  if (!url) return [];
+  try {
+    var res = await fetch(url, { headers: await restHeaders() });
+    if (!res.ok) return [];
+    var row = await res.json();
+    var teams = row.fields && row.fields.teams ? parseFsValue(row.fields.teams) : [];
+    return Array.isArray(teams) ? teams : [];
+  } catch (e) {
+    console.warn("[voter-enhancements] config fetch failed", e);
+    return [];
+  }
+}
+
+async function resolveTeamSquad(teamId, localTeams) {
+  var team = (localTeams || []).find(function (t) {
+    return String(t.id) === String(teamId);
+  });
+  if (team && team.players && team.players.length) return team.players.filter(Boolean);
+  var cloudTeams = await fetchConfigTeams();
+  var cloudTeam = cloudTeams.find(function (t) {
+    return String(t.id) === String(teamId);
+  });
+  return cloudTeam && cloudTeam.players ? cloudTeam.players.filter(Boolean) : [];
 }
 
 function loadLocalData() {
@@ -424,9 +461,9 @@ function wireOfflineQueue() {
 var cloudVotesCache = Object.create(null);
 var cloudVotesInflight = Object.create(null);
 
-async function fetchCloudVotes(teamId) {
+async function fetchCloudVotes(teamId, force) {
   var tid = String(teamId);
-  if (cloudVotesCache[tid] && Date.now() - cloudVotesCache[tid].at < 15000) {
+  if (!force && cloudVotesCache[tid] && Date.now() - cloudVotesCache[tid].at < 15000) {
     return cloudVotesCache[tid].votes;
   }
   if (cloudVotesInflight[tid]) return cloudVotesInflight[tid];
@@ -522,55 +559,87 @@ function ensureWhoHasntVotedBlock() {
   details.className = "subcard";
   details.style.cssText = "padding:0.65rem 0.75rem; margin:0.5rem 0 0";
   details.innerHTML =
-    "<summary style='cursor:pointer;font-weight:800;color:var(--red-dark)'>Who hasn't voted?</summary>" +
-    "<p class='hint' style='margin:0.35rem 0 0'>Squad players without a ballot this round (local + cloud).</p>" +
-    "<div id='whoHasntVotedList' style='margin-top:0.45rem;font-size:0.9rem;line-height:1.5'></div>";
+    "<summary style='cursor:pointer;font-weight:800;color:var(--red-dark)'>Who has / hasn't voted?</summary>" +
+    "<p class='hint' style='margin:0.35rem 0 0'>Ballots this round vs squad list (local + cloud, fuzzy name match).</p>" +
+    "<div id='whoVotedList' style='margin-top:0.45rem;font-size:0.9rem;line-height:1.5'></div>" +
+    "<div id='whoHasntVotedList' style='margin-top:0.45rem;font-size:0.9rem;line-height:1.5'></div>" +
+    "<p id='whoVoteStatusHint' class='hint' style='margin:0.35rem 0 0'></p>";
   results.insertAdjacentElement("afterend", details);
 }
 
 async function updateWhoHasntVoted() {
   ensureWhoHasntVotedBlock();
+  var votedEl = document.getElementById("whoVotedList");
   var listEl = document.getElementById("whoHasntVotedList");
+  var statusEl = document.getElementById("whoVoteStatusHint");
   var teamSel = document.getElementById("resultsTeamSelect");
   var roundSel = document.getElementById("resultsRoundSelect");
   if (!listEl || !teamSel || !roundSel) return;
   var teamId = parseInt(teamSel.value, 10) || 1;
   var round = normalizeRoundLabel(roundSel.value) || roundSel.value || "Round 1";
   var data = loadLocalData();
-  var team = (data.teams || []).find(function (t) {
-    return String(t.id) === String(teamId);
-  });
-  var squad = (team && team.players ? team.players : []).filter(Boolean);
+  listEl.innerHTML = "<span class='hint'>Loading…</span>";
+  if (votedEl) votedEl.innerHTML = "";
+  if (statusEl) statusEl.textContent = "";
+
+  var squad = await resolveTeamSquad(teamId, data.teams || []);
   if (!squad.length) {
-    listEl.innerHTML = "<span class='hint'>No squad list saved.</span>";
+    listEl.innerHTML = "<span class='hint'>No squad list saved (check config sync).</span>";
     return;
   }
-  listEl.innerHTML = "<span class='hint'>Loading vote list…</span>";
+
   var localVotes = (data.votes || []).filter(function (v) {
     return v && String(v.teamId) === String(teamId);
   });
   var cloudVotes = [];
+  var cloudErr = "";
   try {
-    cloudVotes = await fetchCloudVotes(teamId);
+    cloudVotes = await fetchCloudVotes(teamId, isSuperAdminUnlocked());
   } catch (e) {
+    cloudErr = e.message || String(e);
     console.warn("[who-hasnt-voted]", e);
   }
   var votes = mergeVotesLists(localVotes, cloudVotes);
-  var voters = Object.create(null);
-  votes.forEach(function (v) {
-    if (!v || String(v.teamId) !== String(teamId)) return;
-    if (voteRoundLabel(v) !== voteRoundLabel({ round: round })) return;
-    voters[qo(v.voterName)] = true;
+  var roundVotes = votes.filter(function (v) {
+    return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === voteRoundLabel({ round: round });
   });
-  var missing = squad.filter(function (p) {
-    return !voters[qo(p)];
-  });
-  if (!missing.length) {
-    listEl.innerHTML =
-      "<span style='color:#15803d;font-weight:700'>Everyone on the squad has voted.</span>";
-    return;
+  var matched = matchSquadToVoters(squad, votes, teamId, round, voteRoundLabel);
+
+  if (votedEl) {
+    if (matched.voted.length) {
+      votedEl.innerHTML =
+        "<div style='font-weight:700;color:#15803d;margin-bottom:0.25rem'>Voted (" +
+        matched.voted.length +
+        ")</div>" +
+        escapeHtml(matched.voted.join(", "));
+    } else {
+      votedEl.innerHTML =
+        "<div style='font-weight:700;color:#52525b;margin-bottom:0.25rem'>Voted (0)</div><span class='hint'>No ballots yet this round.</span>";
+    }
   }
-  listEl.textContent = missing.join(", ") + " (" + missing.length + "/" + squad.length + " missing)";
+
+  if (matched.missing.length) {
+    listEl.innerHTML =
+      "<div style='font-weight:700;color:var(--red-dark);margin-bottom:0.25rem'>Hasn't voted (" +
+      matched.missing.length +
+      "/" +
+      squad.length +
+      ")</div>" +
+      escapeHtml(matched.missing.join(", "));
+  } else {
+    listEl.innerHTML =
+      "<div style='font-weight:700;color:#15803d;margin-bottom:0.25rem'>Hasn't voted (0)</div>" +
+      "<span style='color:#15803d'>Everyone on the squad has voted.</span>";
+  }
+
+  var hints = [];
+  hints.push(roundVotes.length + " ballot(s) this round");
+  hints.push(squad.length + " on squad");
+  hints.push(isSuperAdminUnlocked() ? "cloud refresh" : "local + public cloud read");
+  if (matched.possible.length) hints.push("fuzzy: " + matched.possible.join("; "));
+  if (matched.extraVoters.length) hints.push("not on squad: " + matched.extraVoters.join(", "));
+  if (cloudErr) hints.push("cloud error: " + cloudErr);
+  if (statusEl) statusEl.textContent = hints.join(" · ");
 }
 
 var whoHasntVotedWired = false;

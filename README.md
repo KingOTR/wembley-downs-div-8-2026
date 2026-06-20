@@ -13,6 +13,7 @@ public/
     app.min.js            Main app (Firebase, voting, coach/admin, lineup)
     voter-enhancements.js Companion: already-voted, offline queue, who hasn't voted, theme
     admin-merge-rounds.js Lazy-loaded super-admin round merge (REST batch writes)
+    name-match.js         Shared fuzzy squad/voter name matching
 firestore.rules           Security rules (public vote create; super-admin delete/config)
 firebase.json             Hosting + rules deploy config
 ```
@@ -82,9 +83,37 @@ node tools/browser-test.js
 
 Exits `0` when all checks pass; prints JSON with `pass`, logo, admin, and vote details.
 
-## Release checklist (bump v121 → v122 together)
+## Debugging
 
-When shipping a new cache-breaking version, update **all** of these to the same version (e.g. `v122`):
+Quick checks after a deploy or when investigating admin/voter bugs:
+
+| Tool | Command | What it reports |
+|------|---------|-----------------|
+| CI validate | `node tools/ci-validate.js` | Version tag sync across `index.html`, `sw.js`, dist bundles |
+| Smoke fetch | `node tools/smoke-fetch.js` | Live HTML/logo checks (no browser) |
+| Browser smoke | `node tools/browser-test.js` | Playwright: fatal banner, logo, admin panel, vote tab |
+| Capture errors | `node tools/capture-error.js` | Playwright: console/page errors after opening admin |
+| Admin check | `node tools/admin-check.js` | Round dropdown counts, squad/vote counts, Firebase auth state |
+
+**Browser DevTools Console** (on the live or local site):
+
+1. Open **Coach / admin** and unlock super admin.
+2. Check `window.__svFirebaseApp` and `window.__svAuth.currentUser` — auth should exist after unlock.
+3. Watch for `[merge-rounds]` or `[who-hasnt-voted]` warnings when using merge or results panels.
+4. Inspect `#mergeRoundsHint` text for round/vote load status.
+
+**Playwright scripts** need a Chromium-based browser once:
+
+```bash
+npm install playwright
+npx playwright install chromium
+```
+
+Run against local emulator: `node tools/admin-check.js http://localhost:5000`
+
+## Release checklist (bump v124 → v125 together)
+
+When shipping a new cache-breaking version, update **all** of these to the same version (e.g. `v125`):
 
 1. `public/index.html` — HTML comment + every `?tag=vNNN` on `app.min.js`, `voter-enhancements.js`, `admin-merge-rounds.js`
 2. `public/sw.js` — `CACHE_VERSION = "vNNN"`

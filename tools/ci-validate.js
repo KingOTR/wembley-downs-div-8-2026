@@ -13,6 +13,7 @@ const required = [
   "public/dist/app.min.js",
   "public/dist/voter-enhancements.js",
   "public/dist/admin-merge-rounds.js",
+  "public/dist/name-match.js",
   "firestore.rules",
   "firebase.json",
 ];

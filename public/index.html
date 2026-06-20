@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v123: disconnect admin MutationObservers after first wire -->
+  <!-- v124: merge rounds fix, who voted/hasn't, fuzzy names -->
   <title>Team Player Vote</title>
   <link rel="icon" href="/wembley-downs-logo.png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/wembley-downs-logo.png" sizes="180x180" />
@@ -17,7 +17,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v123" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v124" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -2773,6 +2773,7 @@
           <p class="hint" style="margin-top: 0">
             Move team votes from a mistaken round into the correct one (e.g. Round 9 → Round 8). Voters already in the destination round are skipped. Names not on the squad list are flagged and not merged. Super admin only.
           </p>
+          <p class="hint" id="mergeRoundsHint" style="margin-top: 0.35rem"></p>
           <label class="field" for="mergeSourceRound">Source round (votes to move)</label>
           <select id="mergeSourceRound" aria-label="Source round for merge"></select>
           <label class="field" for="mergeDestRound" style="margin-top: 0.5rem">Destination round (merge into)</label>
@@ -2935,8 +2936,8 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v123"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v123"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v124"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v124"></script>
   <script>
     (function () {
       var loaded = false;
@@ -2950,7 +2951,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v123").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v124").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
         });
@@ -2990,7 +2991,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=123").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=124").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}

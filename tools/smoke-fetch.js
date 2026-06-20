@@ -31,7 +31,7 @@ function get(url) {
     hasPreloadLogo: html.includes('rel="preload"') && html.includes("/wembley-downs-logo.png"),
     hasVoteSection: html.includes('id="voteSection"'),
     hasShowAdminBtn: html.includes('id="showAdminBtn"'),
-    hasV123: html.includes("tag=v123"),
+    hasV124: html.includes("tag=v124"),
     fatalHiddenByDefault: html.includes('id="fatalBanner" style="display:none'),
   };
 
