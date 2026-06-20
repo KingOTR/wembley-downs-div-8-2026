@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v128: fix name-match module cache bust, clean logo (no pill/ring) -->
+  <!-- v131: FotMob-style public lineup (dark pitch, circular nodes) -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v128" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v131" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -1253,6 +1253,151 @@
       }
     }
 
+    /* FotMob-style public lineup: dark pitch, formation header, generous spacing */
+    .lineup-fotmob {
+      width: 100%;
+    }
+
+    .lineup-fotmob-header {
+      text-align: center;
+      margin: 0 0 0.65rem;
+      line-height: 1.25;
+    }
+
+    .lineup-fotmob-setup {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: rgba(17, 24, 39, 0.55);
+    }
+
+    .lineup-fotmob-formation {
+      font-size: 1.15rem;
+      font-weight: 950;
+      letter-spacing: 0.08em;
+      color: var(--text);
+      margin-top: 0.12rem;
+    }
+
+    #lineupCard .lineup-pitch-fotmob {
+      --pitch-max-h: 700px;
+      background:
+        linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, transparent 18%, transparent 82%, rgba(0, 0, 0, 0.1) 100%),
+        linear-gradient(180deg, #1b5e38 0%, #174a2e 48%, #1b5e38 100%);
+      border-color: rgba(255, 255, 255, 0.1);
+      --pitch-line-soft: rgba(255, 255, 255, 0.24);
+      --pitch-line-strong: rgba(255, 255, 255, 0.38);
+      --pitch-outline: rgba(0, 0, 0, 0.22);
+      margin-bottom: 0.35rem;
+    }
+
+    #lineupCard .lineup-pitch-fotmob .player-chip--public-circle {
+      height: clamp(40px, 8.8cqw, 52px);
+      width: clamp(40px, 8.8cqw, 52px);
+      background: rgba(255, 255, 255, 0.96);
+      border-color: rgba(255, 255, 255, 0.55);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+      cursor: default;
+    }
+
+    #lineupCard .lineup-pitch-fotmob .player-chip--public-circle .pos {
+      font-size: 0.8rem;
+      font-weight: 950;
+      color: rgba(17, 24, 39, 0.92);
+    }
+
+    #lineupCard .lineup-pitch-fotmob .player-chip--public-circle .nm {
+      top: calc(100% + 7px);
+      max-width: min(11ch, 22vw);
+      min-width: 3.5ch;
+      padding: 0.2rem 0.45rem;
+      font-size: 0.74rem;
+      font-weight: 800;
+      background: rgba(255, 255, 255, 0.94);
+      border-color: rgba(255, 255, 255, 0.35);
+      color: rgba(17, 24, 39, 0.92);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.22);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #lineupCard .lineup-pitch-fotmob .player-chip--public-circle.is-gk .nm {
+      bottom: calc(100% + 7px);
+    }
+
+    .lineup-fotmob-subs {
+      margin-top: 0.55rem;
+      padding: 0.55rem 0.65rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .lineup-fotmob-subs-title {
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: rgba(17, 24, 39, 0.55);
+      margin-bottom: 0.35rem;
+    }
+
+    .lineup-fotmob-subs-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.5rem;
+    }
+
+    .lineup-fotmob-sub {
+      font-size: 0.82rem;
+      font-weight: 650;
+      color: var(--text);
+    }
+
+    @media (max-width: 520px) {
+      #lineupCard .lineup-pitch-fotmob {
+        --pitch-max-h: 900px;
+      }
+
+      #lineupCard .lineup-pitch-fotmob .player-chip--public-circle {
+        height: clamp(44px, 10cqw, 54px);
+        width: clamp(44px, 10cqw, 54px);
+      }
+
+      #lineupCard .lineup-pitch-fotmob .player-chip--public-circle .nm {
+        font-size: 0.72rem;
+        max-width: min(10ch, 24vw);
+      }
+
+      .lineup-fotmob-formation {
+        font-size: 1.05rem;
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .lineup-fotmob-setup {
+        color: rgba(226, 232, 240, 0.62);
+      }
+
+      .lineup-fotmob-subs {
+        background: rgba(15, 23, 42, 0.55);
+      }
+
+      .lineup-fotmob-subs-title {
+        color: rgba(226, 232, 240, 0.62);
+      }
+    }
+
+    html[data-theme="dark"] .lineup-fotmob-setup {
+      color: rgba(226, 232, 240, 0.62);
+    }
+
+    html[data-theme="dark"] .lineup-fotmob-subs {
+      background: rgba(15, 23, 42, 0.55);
+    }
+
     #lineupCard .lineup-xi-name,
     #lineupCard .lineup-mini-row .name {
       white-space: normal;
@@ -2463,7 +2608,14 @@
         width: 100%;
         min-height: 2.85rem;
       }
-      #mergeRoundsBlock .actions button {
+      #mergeRoundsBlock #mergeSourceRoundManual,
+      #mergeRoundsBlock #mergeDestRoundManual {
+        display: block !important;
+      }
+      #mergeRoundsBlock label[for="mergeSourceRoundManual"],
+      #mergeRoundsBlock label[for="mergeDestRoundManual"] {
+        display: block !important;
+      }
         width: 100%;
       }
       .lineup-modal {
@@ -3083,8 +3235,8 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v128"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v128"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v131"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v131"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3098,9 +3250,16 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v128").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v131").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
+          var errEl = document.getElementById("mergeRoundsErr");
+          if (errEl) errEl.textContent = "Merge module failed to load: " + (e.message || String(e));
+          var hint = document.getElementById("mergeRoundsHint");
+          if (hint) {
+            hint.textContent = "Merge rounds unavailable — use manual round fields or refresh.";
+            hint.style.color = "var(--red-dark)";
+          }
         });
       }
       function hook() {
@@ -3138,7 +3297,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=128").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=131").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}

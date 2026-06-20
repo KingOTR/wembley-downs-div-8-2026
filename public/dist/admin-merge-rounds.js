@@ -9,7 +9,7 @@ import {
   displayPlayerName,
   DEFAULT_SQUAD_THRESHOLD,
   STRICT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v128";
+} from "./name-match.js?tag=v131";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -813,7 +813,7 @@ function mergeVoteLists() {
 
 async function loadData(teamId) {
   await waitForApp(25000);
-  if (isSuperAdminUnlocked()) await waitForAuth(20000);
+  // Public Firestore reads use API key via readHeaders(); do not block on auth.
   var localData = loadLocalData();
   var localTeams = localData.teams || [];
   var localVotes = (localData.votes || []).filter(function (v) {
@@ -1022,42 +1022,112 @@ function setMergeHint(text, isErr) {
   hint.style.color = isErr ? "var(--red-dark)" : "";
 }
 
+function ensureManualRoundFieldsVisible() {
+  ["mergeSourceRoundManual", "mergeDestRoundManual"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = "";
+    el.removeAttribute("hidden");
+    var label = document.querySelector('label[for="' + id + '"]');
+    if (label) {
+      label.style.display = "";
+      label.removeAttribute("hidden");
+    }
+  });
+}
+
+function localRoundsFallback(teamId) {
+  var localData = loadLocalData();
+  return collectRounds(teamId, localData.teams || [], (localData.votes || []).filter(function (v) {
+    return v && teamIdStr(v.teamId) === teamIdStr(teamId);
+  }));
+}
+
+function fillRoundSelects(srcSel, dstSel, rounds, team) {
+  var current = team && team.round ? normalizeRoundLabel(team.round) || team.round : "";
+  if (!rounds.length) rounds = ["Round 1"];
+  fillSelect(srcSel, rounds, rounds.length > 1 ? rounds[rounds.length - 1] : current);
+  fillSelect(dstSel, rounds, current || rounds[0]);
+}
+
+var unlockPollTimer = null;
+var lastUnlockState = false;
+
+function scheduleUnlockRefresh() {
+  if (unlockPollTimer) return;
+  var attempts = 0;
+  unlockPollTimer = setInterval(function () {
+    attempts++;
+    var unlocked = isSuperAdminUnlocked();
+    if (unlocked !== lastUnlockState) {
+      lastUnlockState = unlocked;
+      refreshRoundSelects().catch(function () {});
+    } else if (unlocked && attempts % 4 === 0) {
+      refreshRoundSelects().catch(function () {});
+    }
+    if (attempts > 120) {
+      clearInterval(unlockPollTimer);
+      unlockPollTimer = null;
+    }
+  }, 500);
+}
+
+function triggerUnlockRefresh() {
+  [0, 400, 1200, 2500, 5000].forEach(function (ms) {
+    setTimeout(function () {
+      refreshRoundSelects().catch(function () {});
+    }, ms);
+  });
+}
+
 async function refreshRoundSelects() {
-  if (!isSuperAdminUnlocked()) {
-    setMergeHint("Unlock super admin to load rounds.", true);
-    return;
-  }
   var srcSel = document.getElementById("mergeSourceRound");
   var dstSel = document.getElementById("mergeDestRound");
   var errEl = document.getElementById("mergeRoundsErr");
   if (!srcSel || !dstSel) return;
+  ensureManualRoundFieldsVisible();
+  var teamId = getAdminTeamId();
+  var unlocked = isSuperAdminUnlocked();
+  lastUnlockState = unlocked;
+
+  if (!unlocked) {
+    var localRounds = localRoundsFallback(teamId);
+    fillRoundSelects(srcSel, dstSel, localRounds, null);
+    setMergeHint(
+      localRounds.length
+        ? localRounds.length + " round(s) from local cache — unlock super admin to load cloud votes."
+        : "Unlock super admin to load rounds from cloud (or type rounds manually below).",
+      true
+    );
+    return;
+  }
+
   setMergeHint("Loading rounds from cloud…");
   if (errEl) errEl.textContent = "";
   try {
-    var teamId = getAdminTeamId();
     var data = await loadData(teamId);
     var team = (data.teams || []).find(function (t) {
       return teamIdStr(t.id) === teamIdStr(teamId);
     });
     var rounds = collectRounds(teamId, data.teams, data.votes);
-    var current = team && team.round ? normalizeRoundLabel(team.round) || team.round : "";
-    fillSelect(srcSel, rounds, rounds.length > 1 ? rounds[rounds.length - 1] : current);
-    fillSelect(dstSel, rounds, current || (rounds.length ? rounds[0] : ""));
+    fillRoundSelects(srcSel, dstSel, rounds, team);
     var authReady = !!(window.__svAuth && window.__svAuth.currentUser);
     var parts = [
       rounds.length + " round(s)",
       (data.votes || []).length + " vote(s) loaded",
       data.localOnly ? "local fallback" : "cloud",
-      authReady ? "auth OK" : "auth pending (reads still work)",
+      authReady ? "auth OK" : "auth optional for reads",
     ];
     if (data.warnings && data.warnings.length) parts.push("warn: " + data.warnings.join("; "));
     setMergeHint(parts.join(" · "), !!(data.warnings && data.warnings.length));
     if (!rounds.length) {
-      if (errEl) errEl.textContent = "No rounds found — check team config, votes, or refresh after unlock.";
+      if (errEl) errEl.textContent = "No rounds found — check team config, votes, or type rounds manually below.";
     }
   } catch (e) {
     console.warn("merge rounds: could not refresh selects", e);
-    setMergeHint("Could not load rounds: " + (e.message || String(e)), true);
+    var fallback = localRoundsFallback(teamId);
+    fillRoundSelects(srcSel, dstSel, fallback.length ? fallback : ["Round 1"], null);
+    setMergeHint("Could not load cloud rounds: " + (e.message || String(e)) + " — using fallback.", true);
     if (errEl) errEl.textContent = e.message || String(e);
   }
 }
@@ -1088,22 +1158,18 @@ function wireMergeUi() {
   var unlockBtn = document.getElementById("unlockAdmin");
   if (unlockBtn) {
     unlockBtn.addEventListener("click", function () {
-      setTimeout(function () {
-        refreshRoundSelects().catch(function () {});
-      }, 2000);
+      triggerUnlockRefresh();
     });
   }
   var superContent = document.getElementById("superAdminContent");
   if (superContent) {
     var unlockObs = new MutationObserver(function () {
       if (!isSuperAdminUnlocked()) return;
-      try {
-        unlockObs.disconnect();
-      } catch (e) {}
-      refreshRoundSelects().catch(function () {});
+      triggerUnlockRefresh();
     });
     unlockObs.observe(superContent, { attributes: true, attributeFilter: ["style"] });
   }
+  scheduleUnlockRefresh();
 
   previewBtn.addEventListener("click", async function () {
     if (errEl) errEl.textContent = "";
@@ -1268,6 +1334,9 @@ function observeAdminMount() {
 }
 
 try {
+  window.__svRefreshMergeRounds = function () {
+    return refreshRoundSelects();
+  };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", observeAdminMount, { once: true });
   } else {
