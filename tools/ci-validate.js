@@ -9,6 +9,7 @@ const sw = fs.readFileSync(path.join(publicDir, "sw.js"), "utf8");
 const required = [
   "public/index.html",
   "public/sw.js",
+  "public/manifest.json",
   "public/wembley-downs-logo.png",
   "public/dist/app.min.js",
   "public/dist/voter-enhancements.js",
@@ -58,6 +59,21 @@ if (!swRegVer || swRegVer !== appTag) {
 
 if (!html.includes("<!DOCTYPE html>")) {
   console.error("index.html missing DOCTYPE");
+  failed = true;
+}
+
+try {
+  const manifest = JSON.parse(fs.readFileSync(path.join(publicDir, "manifest.json"), "utf8"));
+  if (manifest.theme_color !== "#EE2B33") {
+    console.error("manifest.json theme_color must be #EE2B33");
+    failed = true;
+  }
+  if (!html.includes('rel="manifest"')) {
+    console.error("index.html missing manifest link");
+    failed = true;
+  }
+} catch (e) {
+  console.error("manifest.json invalid:", e.message);
   failed = true;
 }
 

@@ -1,7 +1,7 @@
 /* Minimal service worker for fast repeat loads + offline resilience. */
 /* global self */
 
-const CACHE_VERSION = "v124";
+const CACHE_VERSION = "v125";
 const PRECACHE = `sv-precache-${CACHE_VERSION}`;
 const RUNTIME = `sv-runtime-${CACHE_VERSION}`;
 
@@ -9,6 +9,7 @@ const RUNTIME = `sv-runtime-${CACHE_VERSION}`;
 const PRECACHE_URLS = [
   "/",
   "/index.html",
+  "/manifest.json",
   "/wembley-downs-logo.png",
 ];
 

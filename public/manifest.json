@@ -1,0 +1,24 @@
+{
+  "name": "Wembley Downs Div 8 Player Vote",
+  "short_name": "WD Div 8 Vote",
+  "description": "Team Player's Player voting for Wembley Downs Div 8 2026",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#EE2B33",
+  "icons": [
+    {
+      "src": "/wembley-downs-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/wembley-downs-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

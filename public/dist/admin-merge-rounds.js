@@ -812,7 +812,7 @@ async function refreshRoundSelects() {
   var dstSel = document.getElementById("mergeDestRound");
   var errEl = document.getElementById("mergeRoundsErr");
   if (!srcSel || !dstSel) return;
-  setMergeHint("Loading rounds…");
+  setMergeHint("Loading rounds from cloud…");
   if (errEl) errEl.textContent = "";
   try {
     var teamId = getAdminTeamId();
@@ -877,7 +877,11 @@ function wireMergeUi() {
   var superContent = document.getElementById("superAdminContent");
   if (superContent) {
     var unlockObs = new MutationObserver(function () {
-      if (isSuperAdminUnlocked()) refreshRoundSelects().catch(function () {});
+      if (!isSuperAdminUnlocked()) return;
+      try {
+        unlockObs.disconnect();
+      } catch (e) {}
+      refreshRoundSelects().catch(function () {});
     });
     unlockObs.observe(superContent, { attributes: true, attributeFilter: ["style"] });
   }

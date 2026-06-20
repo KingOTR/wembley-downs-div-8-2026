@@ -578,9 +578,9 @@ async function updateWhoHasntVoted() {
   var teamId = parseInt(teamSel.value, 10) || 1;
   var round = normalizeRoundLabel(roundSel.value) || roundSel.value || "Round 1";
   var data = loadLocalData();
-  listEl.innerHTML = "<span class='hint'>Loading…</span>";
+  listEl.innerHTML = "<span class='hint admin-loading'>Loading cloud votes…</span>";
   if (votedEl) votedEl.innerHTML = "";
-  if (statusEl) statusEl.textContent = "";
+  if (statusEl) statusEl.textContent = "Fetching ballots from cloud…";
 
   var squad = await resolveTeamSquad(teamId, data.teams || []);
   if (!squad.length) {
@@ -778,11 +778,96 @@ function wireVoterNameListeners() {
   updateAlreadyVotedBanner();
 }
 
+function ensureParticipationCounter() {
+  var voteSection = document.getElementById("voteSection");
+  if (!voteSection || document.getElementById("participationCounter")) return;
+  var el = document.createElement("div");
+  el.id = "participationCounter";
+  el.className = "participation-pill";
+  el.setAttribute("role", "status");
+  el.setAttribute("aria-live", "polite");
+  el.innerHTML =
+    "<span id='participationText'></span>" +
+    "<span class='participation-bar' aria-hidden='true'><span class='participation-fill' id='participationFill' style='width:0%'></span></span>";
+  var head = voteSection.querySelector(".vote-flow-head");
+  if (head) head.insertAdjacentElement("afterend", el);
+}
+
+var participationInflight = null;
+
+async function updateParticipationCounter() {
+  ensureParticipationCounter();
+  var el = document.getElementById("participationCounter");
+  var textEl = document.getElementById("participationText");
+  var fillEl = document.getElementById("participationFill");
+  if (!el || !textEl) return;
+
+  var teamId = getCurrentTeamId();
+  var round = getCurrentRound(teamId);
+  var data = loadLocalData();
+  var squad = await resolveTeamSquad(teamId, data.teams || []);
+  if (!squad.length) {
+    el.classList.remove("is-visible");
+    return;
+  }
+
+  textEl.textContent = "Loading participation…";
+  el.classList.add("is-visible");
+
+  var localVotes = (data.votes || []).filter(function (v) {
+    return v && String(v.teamId) === String(teamId);
+  });
+  var cloudVotes = [];
+  try {
+    cloudVotes = await fetchCloudVotes(teamId, false);
+  } catch (e) {
+    console.warn("[participation]", e);
+  }
+  var votes = mergeVotesLists(localVotes, cloudVotes);
+  var matched = matchSquadToVoters(squad, votes, teamId, round, voteRoundLabel);
+  var voted = matched.voted.length;
+  var total = squad.length;
+  var pct = total ? Math.round((voted / total) * 100) : 0;
+
+  textEl.textContent = voted + " of " + total + " squad members have voted (" + round + ")";
+  if (fillEl) fillEl.style.width = pct + "%";
+  el.setAttribute("aria-label", voted + " of " + total + " squad members have voted this round");
+}
+
+function wireParticipationCounter() {
+  ensureParticipationCounter();
+  var teamSel = document.getElementById("publicTeamSelect");
+  var roundSel = document.getElementById("publicRoundSelect");
+  var refresh = function () {
+    if (participationInflight) return;
+    participationInflight = updateParticipationCounter()
+      .catch(function (e) {
+        console.warn("[participation]", e);
+      })
+      .finally(function () {
+        participationInflight = null;
+      });
+  };
+  if (teamSel && !teamSel._svParticipation) {
+    teamSel._svParticipation = true;
+    teamSel.addEventListener("change", refresh);
+  }
+  if (roundSel && !roundSel._svParticipation) {
+    roundSel._svParticipation = true;
+    roundSel.addEventListener("change", refresh);
+  }
+  window.addEventListener("sv-votes-merged", function () {
+    setTimeout(refresh, 400);
+  });
+  refresh();
+}
+
 function init() {
   wireVoterNameListeners();
   wireDuplicateSubmitGuard();
   wireOfflineQueue();
   wireThemeToggle();
+  wireParticipationCounter();
 }
 
 function safeInit() {
