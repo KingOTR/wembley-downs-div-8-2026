@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v127: parenthetical name matching, editor chip overlap, empty voter filter -->
+  <!-- v128: fix name-match module cache bust, clean logo (no pill/ring) -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v127" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v128" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -2322,39 +2322,26 @@
     }
 
     .brand-logo {
-      width: 76px;
-      height: 76px;
-      flex: 0 0 76px;
-      border-radius: 999px;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18), 0 0 0 3px rgba(255, 255, 255, 0.95);
-      overflow: hidden;
-      border: 2px solid rgba(238, 43, 51, 0.35);
-      background: #ffffff;
+      flex: 0 0 auto;
       display: flex;
       align-items: center;
       justify-content: center;
+      background: none;
+      border: none;
+      box-shadow: none;
+      border-radius: 0;
+      overflow: visible;
     }
 
     .brand-logo img {
-      width: 88%;
-      height: 88%;
+      width: 72px;
+      height: 72px;
       object-fit: contain;
       display: block;
       padding: 0;
-    }
-
-    html[data-theme="dark"] .brand-logo {
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.92);
-      border-color: rgba(238, 43, 51, 0.55);
-      background: #ffffff;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) .brand-logo {
-        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.92);
-        border-color: rgba(238, 43, 51, 0.55);
-        background: #ffffff;
-      }
+      border: none;
+      box-shadow: none;
+      background: none;
     }
 
     @media (max-width: 400px) {
@@ -2362,18 +2349,16 @@
         flex-direction: column;
         gap: 0.45rem;
       }
-      .brand-logo {
-        width: 68px;
-        height: 68px;
-        flex-basis: 68px;
+      .brand-logo img {
+        width: 64px;
+        height: 64px;
       }
     }
 
     @media (min-width: 520px) {
-      .brand-logo {
-        width: 92px;
-        height: 92px;
-        flex-basis: 92px;
+      .brand-logo img {
+        width: 80px;
+        height: 80px;
       }
     }
 
@@ -3098,8 +3083,8 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v127"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v127"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v128"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v128"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3113,7 +3098,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v127").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v128").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
         });
@@ -3153,7 +3138,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=127").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=128").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}
