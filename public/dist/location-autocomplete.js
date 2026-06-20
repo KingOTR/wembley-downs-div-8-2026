@@ -54,15 +54,39 @@ function setSelected(hit, labelOverride) {
     e.selected.textContent = label ? "📍 " + label : "";
     e.selected.hidden = !label;
   }
+  var latVal = null;
+  var lngVal = null;
+  var groundVal = "";
+  var subVal = "";
   if (hit) {
-    if (e.lat) e.lat.value = String(Number(hit.latitude).toFixed(6));
-    if (e.lng) e.lng.value = String(Number(hit.longitude).toFixed(6));
-    if (e.ground && hit.name) e.ground.value = String(hit.name);
-    var sub = extractSuburb(hit);
-    if (e.suburb && sub) e.suburb.value = sub;
+    latVal = Number(hit.latitude);
+    lngVal = Number(hit.longitude);
+    if (e.lat && isFinite(latVal)) e.lat.value = String(latVal.toFixed(6));
+    if (e.lng && isFinite(lngVal)) e.lng.value = String(lngVal.toFixed(6));
+    if (e.ground && hit.name) {
+      groundVal = String(hit.name);
+      e.ground.value = groundVal;
+    }
+    subVal = extractSuburb(hit);
+    if (e.suburb && subVal) e.suburb.value = subVal;
   }
   hideResults();
   if (e.search && label && !e.search.value.trim()) e.search.value = hit ? hit.name : label;
+  if (hit && isFinite(latVal) && isFinite(lngVal)) {
+    try {
+      if (typeof window.__svPatchMatchLocationFields === "function") {
+        window.__svPatchMatchLocationFields({
+          lat: latVal,
+          lng: lngVal,
+          locationLabel: label,
+          groundName: groundVal || undefined,
+          suburb: subVal || undefined,
+        });
+      }
+    } catch (err) {
+      console.warn("[location-autocomplete] patch match", err);
+    }
+  }
 }
 
 function hideResults() {
@@ -172,6 +196,9 @@ function syncFromMatchEntry(entry) {
   if (isFinite(lat) && isFinite(lng)) {
     if (e.lat) e.lat.value = String(lat.toFixed(6));
     if (e.lng) e.lng.value = String(lng.toFixed(6));
+  } else {
+    if (e.lat && document.activeElement !== e.lat) e.lat.value = "";
+    if (e.lng && document.activeElement !== e.lng) e.lng.value = "";
   }
   if (e.ground && ground && document.activeElement !== e.ground) e.ground.value = ground;
   if (e.suburb && suburb && document.activeElement !== e.suburb) e.suburb.value = suburb;
@@ -208,6 +235,10 @@ export function initLocationAutocomplete() {
   e.search.addEventListener("keydown", function (ev) {
     if (ev.key === "Escape") hideResults();
   });
+}
+
+export function syncLocationFromMatch(entry) {
+  syncFromMatchEntry(entry);
 }
 
 export function syncLocationFromInputs() {

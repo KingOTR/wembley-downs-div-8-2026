@@ -1,7 +1,7 @@
 /* Minimal service worker for fast repeat loads + offline resilience. */
 /* global self */
 
-const CACHE_VERSION = "v143";
+const CACHE_VERSION = "v144";
 const PRECACHE = `sv-precache-${CACHE_VERSION}`;
 const RUNTIME = `sv-runtime-${CACHE_VERSION}`;
 

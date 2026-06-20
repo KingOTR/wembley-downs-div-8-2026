@@ -10,7 +10,7 @@ import {
   nameSimilarity,
   findAmbiguousByFirstName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v143";
+} from "./name-match.js?tag=v144";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -882,6 +882,44 @@ function wireNameSuggestDeferUntilFocus() {
   });
 }
 
+function getAdminTeamId() {
+  var tabs = document.getElementById("adminTeamTabs");
+  if (tabs) {
+    var active = tabs.querySelector("button.active,[aria-selected='true']");
+    if (active) {
+      var id = active.getAttribute("data-team-id") || active.getAttribute("data-id");
+      if (id) return parseInt(id, 10) || 1;
+      var m = (active.textContent || "").match(/(\d+)/);
+      if (m) return parseInt(m[1], 10);
+    }
+  }
+  var teamSel = document.getElementById("resultsTeamSelect");
+  if (teamSel && teamSel.value) return parseInt(teamSel.value, 10) || 1;
+  return getCurrentTeamId();
+}
+
+function getAdminMatchRound() {
+  var roundSel = document.getElementById("adminMatchRoundSelect");
+  if (roundSel && roundSel.value) return normalizeRoundLabel(roundSel.value) || roundSel.value;
+  return getCurrentRound(getAdminTeamId());
+}
+
+function syncAdminLocationFromStore() {
+  var teamId = getAdminTeamId();
+  var round = getAdminMatchRound();
+  var entry = loadLocalTeamMatch(teamId, round) || {};
+  if (typeof window.__svSyncLocationFromMatch === "function") {
+    window.__svSyncLocationFromMatch(entry);
+    return;
+  }
+  import("./location-autocomplete.js?tag=v144")
+    .then(function (mod) {
+      if (mod.syncLocationFromMatch) mod.syncLocationFromMatch(entry);
+      else mod.syncLocationFromInputs();
+    })
+    .catch(function () {});
+}
+
 function loadLocalTeamMatch(teamId, round) {
   var data = loadLocalData();
   var team = (data.teams || []).find(function (t) {
@@ -912,7 +950,7 @@ function wireLineupExportOverride() {
     function (ev) {
       ev.stopImmediatePropagation();
       ev.preventDefault();
-      import("./lineup-export.js?tag=v143")
+      import("./lineup-export.js?tag=v144")
         .then(function (mod) {
           var snap =
             typeof window.__svLineupExportSnapshot === "function"
@@ -975,7 +1013,7 @@ async function updateMatchCardWeather() {
 
   mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
   try {
-    var mod = await import("./weather-forecast.js?tag=v143");
+    var mod = await import("./weather-forecast.js?tag=v144");
     var units = mod.getWeatherUnits();
     var data = await mod.fetchMatchWeather({
       suburb: entry.suburb,
@@ -1013,6 +1051,9 @@ function wireMatchWeather() {
   }
   window.addEventListener("storage", function (ev) {
     if (ev.key === STORAGE_KEY) refresh();
+  });
+  window.addEventListener("sv-match-saved", function () {
+    refresh();
   });
   refresh();
 }
@@ -1159,7 +1200,7 @@ function wireLineupPublicTabs() {
       advBtn.setAttribute("aria-pressed", advOn ? "true" : "false");
       advBtn.classList.toggle("lineup-tab-overlay-active", advOn);
     }
-    import("./lineup-fotmob.js?tag=v143")
+    import("./lineup-fotmob.js?tag=v144")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1214,7 +1255,7 @@ function wireLineupPublicTabs() {
   }
 
   window.addEventListener("sv-lineup-rendered", function () {
-    import("./lineup-fotmob.js?tag=v143")
+    import("./lineup-fotmob.js?tag=v144")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1486,10 +1527,10 @@ function wireAdminSectionTabs() {
       p.hidden = p.getAttribute("data-admin-panel") !== tab;
     });
     if (tab === "team") {
-      import("./location-autocomplete.js?tag=v143")
+      import("./location-autocomplete.js?tag=v144")
         .then(function (mod) {
           mod.initLocationAutocomplete();
-          mod.syncLocationFromInputs();
+          syncAdminLocationFromStore();
         })
         .catch(function () {});
     }
@@ -1508,12 +1549,13 @@ function wireLocationOnRoundChange() {
   roundSel._svLocWire = true;
   roundSel.addEventListener("change", function () {
     setTimeout(function () {
-      import("./location-autocomplete.js?tag=v143")
+      import("./location-autocomplete.js?tag=v144")
         .then(function (mod) {
-          mod.syncLocationFromInputs();
+          mod.initLocationAutocomplete();
+          syncAdminLocationFromStore();
         })
         .catch(function () {});
-    }, 350);
+    }, 400);
   });
 }
 
