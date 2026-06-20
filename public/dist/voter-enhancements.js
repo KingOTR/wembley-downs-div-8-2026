@@ -10,7 +10,7 @@ import {
   nameSimilarity,
   findAmbiguousByFirstName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v140";
+} from "./name-match.js?tag=v141";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -912,7 +912,7 @@ function wireLineupExportOverride() {
     function (ev) {
       ev.stopImmediatePropagation();
       ev.preventDefault();
-      import("./lineup-export.js?tag=v140")
+      import("./lineup-export.js?tag=v141")
         .then(function (mod) {
           var snap =
             typeof window.__svLineupExportSnapshot === "function"
@@ -975,7 +975,8 @@ async function updateMatchCardWeather() {
 
   mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
   try {
-    var mod = await import("./weather-forecast.js?tag=v140");
+    var mod = await import("./weather-forecast.js?tag=v141");
+    var units = mod.getWeatherUnits();
     var data = await mod.fetchMatchWeather({
       suburb: entry.suburb,
       groundName: entry.groundName || entry.venue,
@@ -984,8 +985,12 @@ async function updateMatchCardWeather() {
       venue: entry.venue,
       lat: entry.lat,
       lng: entry.lng,
+      locationLabel: entry.locationLabel,
     });
-    mount.innerHTML = mod.weatherPanelHtml(data);
+    mount.innerHTML = mod.weatherPanelHtml(data, units);
+    mod.wireWeatherUnitsToggle(mount, function () {
+      updateMatchCardWeather().catch(function () {});
+    });
   } catch (e) {
     console.warn("[match-weather]", e);
     mount.innerHTML = "";
@@ -1154,7 +1159,7 @@ function wireLineupPublicTabs() {
       advBtn.setAttribute("aria-pressed", advOn ? "true" : "false");
       advBtn.classList.toggle("lineup-tab-overlay-active", advOn);
     }
-    import("./lineup-fotmob.js?tag=v140")
+    import("./lineup-fotmob.js?tag=v141")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1209,7 +1214,7 @@ function wireLineupPublicTabs() {
   }
 
   window.addEventListener("sv-lineup-rendered", function () {
-    import("./lineup-fotmob.js?tag=v140")
+    import("./lineup-fotmob.js?tag=v141")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1418,12 +1423,14 @@ function renderSquadBadgesPanel() {
     var key = squadBadgeKey(name);
     var cur = squadBadgesCache[key] || squadBadgesCache[name] || "";
     html +=
-      "<label class='squad-badge-row'>" +
-      "<span class='squad-badge-name'>" +
+      "<div class='squad-badge-row'>" +
+      "<div class='squad-badge-name'>" +
       escapeHtml(name) +
-      "</span>" +
+      "</div>" +
       "<select class='squad-badge-select' data-player='" +
       escapeHtml(key) +
+      "' aria-label='Badge for " +
+      escapeHtml(name) +
       "'>" +
       "<option value=''" +
       (cur ? "" : " selected") +
@@ -1437,7 +1444,7 @@ function renderSquadBadgesPanel() {
       "<option value='GK'" +
       (cur === "GK" ? " selected" : "") +
       ">Goalkeeper (GK)</option>" +
-      "</select></label>";
+      "</select></div>";
   });
   html += "</div>";
   panel.innerHTML = html;
@@ -1479,11 +1486,10 @@ function wireAdminSectionTabs() {
       p.hidden = p.getAttribute("data-admin-panel") !== tab;
     });
     if (tab === "team") {
-      import("./ground-map-picker.js?tag=v140")
+      import("./location-autocomplete.js?tag=v141")
         .then(function (mod) {
-          mod.initGroundMapPicker().then(function () {
-            mod.syncMapFromInputs();
-          });
+          mod.initLocationAutocomplete();
+          mod.syncLocationFromInputs();
         })
         .catch(function () {});
     }
@@ -1496,15 +1502,15 @@ function wireAdminSectionTabs() {
   show("team");
 }
 
-function wireGroundMapOnRoundChange() {
+function wireLocationOnRoundChange() {
   var roundSel = document.getElementById("adminMatchRoundSelect");
-  if (!roundSel || roundSel._svMapWire) return;
-  roundSel._svMapWire = true;
+  if (!roundSel || roundSel._svLocWire) return;
+  roundSel._svLocWire = true;
   roundSel.addEventListener("change", function () {
     setTimeout(function () {
-      import("./ground-map-picker.js?tag=v140")
+      import("./location-autocomplete.js?tag=v141")
         .then(function (mod) {
-          mod.syncMapFromInputs();
+          mod.syncLocationFromInputs();
         })
         .catch(function () {});
     }, 350);
@@ -1571,7 +1577,7 @@ var adminObs = new MutationObserver(function () {
     ensureLineupSharePackButton();
     wireSquadBadges();
     wireAdminSectionTabs();
-    wireGroundMapOnRoundChange();
+    wireLocationOnRoundChange();
   } catch (e) {
     adminEnhanceWired = false;
     console.warn("[voter-enhancements] admin wire failed", e);

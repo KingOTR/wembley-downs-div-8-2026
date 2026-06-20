@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v140: fix match save, lineup sync, squad badges, map picker, UI polish -->
+  <!-- v141: fix La collision, location autocomplete, weather units -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v140" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v141" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -2779,6 +2779,138 @@
       background: #e5e7eb;
     }
 
+    .location-search-wrap {
+      position: relative;
+      margin-bottom: 0.35rem;
+    }
+
+    #matchLocationSearch {
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+    }
+
+    .location-results {
+      position: absolute;
+      z-index: 40;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      max-height: 240px;
+      overflow-y: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+    }
+
+    .location-result {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.15rem;
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border: none;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .location-result:hover {
+      background: rgba(238, 43, 51, 0.06);
+    }
+
+    .location-result-name {
+      font-weight: 800;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .location-result-meta {
+      font-size: 0.78rem;
+      color: #52525b;
+    }
+
+    .location-selected {
+      margin: 0.35rem 0 0.5rem;
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: var(--red-dark);
+    }
+
+    .lineup-weather-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.35rem;
+    }
+
+    .weather-units-toggle {
+      display: inline-flex;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .weather-units-btn {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.72rem;
+      font-weight: 800;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .weather-units-btn.active {
+      background: rgba(238, 43, 51, 0.12);
+      color: var(--red-dark);
+    }
+
+    .lineup-weather-stats {
+      display: grid;
+      gap: 0.35rem;
+      margin: 0.45rem 0 0.55rem;
+    }
+
+    .lineup-weather-stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      font-size: 0.86rem;
+    }
+
+    .lineup-weather-stat-label {
+      color: #52525b;
+      font-weight: 600;
+    }
+
+    .lineup-weather-stat-value {
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .lineup-weather-hourly-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #71717a;
+      margin-bottom: 0.35rem;
+    }
+
+    .lineup-weather-hour-wind {
+      font-size: 0.68rem;
+      color: #71717a;
+    }
+
     .squad-badges-panel .squad-badges-head {
       font-weight: 800;
       font-size: 0.88rem;
@@ -2794,23 +2926,26 @@
 
     .squad-badge-row {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.65rem;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.35rem;
       font-size: 0.88rem;
+      padding: 0.55rem 0.65rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.6);
     }
 
     .squad-badge-name {
-      font-weight: 700;
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-weight: 800;
+      font-size: 0.92rem;
+      line-height: 1.25;
     }
 
     .squad-badge-select {
-      min-width: 9rem;
-      padding: 0.35rem 0.45rem;
+      width: 100%;
+      min-width: 0;
+      padding: 0.4rem 0.45rem;
       border-radius: 8px;
       border: 1px solid var(--border);
       background: var(--white);
@@ -3314,18 +3449,20 @@
           <input type="text" id="matchSuburbInput" placeholder="e.g. Wembley Downs" />
           <label class="field" for="matchKickoffInput">Kick off (date &amp; time)</label>
           <input type="datetime-local" id="matchKickoffInput" />
-          <label class="field" for="matchGroundInput">Ground name</label>
-          <input type="text" id="matchGroundInput" placeholder="e.g. Butlers Reserve" />
-          <label class="field" for="matchPitchInput">Pitch number (optional)</label>
-          <input type="text" id="matchPitchInput" placeholder="e.g. 3" inputmode="numeric" />
+          <label class="field" for="matchLocationSearch">Ground / location search</label>
+          <p class="hint" style="margin:0 0 0.35rem">Type a ground or address — pick from suggestions for accurate weather.</p>
+          <div class="location-search-wrap">
+            <input type="search" id="matchLocationSearch" placeholder="e.g. Rosalie Park, Subiaco" autocomplete="off" spellcheck="false" />
+            <div id="matchLocationResults" class="location-results" hidden></div>
+          </div>
+          <input type="hidden" id="matchLocationLabel" />
+          <p class="location-selected" id="matchLocationSelected" hidden></p>
           <input type="hidden" id="matchLatInput" />
           <input type="hidden" id="matchLngInput" />
-          <label class="field" style="margin-top:0.5rem">Ground location (map)</label>
-          <p class="hint" id="groundMapHint" style="margin:0 0 0.35rem">Tap the map to set the pin — used for accurate weather.</p>
-          <div id="groundMapPicker" class="ground-map-picker" aria-label="Pick ground location on map"></div>
-          <div class="actions" style="margin:0.35rem 0 0">
-            <button type="button" class="ghost" id="groundMapLocate" style="padding:0.4rem 0.65rem">Use my location</button>
-          </div>
+          <label class="field" for="matchGroundInput">Ground name</label>
+          <input type="text" id="matchGroundInput" placeholder="e.g. Rosalie Park" />
+          <label class="field" for="matchPitchInput">Pitch number (optional)</label>
+          <input type="text" id="matchPitchInput" placeholder="e.g. 3" inputmode="numeric" />
           <label class="field" for="matchVenueInput">Venue (legacy / override)</label>
           <input type="text" id="matchVenueInput" placeholder="Optional — ground name above is preferred" />
           <label class="field" for="matchOpponentInput">Opponent</label>
@@ -3426,7 +3563,7 @@
                     <button type="button" class="ghost" id="lineupApplyStartersPaste" style="padding:0.35rem 0.55rem">Apply</button>
                   </div>
                   <textarea id="lineupStartersPaste" placeholder="Paste 11 names (optionally with numbers), one per line&#10;e.g. 1 Sam&#10;2 Alex&#10;..." style="min-height: 120px"></textarea>
-                  <p class="hint" style="margin:0.35rem 0 0">Tip: You can paste more than 11 lines — we'll take the first 11.</p>
+                  <p class="hint" style="margin:0.35rem 0 0">Tip: Paste 11+ names (one per line or comma-separated) — first 11 start, rest become subs.</p>
                 </div>
               </div>
 
@@ -3741,9 +3878,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v140"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v140"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v140"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v141"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v141"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v141"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3757,7 +3894,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v140").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v141").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
@@ -3804,7 +3941,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=140").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=141").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}

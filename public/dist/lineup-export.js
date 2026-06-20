@@ -5,7 +5,7 @@ import {
   prepareLineupDisplay,
   clamp01,
   pitchMarkup,
-} from "./lineup-fotmob.js?tag=v140";
+} from "./lineup-fotmob.js?tag=v141";
 
 function roundRect(ctx, x, y, w, h, r) {
   var rad = Math.min(r, w / 2, h / 2);
@@ -166,6 +166,12 @@ export async function exportLineupPng(opts) {
 
   var W = 1080;
   var H = 1400;
+  var MAX_DIM = 4096;
+  if (W > MAX_DIM || H > MAX_DIM) {
+    var sc = Math.min(MAX_DIM / W, MAX_DIM / H);
+    W = Math.floor(W * sc);
+    H = Math.floor(H * sc);
+  }
   var canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
