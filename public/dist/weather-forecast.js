@@ -76,6 +76,7 @@ async function geocode(suburb, groundName) {
     candidates.push([groundName, "Western Australia, Australia"].join(", "));
   }
   if (suburb) {
+    candidates.push(String(suburb).trim());
     candidates.push([suburb, "Western Australia, Australia"].join(", "));
     candidates.push([suburb, "Australia"].join(", "));
   }
@@ -133,7 +134,12 @@ export async function fetchMatchWeather(match) {
 
   var geo = await geocode(suburb, groundName);
   if (!geo) {
-    return { ok: false, reason: "geocode_failed", message: "Could not locate " + (groundName && suburb ? groundName + ", " + suburb : groundName || suburb || "venue") + "." };
+    var label = groundName && suburb ? groundName + ", " + suburb : groundName || suburb || "venue";
+    return {
+      ok: false,
+      reason: "geocode_failed",
+      message: "Could not find weather for " + label + ". Check suburb/ground in Coach / admin.",
+    };
   }
 
   var start = new Date(kickoff.getTime());

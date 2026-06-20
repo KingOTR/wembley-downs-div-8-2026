@@ -26,6 +26,8 @@ export function stripNameQualifiers(name) {
  */
 export const NAME_ALIASES = {
   rainey: "Rainy",
+  ulrika: "Uli",
+  johanna: "Jay",
 };
 
 /** Resolve alias → canonical display name (unchanged if no alias). */
@@ -152,6 +154,38 @@ export function nameSimilarity(a, b) {
 
 export function namesMatch(a, b, threshold) {
   return nameSimilarity(a, b) >= (threshold == null ? DEFAULT_SQUAD_THRESHOLD : threshold);
+}
+
+/**
+ * When voter enters a lone first name shared by multiple squad players (e.g. two Sarahs).
+ * Returns squad display names to choose from, or null if unambiguous.
+ */
+export function findAmbiguousByFirstName(inputName, squad) {
+  var raw = displayPlayerName(inputName);
+  if (!raw) return null;
+  var stripped = stripNameQualifiers(raw);
+  var parts = nameParts(stripped);
+  if (!parts.first) return null;
+  if (parts.last && parts.last.length > 1) return null;
+
+  var first = parts.first;
+  var hits = (squad || []).filter(function (p) {
+    var pp = nameParts(stripNameQualifiers(p));
+    return pp.first === first;
+  });
+  if (hits.length <= 1) return null;
+
+  var canon = hits.map(function (p) {
+    return canonicalPlayerName(displayPlayerName(p));
+  });
+  var unique = [];
+  var seen = Object.create(null);
+  canon.forEach(function (n) {
+    if (!n || seen[n.toLowerCase()]) return;
+    seen[n.toLowerCase()] = true;
+    unique.push(n);
+  });
+  return unique.length > 1 ? unique : null;
 }
 
 export function findSquadMatch(voterName, players, threshold) {

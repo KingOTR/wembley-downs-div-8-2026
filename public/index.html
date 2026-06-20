@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v138: fix app.min.js boot crash, improve weather geocoding -->
+  <!-- v139: FotMob export parity, badges, Sarah disambiguation, pitch guides -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v138" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v139" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -544,22 +544,22 @@
       100% { transform: translate3d(0,0,0); }
     }
 
-    /* Match card aesthetic */
+    /* Match card aesthetic — Wembley Downs club branding */
     #matchCard {
       position: relative;
       overflow: hidden;
-      /* more "hero" result panel */
       background: linear-gradient(
-        135deg,
-        rgba(254, 226, 226, 0.95) 0%,
-        rgba(254, 202, 202, 0.88) 42%,
-        rgba(255, 241, 242, 0.86) 100%
+        145deg,
+        rgba(255, 255, 255, 0.98) 0%,
+        rgba(255, 245, 245, 0.96) 55%,
+        rgba(254, 242, 242, 0.94) 100%
       );
-      border-color: rgba(185, 28, 28, 0.26);
-      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10), var(--shadow);
+      border: 1px solid rgba(238, 43, 51, 0.22);
+      box-shadow: 0 16px 36px rgba(238, 43, 51, 0.1), 0 4px 12px rgba(15, 23, 42, 0.06);
       backdrop-filter: none;
       padding: 1.25rem 1.1rem 1.25rem;
       text-align: left;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
     }
 
     #matchCard::before {
@@ -568,9 +568,8 @@
       inset: -1px;
       pointer-events: none;
       background:
-        radial-gradient(115% 110% at 0% 0%, rgba(127, 29, 29, 0.38) 0%, rgba(127, 29, 29, 0.00) 60%),
-        radial-gradient(110% 100% at 100% 0%, rgba(127, 29, 29, 0.22) 0%, rgba(127, 29, 29, 0.00) 62%),
-        linear-gradient(180deg, rgba(127, 29, 29, 0.22) 0%, rgba(127, 29, 29, 0.00) 56%);
+        radial-gradient(90% 80% at 0% 0%, rgba(238, 43, 51, 0.14) 0%, transparent 58%),
+        linear-gradient(180deg, rgba(238, 43, 51, 0.06) 0%, transparent 48%);
       opacity: 1;
     }
 
@@ -597,11 +596,12 @@
       align-items: center;
       justify-content: space-between;
       gap: 0.65rem;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      font-size: 0.88rem;
+      font-size: 0.82rem;
+      font-weight: 900;
       margin-bottom: 0.8rem;
-      color: rgba(127, 29, 29, 0.92);
+      color: #EE2B33;
     }
 
     #matchCard h2 .match-badge {
@@ -701,7 +701,17 @@
 
     #matchCard #matchOpponentLine .opp {
       color: rgba(17, 24, 39, 0.92);
-      font-weight: 650;
+      font-weight: 800;
+    }
+
+    #matchCard #matchWeatherBlock .lineup-weather {
+      margin-top: 0.45rem;
+      border-color: rgba(238, 43, 51, 0.14);
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    #matchCard #matchWeatherBlock .lineup-weather-title {
+      color: #EE2B33;
     }
 
     #matchCard #matchVenueLine {
@@ -825,6 +835,23 @@
     }
 
     /* Full pitch markings overlay */
+    .pitch-markings {
+      position: absolute;
+      inset: var(--pitch-inset);
+      border-radius: 0;
+      border: var(--pitch-line) solid var(--pitch-line-strong);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pitch-outline) 85%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--pitch-outline) 70%, transparent);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .pitch-markings > * {
+      position: absolute;
+      z-index: 1;
+    }
+
     .pitch-lines {
       position: absolute;
       inset: var(--pitch-inset);
@@ -832,9 +859,15 @@
       border: var(--pitch-line) solid var(--pitch-line-strong);
       box-shadow:
         inset 0 0 0 1px color-mix(in srgb, var(--pitch-outline) 85%, transparent),
-        0 0 0 1px color-mix(in srgb, var(--pitch-outline) 70%, transparent),
-        0 1px 0 rgba(0, 0, 0, 0.04);
+        0 0 0 1px color-mix(in srgb, var(--pitch-outline) 70%, transparent);
       pointer-events: none;
+      z-index: 1;
+    }
+
+    /* FotMob public pitch: boundary on .pitch-markings; guides layer has no border */
+    .lineup-pitch-fotmob .pitch-lines {
+      border: none;
+      box-shadow: none;
     }
 
     /* Optional tactical lane guides (wings / half-spaces / centre) */
@@ -846,7 +879,8 @@
       z-index: 0;
     }
 
-    body.pitch-guides-on .pitch-guides {
+    body.pitch-guides-on .pitch-guides,
+    .lineup-pitch-fotmob.pitch-overlay-guides .pitch-guides {
       display: block !important;
     }
 
@@ -880,7 +914,8 @@
       display: none;
       z-index: 0;
     }
-    body.pitch-adv-guides-on .pitch-adv-guides {
+    body.pitch-adv-guides-on .pitch-adv-guides,
+    .lineup-pitch-fotmob.pitch-overlay-adv .pitch-adv-guides {
       display: block !important;
     }
     .pitch-adv-line {
@@ -1395,6 +1430,148 @@
       font-weight: 700;
       color: var(--text);
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    /* FotMob pitch: white tactical guides above markings, below chips */
+    #lineupCard .lineup-pitch-fotmob .pitch-guide {
+      border-left-color: rgba(255, 255, 255, 0.32);
+      border-left-style: dashed;
+    }
+
+    #lineupCard .lineup-pitch-fotmob .pitch-guide--center {
+      border-left-color: rgba(255, 255, 255, 0.42);
+    }
+
+    #lineupCard .lineup-pitch-fotmob .pitch-adv-line.h {
+      border-top-color: rgba(255, 255, 255, 0.28);
+      background: transparent;
+    }
+
+    #lineupCard .lineup-pitch-fotmob .pitch-adv-line.v {
+      border-left-color: rgba(255, 255, 255, 0.28);
+      background: transparent;
+    }
+
+    .pitch-zone-label {
+      position: absolute;
+      top: 4%;
+      transform: translateX(-50%);
+      font-size: clamp(0.55rem, 1.8cqw, 0.68rem);
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.55);
+      pointer-events: none;
+      z-index: 3;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    }
+
+    .pitch-zone-label--adv {
+      top: auto;
+      transform: translate(-50%, -50%);
+      font-size: clamp(0.52rem, 1.6cqw, 0.64rem);
+      color: rgba(255, 255, 255, 0.48);
+    }
+
+    #lineupCard .lineup-pitch-fotmob .player-chip--fotmob-unit {
+      z-index: 6;
+    }
+
+    #lineupCard .lineup-pitch-fotmob .fotmob-unit__badge {
+      position: absolute;
+      top: -4px;
+      right: -6px;
+      min-width: 1.15rem;
+      padding: 0.08rem 0.28rem;
+      border-radius: 4px;
+      font-size: 0.58rem;
+      font-weight: 950;
+      letter-spacing: 0.04em;
+      color: #fff;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.28);
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    #lineupCard .lineup-pitch-fotmob .fotmob-unit__badge--c {
+      background: #EE2B33;
+    }
+
+    #lineupCard .lineup-pitch-fotmob .fotmob-unit__badge--vc {
+      background: #1e3a5f;
+    }
+
+    #lineupCard .lineup-pitch-fotmob .fotmob-unit__badge--gk {
+      background: #0f766e;
+    }
+
+    /* Lineup tab active states */
+    #lineupCard h2 .ghost[aria-pressed="true"] {
+      background: rgba(238, 43, 51, 0.12);
+      border-color: rgba(238, 43, 51, 0.35);
+      color: var(--red-dark);
+      font-weight: 800;
+    }
+
+    #lineupCard h2 .ghost.lineup-tab-overlay-active {
+      background: rgba(17, 24, 39, 0.08);
+      border-color: rgba(17, 24, 39, 0.22);
+      font-weight: 800;
+    }
+
+    /* Sarah disambiguation modal */
+    .sv-name-pick-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10050;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(15, 23, 42, 0.45);
+    }
+
+    .sv-name-pick-card {
+      width: min(100%, 380px);
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      box-shadow: var(--shadow);
+    }
+
+    .sv-name-pick-card h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1rem;
+      color: var(--red-dark);
+    }
+
+    .sv-name-pick-card p {
+      margin: 0 0 0.75rem;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .sv-name-pick-options {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .sv-name-pick-options button {
+      width: 100%;
+      text-align: left;
+      padding: 0.55rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--gray);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .sv-name-pick-options button:hover {
+      border-color: rgba(238, 43, 51, 0.35);
+      background: rgba(238, 43, 51, 0.08);
     }
 
     .lineup-weather-mount {
@@ -3098,6 +3275,15 @@
                       <input type="text" id="lineupSelectedNumber" inputmode="numeric" placeholder="10" />
                     </div>
                   </div>
+                  <div style="margin-top:0.5rem">
+                    <label class="field" for="lineupSelectedBadge" style="margin-bottom:0.25rem">Badge</label>
+                    <select id="lineupSelectedBadge">
+                      <option value="">None</option>
+                      <option value="C">Captain (C)</option>
+                      <option value="VC">Vice Captain (VC)</option>
+                      <option value="GK">Goalkeeper (GK)</option>
+                    </select>
+                  </div>
                   <div class="actions" style="margin-top:0.55rem">
                     <button type="button" class="primary" id="lineupApplySelected" disabled>Apply</button>
                   </div>
@@ -3420,9 +3606,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v138"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v138"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v138"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v139"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v139"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v139"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3436,7 +3622,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v138").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v139").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
@@ -3483,7 +3669,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=138").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=139").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}

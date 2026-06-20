@@ -2,8 +2,8 @@
  * FotMob-style public lineup view (single team, dark pitch, circular nodes).
  * Shared display logic for public tab + PNG export.
  */
-import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v138";
-import { fetchMatchWeather, weatherPanelHtml } from "./weather-forecast.js?tag=v138";
+import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v139";
+import { fetchMatchWeather, weatherPanelHtml } from "./weather-forecast.js?tag=v139";
 
 export const FORMATION_ROLES = {
   "4-3-3": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "CM", "LW", "ST", "RW"],
@@ -40,6 +40,26 @@ export function lineupLabel(name, number) {
   var surname = parts.length > 1 ? parts[parts.length - 1] : clean;
   var num = String(number || "").trim();
   return num ? num + " " + surname : surname;
+}
+
+/** C / VC / GK badge stored on starter or lineup.badges map. */
+export function resolvePlayerBadge(player, badgesMap) {
+  if (!player) return "";
+  var b = "";
+  if (player.badge) b = player.badge;
+  else if (Array.isArray(player.badges) && player.badges.length) b = player.badges[0];
+  if (!b && badgesMap && player.name) {
+    var key = canonicalPlayerName(displayPlayerName(player.name));
+    if (badgesMap[key]) b = badgesMap[key];
+    else if (badgesMap[player.name]) b = badgesMap[player.name];
+  }
+  b = String(b || "")
+    .trim()
+    .toUpperCase();
+  if (b === "CAPTAIN" || b === "CAPT") b = "C";
+  if (b === "VICE" || b === "VICE CAPTAIN" || b === "VICECAPTAIN") b = "VC";
+  if (b === "GOALKEEPER" || b === "GOALIE") b = "GK";
+  return b === "C" || b === "VC" || b === "GK" ? b : "";
 }
 
 function sortedIndices(starters, clamp) {
@@ -104,9 +124,14 @@ const ROW_ROLE_TEMPLATES = [
 const GUIDES_MARKUP =
   "<div class='pitch-guides' aria-hidden='true'>" +
   "<div class='pitch-guide' style='left:20%'></div>" +
-  "<div class='pitch-guide' style='left:36.55%'></div>" +
-  "<div class='pitch-guide' style='left:63.45%'></div>" +
-  "<div class='pitch-guide' style='left:80%'></div></div>" +
+  "<div class='pitch-guide pitch-guide--center' style='left:50%'></div>" +
+  "<div class='pitch-guide' style='left:80%'></div>" +
+  "<span class='pitch-zone-label' style='left:10%'>Wing</span>" +
+  "<span class='pitch-zone-label' style='left:28%'>Half</span>" +
+  "<span class='pitch-zone-label' style='left:50%'>Centre</span>" +
+  "<span class='pitch-zone-label' style='left:72%'>Half</span>" +
+  "<span class='pitch-zone-label' style='left:90%'>Wing</span>" +
+  "</div>" +
   "<div class='pitch-adv-guides' aria-hidden='true'>" +
   "<div class='pitch-adv-line v' style='left:20.35%'></div>" +
   "<div class='pitch-adv-line v seg-between-boxes' style='left:36.55%'></div>" +
@@ -116,12 +141,15 @@ const GUIDES_MARKUP =
   "<div class='pitch-adv-line h' style='top:15.7%; left:0; right:79.65%'></div>" +
   "<div class='pitch-adv-line h' style='top:84.3%; left:0; right:79.65%'></div>" +
   "<div class='pitch-adv-line v seg-top' style='left:50%'></div>" +
-  "<div class='pitch-adv-line v seg-bot' style='left:50%'></div></div>";
+  "<div class='pitch-adv-line v seg-bot' style='left:50%'></div>" +
+  "<span class='pitch-zone-label pitch-zone-label--adv' style='left:28%;top:8%'>Final third</span>" +
+  "<span class='pitch-zone-label pitch-zone-label--adv' style='left:28%;top:42%'>Middle third</span>" +
+  "<span class='pitch-zone-label pitch-zone-label--adv' style='left:28%;top:76%'>Defensive third</span>" +
+  "</div>";
 
 export function pitchMarkup() {
   return (
-    "<div class='pitch-lines' aria-hidden='true'>" +
-    GUIDES_MARKUP +
+    "<div class='pitch-markings' aria-hidden='true'>" +
     "<div class='pitch-halfway'></div>" +
     "<div class='pitch-centre-circle'></div>" +
     "<div class='pitch-centre-spot'></div>" +
@@ -137,6 +165,9 @@ export function pitchMarkup() {
     "<div class='pitch-corner-arc tr'></div>" +
     "<div class='pitch-corner-arc bl'></div>" +
     "<div class='pitch-corner-arc br'></div>" +
+    "</div>" +
+    "<div class='pitch-lines' aria-hidden='true'>" +
+    GUIDES_MARKUP +
     "</div>"
   );
 }
@@ -150,6 +181,8 @@ export function applySetup(lineup, setupKey, clamp) {
       x: clamp(s && s.x),
       y: clamp(s && s.y),
       role: (s && s.role) || "",
+      badge: (s && s.badge) || "",
+      badges: s && s.badges,
     };
   });
 
@@ -170,6 +203,7 @@ export function applySetup(lineup, setupKey, clamp) {
     formation: formation,
     starters: starters,
     subs: lineup.subs || [],
+    badges: lineup.badges || null,
   };
 }
 
@@ -248,19 +282,22 @@ export function prepareLineupDisplay(lineup, setupKey, clamp) {
   var gkIdx = findGkIndex(starters, clamp);
   var setupLabel = setupKey === "att" ? "Attacking" : "Defensive";
   var formLabel = formation === "custom" ? "Custom" : formation;
+  var badgesMap = applied.badges;
 
   var units = starters.map(function (p, i) {
     var role = (p.role && String(p.role).trim()) || roles[i] || "";
+    var badge = resolvePlayerBadge(p, badgesMap);
     return {
       index: i,
       name: p.name,
       number: p.number,
       role: role,
+      badge: badge,
       label: lineupLabel(p.name, p.number),
       leftPct: clamp(p.x) * 100,
       topPct: displayRowY(starters, formation, i, gkIdx, clamp) * 100,
-      ringText: String(p.number || "").trim() || role || "—",
-      isGk: role === "GK" || i === gkIdx,
+      ringText: role || String(p.number || "").trim() || "—",
+      isGk: role === "GK" || i === gkIdx || badge === "GK",
     };
   });
 
@@ -276,7 +313,7 @@ export function prepareLineupDisplay(lineup, setupKey, clamp) {
   };
 }
 
-function subsMarkup(subList, esc) {
+export function subsMarkup(subList, esc) {
   if (!subList.length) return "";
   return (
     "<div class='lineup-fotmob-subs'>" +
@@ -291,17 +328,28 @@ function subsMarkup(subList, esc) {
   );
 }
 
-function chipsMarkup(units, esc) {
+export function chipsMarkup(units, esc) {
   return units
     .map(function (u) {
+      var gkClass = u.isGk ? " is-gk" : "";
+      var badgeHtml = u.badge
+        ? "<span class='fotmob-unit__badge fotmob-unit__badge--" +
+          esc(u.badge.toLowerCase()) +
+          "'>" +
+          esc(u.badge) +
+          "</span>"
+        : "";
       return (
-        "<div class='player-chip player-chip--fotmob-unit' style='left:" +
+        "<div class='player-chip player-chip--fotmob-unit" +
+        gkClass +
+        "' style='left:" +
         u.leftPct.toFixed(2) +
         "%;top:" +
         u.topPct.toFixed(2) +
         "%' data-idx='" +
         u.index +
         "'>" +
+        badgeHtml +
         "<span class='fotmob-unit__ring'>" +
         esc(u.ringText) +
         "</span>" +
@@ -311,6 +359,17 @@ function chipsMarkup(units, esc) {
       );
     })
     .join("");
+}
+
+/** Sync pitch overlay visibility (guides / advanced) on the public FotMob pitch. */
+export function syncPitchOverlay(wrap) {
+  if (!wrap) return;
+  var pitch = wrap.querySelector(".lineup-pitch-fotmob");
+  if (!pitch) return;
+  var guidesOn = document.body.classList.contains("pitch-guides-on");
+  var advOn = document.body.classList.contains("pitch-adv-guides-on");
+  pitch.classList.toggle("pitch-overlay-guides", guidesOn && !advOn);
+  pitch.classList.toggle("pitch-overlay-adv", advOn);
 }
 
 /**
@@ -355,10 +414,11 @@ export function renderLineupTab(ctx, teamId) {
     subsMarkup(view.subs, esc) +
     "</div>";
 
+  syncPitchOverlay(wrap);
+
   var weatherMount = document.getElementById("lineupWeatherMount");
   if (weatherMount && entry) {
-    weatherMount.innerHTML =
-      "<p class='hint' style='margin:0'>Loading weather…</p>";
+    weatherMount.innerHTML = "<p class='hint' style='margin:0'>Loading weather…</p>";
     fetchMatchWeather({
       suburb: entry.suburb,
       groundName: entry.groundName || entry.venue,
@@ -376,4 +436,8 @@ export function renderLineupTab(ctx, teamId) {
         }
       });
   }
+
+  try {
+    window.dispatchEvent(new CustomEvent("sv-lineup-rendered"));
+  } catch {}
 }

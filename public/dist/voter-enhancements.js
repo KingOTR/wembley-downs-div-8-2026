@@ -8,8 +8,9 @@ import {
   displayPlayerName,
   canonicalPlayerName,
   nameSimilarity,
+  findAmbiguousByFirstName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v138";
+} from "./name-match.js?tag=v139";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -911,7 +912,7 @@ function wireLineupExportOverride() {
     function (ev) {
       ev.stopImmediatePropagation();
       ev.preventDefault();
-      import("./lineup-export.js?tag=v138")
+      import("./lineup-export.js?tag=v139")
         .then(function (mod) {
           var snap =
             typeof window.__svLineupExportSnapshot === "function"
@@ -974,7 +975,7 @@ async function updateMatchCardWeather() {
 
   mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
   try {
-    var mod = await import("./weather-forecast.js?tag=v138");
+    var mod = await import("./weather-forecast.js?tag=v139");
     var data = await mod.fetchMatchWeather({
       suburb: entry.suburb,
       groundName: entry.groundName || entry.venue,
@@ -1123,6 +1124,240 @@ function normalizeLineupNameEl(el) {
   el._svNameNorm = true;
 }
 
+function wireLineupPublicTabs() {
+  var defBtn = document.getElementById("lineupPublicDef");
+  var attBtn = document.getElementById("lineupPublicAtt");
+  var guidesBtn = document.getElementById("togglePitchGuides");
+  var advBtn = document.getElementById("togglePitchAdvGuides");
+  if (!defBtn || defBtn._svLineupTabs) return;
+  defBtn._svLineupTabs = true;
+
+  var storageKey = STORAGE_KEY + "_pitch_guides";
+  var advKey = STORAGE_KEY + "_pitch_adv_guides";
+
+  function setOverlay(mode) {
+    var guidesOn = mode === "guides";
+    var advOn = mode === "adv";
+    document.body.classList.toggle("pitch-guides-on", guidesOn);
+    document.body.classList.toggle("pitch-adv-guides-on", advOn);
+    try {
+      localStorage.setItem(storageKey, guidesOn ? "1" : "0");
+      localStorage.setItem(advKey, advOn ? "1" : "0");
+    } catch {}
+    if (guidesBtn) {
+      guidesBtn.setAttribute("aria-pressed", guidesOn ? "true" : "false");
+      guidesBtn.classList.toggle("lineup-tab-overlay-active", guidesOn);
+    }
+    if (advBtn) {
+      advBtn.setAttribute("aria-pressed", advOn ? "true" : "false");
+      advBtn.classList.toggle("lineup-tab-overlay-active", advOn);
+    }
+    import("./lineup-fotmob.js?tag=v139")
+      .then(function (mod) {
+        mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
+      })
+      .catch(function () {});
+  }
+
+  function clickSetup(btn, other, setup) {
+    if (!btn || btn._svSetupWired) return;
+    btn._svSetupWired = true;
+    btn.addEventListener(
+      "click",
+      function () {
+        setOverlay("none");
+        try {
+          btn.setAttribute("aria-pressed", "true");
+          if (other) other.setAttribute("aria-pressed", "false");
+        } catch {}
+      },
+      true
+    );
+  }
+
+  clickSetup(defBtn, attBtn, "def");
+  clickSetup(attBtn, defBtn, "att");
+
+  if (guidesBtn && !guidesBtn._svOverlayWired) {
+    guidesBtn._svOverlayWired = true;
+    guidesBtn.addEventListener(
+      "click",
+      function (ev) {
+        ev.stopImmediatePropagation();
+        var next = !document.body.classList.contains("pitch-guides-on");
+        setOverlay(next ? "guides" : "none");
+        if (advBtn && next) advBtn.classList.remove("lineup-tab-overlay-active");
+      },
+      true
+    );
+  }
+
+  if (advBtn && !advBtn._svOverlayWired) {
+    advBtn._svOverlayWired = true;
+    advBtn.addEventListener(
+      "click",
+      function (ev) {
+        ev.stopImmediatePropagation();
+        var next = !document.body.classList.contains("pitch-adv-guides-on");
+        setOverlay(next ? "adv" : "none");
+        if (guidesBtn && next) guidesBtn.classList.remove("lineup-tab-overlay-active");
+      },
+      true
+    );
+  }
+
+  window.addEventListener("sv-lineup-rendered", function () {
+    import("./lineup-fotmob.js?tag=v139")
+      .then(function (mod) {
+        mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
+      })
+      .catch(function () {});
+  });
+
+  try {
+    if (localStorage.getItem(advKey) === "1") setOverlay("adv");
+    else if (localStorage.getItem(storageKey) === "1") setOverlay("guides");
+  } catch {}
+}
+
+var sarahPickPromise = null;
+
+function showNamePickModal(title, message, options) {
+  return new Promise(function (resolve) {
+    var existing = document.getElementById("svNamePickModal");
+    if (existing) existing.remove();
+
+    var modal = document.createElement("div");
+    modal.id = "svNamePickModal";
+    modal.className = "sv-name-pick-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+
+    var card = document.createElement("div");
+    card.className = "sv-name-pick-card";
+    card.innerHTML =
+      "<h3>" +
+      escapeHtml(title) +
+      "</h3><p>" +
+      escapeHtml(message) +
+      "</p><div class='sv-name-pick-options'></div>";
+    var opts = card.querySelector(".sv-name-pick-options");
+
+    options.forEach(function (name) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = name;
+      btn.addEventListener("click", function () {
+        modal.remove();
+        resolve(name);
+      });
+      opts.appendChild(btn);
+    });
+
+    modal.appendChild(card);
+    modal.addEventListener("click", function (ev) {
+      if (ev.target === modal) {
+        modal.remove();
+        resolve(null);
+      }
+    });
+    document.body.appendChild(modal);
+  });
+}
+
+async function resolveAmbiguousVoterName(rawName, teamId) {
+  var name = displayPlayerName(rawName);
+  if (!name) return name;
+
+  var data = loadLocalData();
+  var squad = await resolveTeamSquad(teamId, data.teams || []);
+  var choices = findAmbiguousByFirstName(name, squad);
+  if (!choices) return canonicalPlayerName(name);
+
+  var exact = squad.find(function (p) {
+    return normalizeName(p) === normalizeName(name);
+  });
+  if (exact) return canonicalPlayerName(displayPlayerName(exact));
+
+  if (sarahPickPromise) return sarahPickPromise;
+
+  sarahPickPromise = showNamePickModal(
+    "Which player?",
+    "More than one squad member matches \"" + name + "\". Pick your exact squad name:",
+    choices
+  ).finally(function () {
+    sarahPickPromise = null;
+  });
+
+  var picked = await sarahPickPromise;
+  return picked ? canonicalPlayerName(picked) : null;
+}
+
+function wireSarahDisambiguation() {
+  var input = document.getElementById("voterNameInput");
+  var submitBtn = document.getElementById("submitVote");
+  if (!input || input._svSarahWire) return;
+  input._svSarahWire = true;
+
+  input.addEventListener("blur", function () {
+    var name = input.value.trim();
+    if (!name) return;
+    resolveAmbiguousVoterName(name, getCurrentTeamId()).then(function (resolved) {
+      if (resolved && resolved !== name) input.value = resolved;
+      updateAlreadyVotedBanner();
+    });
+  });
+
+  if (submitBtn && !submitBtn._svSarahGuard) {
+    submitBtn._svSarahGuard = true;
+    submitBtn.addEventListener(
+      "click",
+      function (ev) {
+        if (submitBtn._svSarahResubmit) {
+          submitBtn._svSarahResubmit = false;
+          return;
+        }
+        var name = input.value.trim();
+        if (!name) return;
+
+        ev.stopImmediatePropagation();
+        ev.preventDefault();
+
+        (async function () {
+          var teamId = getCurrentTeamId();
+          var data = loadLocalData();
+          var squad = await resolveTeamSquad(teamId, data.teams || []);
+          var choices = findAmbiguousByFirstName(name, squad);
+          if (!choices) {
+            submitBtn._svSarahResubmit = true;
+            submitBtn.click();
+            return;
+          }
+          var exact = squad.find(function (p) {
+            return normalizeName(p) === normalizeName(name);
+          });
+          if (exact) {
+            input.value = canonicalPlayerName(displayPlayerName(exact));
+            submitBtn._svSarahResubmit = true;
+            submitBtn.click();
+            return;
+          }
+          var resolved = await resolveAmbiguousVoterName(name, teamId);
+          if (resolved) {
+            input.value = resolved;
+            updateAlreadyVotedBanner();
+            submitBtn._svSarahResubmit = true;
+            submitBtn.click();
+          }
+        })().catch(function (e) {
+          console.warn("[sarah-disambig]", e);
+        });
+      },
+      true
+    );
+  }
+}
+
 function wireLineupNameNormalize() {
   var roots = [document.getElementById("lineupCard"), document.getElementById("lineupEditorGrid")].filter(Boolean);
   if (!roots.length) return;
@@ -1152,6 +1387,8 @@ function init() {
   wireLineupNameNormalize();
   wireLineupExportOverride();
   wireMatchWeather();
+  wireLineupPublicTabs();
+  wireSarahDisambiguation();
 }
 
 function safeInit() {

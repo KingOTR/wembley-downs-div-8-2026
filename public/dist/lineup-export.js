@@ -1,11 +1,11 @@
 /**
- * PNG lineup export aligned with public FotMob view (same setup + row spacing).
+ * PNG lineup export aligned with public FotMob view (same setup + row spacing + chips).
  */
 import {
   prepareLineupDisplay,
   clamp01,
   pitchMarkup,
-} from "./lineup-fotmob.js?tag=v138";
+} from "./lineup-fotmob.js?tag=v139";
 
 function roundRect(ctx, x, y, w, h, r) {
   var rad = Math.min(r, w / 2, h / 2);
@@ -18,7 +18,7 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function drawPitch(ctx, x, y, w, h) {
+function drawPitchBackground(ctx, x, y, w, h) {
   var grad = ctx.createLinearGradient(x, y, x, y + h);
   grad.addColorStop(0, "#1b5e38");
   grad.addColorStop(0.48, "#174a2e");
@@ -26,8 +26,10 @@ function drawPitch(ctx, x, y, w, h) {
   ctx.fillStyle = grad;
   roundRect(ctx, x, y, w, h, 12);
   ctx.fill();
+}
 
-  var inset = Math.max(8, w * 0.028);
+function drawPitchMarkings(ctx, x, y, w, h) {
+  var inset = Math.max(10, w * 0.032);
   var lx = x + inset;
   var ly = y + inset;
   var lw = w - inset * 2;
@@ -49,6 +51,68 @@ function drawPitch(ctx, x, y, w, h) {
   var penW = lw * 0.59;
   ctx.strokeRect(lx + (lw - penW) / 2, ly, penW, penH);
   ctx.strokeRect(lx + (lw - penW) / 2, ly + lh - penH, penW, penH);
+}
+
+function drawFotmobChip(ctx, px, py, unit, pitchW) {
+  var ringR = Math.max(16, pitchW * 0.028);
+  var ringY = py - ringR * 0.15;
+
+  if (unit.badge) {
+    ctx.font = "900 9px Segoe UI, system-ui, sans-serif";
+    var bw = 18;
+    var bh = 14;
+    var bx = px + ringR * 0.35;
+    var by = ringY - ringR * 0.75;
+    roundRect(ctx, bx, by, bw, bh, 4);
+    ctx.fillStyle = unit.badge === "C" ? "#EE2B33" : unit.badge === "VC" ? "#1e3a5f" : "#0f766e";
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(unit.badge, bx + (bw - ctx.measureText(unit.badge).width) / 2, by + 11);
+  }
+
+  ctx.fillStyle = "rgba(255,255,255,0.96)";
+  ctx.beginPath();
+  ctx.arc(px, ringY, ringR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(17,24,39,0.92)";
+  ctx.font = "900 11px Segoe UI, system-ui, sans-serif";
+  var rt = String(unit.ringText).slice(0, 3);
+  ctx.fillText(rt, px - ctx.measureText(rt).width / 2, ringY + 4);
+
+  var label = String(unit.label).slice(0, 16);
+  ctx.font = "800 10px Segoe UI, system-ui, sans-serif";
+  var lw = Math.max(44, ctx.measureText(label).width + 14);
+  var lh = 18;
+  var lx = px - lw / 2;
+  var ly = ringY + ringR - 2;
+  roundRect(ctx, lx, ly, lw, lh, 6);
+  ctx.fillStyle = "rgba(255,255,255,0.96)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(17,24,39,0.92)";
+  ctx.fillText(label, px - ctx.measureText(label).width / 2, ly + 13);
+}
+
+function drawSubChip(ctx, x, y, name, maxW) {
+  var label = String(name).slice(0, 18);
+  ctx.font = "700 12px Segoe UI, system-ui, sans-serif";
+  var w = Math.min(maxW, ctx.measureText(label).width + 20);
+  var h = 24;
+  roundRect(ctx, x, y, w, h, 999);
+  ctx.fillStyle = "rgba(255,255,255,0.94)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(238,43,51,0.18)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(17,24,39,0.9)";
+  ctx.fillText(label, x + 10, y + 16);
+  return w + 8;
 }
 
 function formatDate(dateStr, kickoff) {
@@ -101,7 +165,7 @@ export async function exportLineupPng(opts) {
   });
 
   var W = 1080;
-  var H = 1350;
+  var H = 1400;
   var canvas = document.createElement("canvas");
   canvas.width = W;
   canvas.height = H;
@@ -111,125 +175,80 @@ export async function exportLineupPng(opts) {
   ctx.fillStyle = "#f4f4f5";
   ctx.fillRect(0, 0, W, H);
 
-  var pad = 56;
-  roundRect(ctx, pad, pad, W - pad * 2, H - pad * 2, 28);
+  var pad = 48;
+  roundRect(ctx, pad, pad, W - pad * 2, H - pad * 2, 24);
   ctx.fillStyle = "#ffffff";
   ctx.fill();
-  ctx.strokeStyle = "rgba(185,28,28,0.2)";
+  ctx.strokeStyle = "rgba(238,43,51,0.22)";
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  var tx = pad + 34;
-  var ty = pad + 30;
+  var tx = pad + 28;
+  var ty = pad + 24;
   if (logo.complete && logo.naturalWidth) {
     ctx.save();
     ctx.beginPath();
-    ctx.arc(tx + 32, ty + 32, 32, 0, Math.PI * 2);
+    ctx.arc(tx + 28, ty + 28, 28, 0, Math.PI * 2);
     ctx.clip();
-    ctx.drawImage(logo, tx, ty, 64, 64);
+    ctx.drawImage(logo, tx, ty, 56, 56);
     ctx.restore();
   }
 
-  ctx.fillStyle = "rgba(127,29,29,0.92)";
-  ctx.font = "900 34px Segoe UI, system-ui, sans-serif";
-  ctx.fillText(team.name || "Wembley Downs", tx + 80, ty + 42);
+  ctx.fillStyle = "#EE2B33";
+  ctx.font = "900 30px Segoe UI, system-ui, sans-serif";
+  ctx.fillText(team.name || "Wembley Downs", tx + 68, ty + 36);
 
   var vs = entry.opponent ? "vs " + entry.opponent : "";
   ctx.fillStyle = "rgba(17,24,39,0.92)";
-  ctx.font = "700 26px Segoe UI, system-ui, sans-serif";
-  if (vs) ctx.fillText(vs, tx + 80, ty + 76);
+  ctx.font = "700 22px Segoe UI, system-ui, sans-serif";
+  if (vs) ctx.fillText(vs, tx + 68, ty + 64);
 
   var meta = [round, formatDate(entry.date, entry.kickoff), groundLine(entry), entry.suburb || ""]
     .filter(Boolean)
     .join(" · ");
-  ctx.fillStyle = "rgba(127,29,29,0.7)";
-  ctx.font = "600 18px Segoe UI, system-ui, sans-serif";
-  if (meta) ctx.fillText(meta.slice(0, 90), tx, ty + 110);
+  ctx.fillStyle = "rgba(17,24,39,0.62)";
+  ctx.font = "600 16px Segoe UI, system-ui, sans-serif";
+  if (meta) ctx.fillText(meta.slice(0, 95), tx, ty + 94);
 
-  ctx.fillStyle = "rgba(127,29,29,0.82)";
-  ctx.font = "900 16px Segoe UI, system-ui, sans-serif";
-  ctx.fillText(view.setupLabel.toUpperCase() + " · " + view.formLabel, tx, ty + 138);
+  ctx.fillStyle = "#EE2B33";
+  ctx.font = "900 14px Segoe UI, system-ui, sans-serif";
+  ctx.fillText(view.setupLabel.toUpperCase() + " · " + view.formLabel, tx, ty + 118);
 
-  var score =
-    entry.ourScore != null || entry.oppScore != null
-      ? String(entry.ourScore != null ? entry.ourScore : "–") +
-        " : " +
-        String(entry.oppScore != null ? entry.oppScore : "–")
-      : "";
-  if (score) {
-    var sw = 220;
-    var sh = 78;
-    var sx = pad + (W - pad * 2) - sw - 34;
-    roundRect(ctx, sx, ty + 10, sw, sh, 999);
-    ctx.fillStyle = "rgba(255,255,255,0.98)";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(185,28,28,0.18)";
-    ctx.stroke();
-    ctx.fillStyle = "rgba(17,24,39,0.92)";
-    ctx.font = "950 42px Segoe UI, system-ui, sans-serif";
-    var mw = ctx.measureText(score).width;
-    ctx.fillText(score, sx + (sw - mw) / 2, ty + 62);
-  }
-
-  var pitchX = pad + 34;
-  var pitchY = pad + 170;
-  var pitchW = Math.floor((W - pad * 2 - 68) * 0.62);
-  var pitchH = Math.floor(H - pad * 2 - 250);
-  drawPitch(ctx, pitchX, pitchY, pitchW, pitchH);
+  var pitchX = pad + 28;
+  var pitchY = pad + 138;
+  var pitchW = W - pad * 2 - 56;
+  var pitchH = Math.floor(H - pad * 2 - 320);
+  drawPitchBackground(ctx, pitchX, pitchY, pitchW, pitchH);
+  drawPitchMarkings(ctx, pitchX, pitchY, pitchW, pitchH);
 
   view.units.forEach(function (u) {
     var px = pitchX + (u.leftPct / 100) * pitchW;
     var py = pitchY + (u.topPct / 100) * pitchH;
-    var ring = Math.max(28, pitchW * 0.055);
-
-    ctx.fillStyle = "rgba(255,255,255,0.96)";
-    ctx.beginPath();
-    ctx.arc(px, py - ring * 0.55, ring / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(185,28,28,0.22)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = "rgba(17,24,39,0.92)";
-    ctx.font = "900 14px Segoe UI, system-ui, sans-serif";
-    var rt = String(u.ringText).slice(0, 3);
-    ctx.fillText(rt, px - ctx.measureText(rt).width / 2, py - ring * 0.55 + 5);
-
-    var label = String(u.label).slice(0, 14);
-    var lw = Math.max(56, ctx.measureText(label).width + 18);
-    var lh = 22;
-    var lx = px - lw / 2;
-    var ly = py - ring * 0.55 + ring / 2 + 2;
-    roundRect(ctx, lx, ly, lw, lh, 8);
-    ctx.fillStyle = "rgba(255,255,255,0.96)";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(185,28,28,0.15)";
-    ctx.stroke();
-    ctx.fillStyle = "rgba(17,24,39,0.92)";
-    ctx.font = "700 13px Segoe UI, system-ui, sans-serif";
-    ctx.fillText(label, px - ctx.measureText(label).width / 2, ly + 15);
+    drawFotmobChip(ctx, px, py, u, pitchW);
   });
 
-  var subsX = pitchX + pitchW + 26;
-  var subsY = pitchY;
-  var subsW = W - pad - 34 - subsX;
-  roundRect(ctx, subsX, subsY, subsW, pitchH, 18);
-  ctx.fillStyle = "rgba(185,28,28,0.06)";
-  ctx.fill();
-  ctx.strokeStyle = "rgba(185,28,28,0.14)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  var subsY = pitchY + pitchH + 22;
+  ctx.fillStyle = "rgba(17,24,39,0.55)";
+  ctx.font = "900 13px Segoe UI, system-ui, sans-serif";
+  ctx.fillText("SUBSTITUTES", pitchX, subsY);
 
-  ctx.fillStyle = "rgba(127,29,29,0.82)";
-  ctx.font = "900 18px Segoe UI, system-ui, sans-serif";
-  ctx.fillText("SUBSTITUTES", subsX + 18, subsY + 34);
-
-  var subs = view.subs.length ? view.subs : ["—"];
-  ctx.fillStyle = "rgba(17,24,39,0.86)";
-  ctx.font = "650 18px Segoe UI, system-ui, sans-serif";
-  subs.slice(0, 20).forEach(function (name, i) {
-    ctx.fillText(i + 1 + ". " + String(name).slice(0, 22), subsX + 18, subsY + 70 + i * 28);
+  var subs = view.subs.length ? view.subs : [];
+  var chipX = pitchX;
+  var chipY = subsY + 14;
+  var rowW = pitchW;
+  subs.slice(0, 12).forEach(function (name) {
+    var used = drawSubChip(ctx, chipX, chipY, name, rowW - (chipX - pitchX));
+    chipX += used;
+    if (chipX > pitchX + rowW - 80) {
+      chipX = pitchX;
+      chipY += 32;
+    }
   });
+  if (!subs.length) {
+    ctx.fillStyle = "rgba(17,24,39,0.45)";
+    ctx.font = "600 14px Segoe UI, system-ui, sans-serif";
+    ctx.fillText("—", pitchX, chipY + 16);
+  }
 
   var blob = await new Promise(function (resolve) {
     canvas.toBlob(resolve, "image/png");
