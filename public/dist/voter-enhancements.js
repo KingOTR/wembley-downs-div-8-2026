@@ -6,8 +6,9 @@ import {
   matchSquadToVoters,
   normalizeName,
   displayPlayerName,
+  canonicalPlayerName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v132";
+} from "./name-match.js?tag=v133";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -173,7 +174,7 @@ function findExistingVote(teamId, voterName, roundLabel) {
     return (
       String(v.teamId) === String(teamId) &&
       voteRoundLabel(v) === round &&
-      (v.voterNameKey === key || qo(v.voterName) === qo(voterName))
+      (nameKey(v.voterName || "") === key || qo(v.voterName) === qo(voterName))
     );
   });
   return hit || null;
@@ -885,7 +886,7 @@ function wireParticipationCounter() {
 function normalizeLineupNameEl(el) {
   if (!el || el._svNameNorm) return;
   var raw = el.textContent || "";
-  var norm = displayPlayerName(raw);
+  var norm = canonicalPlayerName(displayPlayerName(raw));
   if (norm && norm !== raw) el.textContent = norm;
   el._svNameNorm = true;
 }

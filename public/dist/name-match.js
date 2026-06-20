@@ -20,8 +20,26 @@ export function stripNameQualifiers(name) {
     .trim();
 }
 
+/**
+ * Manual alias map: lowercase stripped name → canonical display name.
+ * Add entries here when the same person appears under different spellings.
+ */
+export const NAME_ALIASES = {
+  rainey: "Rainy",
+};
+
+/** Resolve alias → canonical display name (unchanged if no alias). */
+export function canonicalPlayerName(name) {
+  var base = displayPlayerName(name);
+  if (!base) return "";
+  var key = stripNameQualifiers(base).toLowerCase();
+  return NAME_ALIASES[key] || base;
+}
+
 export function normalizeName(c) {
-  return stripNameQualifiers(c).toLowerCase();
+  var stripped = stripNameQualifiers(c).toLowerCase();
+  if (NAME_ALIASES[stripped]) return NAME_ALIASES[stripped].toLowerCase();
+  return stripped;
 }
 
 export function nameParts(name) {

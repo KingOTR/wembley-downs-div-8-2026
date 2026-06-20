@@ -2,7 +2,7 @@
  * FotMob-style public lineup view (single team, dark pitch, circular nodes).
  * Loaded by app.min.js via chunk-HQEVIJDY.js.
  */
-import { displayPlayerName } from "./name-match.js?tag=v132";
+import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v133";
 
 const FORMATION_ROLES = {
   "4-3-3": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "CM", "LW", "ST", "RW"],
@@ -42,7 +42,7 @@ function escapeHtml(s) {
 
 /** Number + surname (trimmed, no double spaces). */
 function lineupLabel(name, number) {
-  var clean = displayPlayerName(name);
+  var clean = canonicalPlayerName(displayPlayerName(name));
   var parts = clean.split(/\s+/).filter(Boolean);
   var surname = parts.length > 1 ? parts[parts.length - 1] : clean;
   var num = String(number || "").trim();
@@ -156,8 +156,8 @@ function applySetup(lineup, setupKey, clamp) {
 
 function subName(sub) {
   if (!sub) return "";
-  if (typeof sub === "string") return displayPlayerName(sub);
-  return displayPlayerName(sub.name || "");
+  if (typeof sub === "string") return canonicalPlayerName(displayPlayerName(sub));
+  return canonicalPlayerName(displayPlayerName(sub.name || ""));
 }
 
 /**

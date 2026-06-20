@@ -15,6 +15,7 @@ const required = [
   "public/dist/voter-enhancements.js",
   "public/dist/admin-merge-rounds.js",
   "public/dist/name-match.js",
+  "public/dist/name-match-bootstrap.js",
   "firestore.rules",
   "firebase.json",
 ];

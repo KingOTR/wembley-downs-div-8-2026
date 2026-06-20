@@ -5,11 +5,12 @@
 import {
   findSquadMatch,
   normalizeName,
+  canonicalPlayerName,
   explainSquadMismatch,
   displayPlayerName,
   DEFAULT_SQUAD_THRESHOLD,
   STRICT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v132";
+} from "./name-match.js?tag=v133";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -191,9 +192,13 @@ function getRoundFromUi(selectId, manualId) {
   return validateRoundLabel(sel.value);
 }
 
+function voterDocKey(v) {
+  return nameKey(v && v.voterName ? v.voterName : "");
+}
+
 function analyzeSourceVote(v, players, destKeys, th, forceInclude) {
-  var key = v.voterNameKey || nameKey(v.voterName);
-  var voterLabel = displayPlayerName(v.voterName) || "(unnamed)";
+  var key = voterDocKey(v);
+  var voterLabel = canonicalPlayerName(v.voterName) || "(unnamed)";
   var forced = forceInclude && forceInclude[key];
   var squadHit = findSquadMatch(v.voterName, players, th);
   var isDup = !!destKeys[key];
@@ -250,7 +255,7 @@ function planMerge(teamId, teams, votes, srcRound, dstRound, opts) {
   (votes || []).forEach(function (v) {
     if (!v || teamIdStr(v.teamId) !== teamIdStr(teamId)) return;
     if (voteRoundLabel(v) !== dstLabel) return;
-    destKeys[v.voterNameKey || nameKey(v.voterName)] = true;
+    destKeys[voterDocKey(v)] = true;
   });
 
   var sourceVotes = (votes || []).filter(function (v) {
@@ -938,7 +943,7 @@ async function deleteSourceVotesCloud(teamId, srcLabel, sourceVotes) {
 
 async function runMergeCloud(teamId, plan) {
   var writes = plan.merged.map(function (v) {
-    var key = v.voterNameKey || nameKey(v.voterName);
+    var key = voterDocKey(v);
     var newId = "t" + teamId + "_r" + plan.dstRoundKey + "_v" + key;
     console.log("[merge-rounds] upsert", newId, "←", v.voterName, plan.srcLabel, "→", plan.dstLabel);
     // No updateMask: destination docs usually don't exist yet; masked update fails with NOT_FOUND.
@@ -947,10 +952,14 @@ async function runMergeCloud(teamId, plan) {
         name: docName(newId),
         fields: {
           teamId: fsValue(teamId),
-          voterName: fsValue(v.voterName),
+          voterName: fsValue(canonicalPlayerName(v.voterName) || v.voterName),
           voterNameKey: fsValue(key),
           round: fsValue(plan.dstLabel),
-          picks: fsValue(Array.isArray(v.picks) ? v.picks.slice() : []),
+          picks: fsValue(
+            (Array.isArray(v.picks) ? v.picks.slice() : []).map(function (p) {
+              return canonicalPlayerName(p) || p;
+            })
+          ),
           submittedAt: fsValue(v.submittedAt || new Date().toISOString()),
         },
       },
@@ -1009,15 +1018,17 @@ function applyMergedVotesLocal(teamId, plan, deleteSource) {
   var data = loadLocalData();
   data.votes = data.votes || [];
   plan.merged.forEach(function (v) {
-    var key = v.voterNameKey || nameKey(v.voterName);
+    var key = voterDocKey(v);
     var newId = "t" + teamId + "_r" + plan.dstRoundKey + "_v" + key;
     var row = {
       id: newId,
       teamId: teamId,
-      voterName: v.voterName,
+      voterName: canonicalPlayerName(v.voterName) || v.voterName,
       voterNameKey: key,
       round: plan.dstLabel,
-      picks: Array.isArray(v.picks) ? v.picks.slice() : [],
+      picks: (Array.isArray(v.picks) ? v.picks.slice() : []).map(function (p) {
+        return canonicalPlayerName(p) || p;
+      }),
       submittedAt: v.submittedAt || new Date().toISOString(),
     };
     var found = false;
