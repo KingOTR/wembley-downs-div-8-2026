@@ -10,7 +10,7 @@ import {
   nameSimilarity,
   findAmbiguousByFirstName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v139";
+} from "./name-match.js?tag=v140";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -912,7 +912,7 @@ function wireLineupExportOverride() {
     function (ev) {
       ev.stopImmediatePropagation();
       ev.preventDefault();
-      import("./lineup-export.js?tag=v139")
+      import("./lineup-export.js?tag=v140")
         .then(function (mod) {
           var snap =
             typeof window.__svLineupExportSnapshot === "function"
@@ -975,13 +975,15 @@ async function updateMatchCardWeather() {
 
   mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
   try {
-    var mod = await import("./weather-forecast.js?tag=v139");
+    var mod = await import("./weather-forecast.js?tag=v140");
     var data = await mod.fetchMatchWeather({
       suburb: entry.suburb,
       groundName: entry.groundName || entry.venue,
       kickoff: entry.kickoff,
       date: entry.date,
       venue: entry.venue,
+      lat: entry.lat,
+      lng: entry.lng,
     });
     mount.innerHTML = mod.weatherPanelHtml(data);
   } catch (e) {
@@ -1152,7 +1154,7 @@ function wireLineupPublicTabs() {
       advBtn.setAttribute("aria-pressed", advOn ? "true" : "false");
       advBtn.classList.toggle("lineup-tab-overlay-active", advOn);
     }
-    import("./lineup-fotmob.js?tag=v139")
+    import("./lineup-fotmob.js?tag=v140")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1207,7 +1209,7 @@ function wireLineupPublicTabs() {
   }
 
   window.addEventListener("sv-lineup-rendered", function () {
-    import("./lineup-fotmob.js?tag=v139")
+    import("./lineup-fotmob.js?tag=v140")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1358,6 +1360,157 @@ function wireSarahDisambiguation() {
   }
 }
 
+var squadBadgesCache = Object.create(null);
+
+function squadBadgeKey(name) {
+  return canonicalPlayerName(displayPlayerName(name));
+}
+
+window.__svSquadBadgeForName = function (name) {
+  var key = squadBadgeKey(name);
+  return squadBadgesCache[key] || squadBadgesCache[name] || "";
+};
+
+window.__svGetSquadBadges = function () {
+  var out = Object.create(null);
+  Object.keys(squadBadgesCache).forEach(function (k) {
+    if (squadBadgesCache[k]) out[k] = squadBadgesCache[k];
+  });
+  return out;
+};
+
+window.__svSetSquadBadges = function (map) {
+  squadBadgesCache = Object.create(null);
+  if (map && typeof map === "object") {
+    Object.keys(map).forEach(function (k) {
+      var b = String(map[k] || "")
+        .trim()
+        .toUpperCase();
+      if (b) squadBadgesCache[k] = b;
+    });
+  }
+  renderSquadBadgesPanel();
+};
+
+function parseSquadFromEditor() {
+  var ta = document.getElementById("playerEditor");
+  if (!ta) return [];
+  return String(ta.value || "")
+    .split(/\r?\n/)
+    .map(function (l) {
+      return l.trim();
+    })
+    .filter(Boolean);
+}
+
+function renderSquadBadgesPanel() {
+  var panel = document.getElementById("squadBadgesPanel");
+  if (!panel) return;
+  var squad = parseSquadFromEditor();
+  if (!squad.length) {
+    panel.innerHTML = "<p class='hint' style='margin:0'>Add squad names below, then assign badges here.</p>";
+    return;
+  }
+  var html =
+    "<div class='squad-badges-head'>Squad badges <span class='hint'>(persist across rounds)</span></div>" +
+    "<div class='squad-badges-list'>";
+  squad.forEach(function (name) {
+    var key = squadBadgeKey(name);
+    var cur = squadBadgesCache[key] || squadBadgesCache[name] || "";
+    html +=
+      "<label class='squad-badge-row'>" +
+      "<span class='squad-badge-name'>" +
+      escapeHtml(name) +
+      "</span>" +
+      "<select class='squad-badge-select' data-player='" +
+      escapeHtml(key) +
+      "'>" +
+      "<option value=''" +
+      (cur ? "" : " selected") +
+      ">None</option>" +
+      "<option value='C'" +
+      (cur === "C" ? " selected" : "") +
+      ">Captain (C)</option>" +
+      "<option value='VC'" +
+      (cur === "VC" ? " selected" : "") +
+      ">Vice Captain (VC)</option>" +
+      "<option value='GK'" +
+      (cur === "GK" ? " selected" : "") +
+      ">Goalkeeper (GK)</option>" +
+      "</select></label>";
+  });
+  html += "</div>";
+  panel.innerHTML = html;
+  panel.querySelectorAll(".squad-badge-select").forEach(function (sel) {
+    sel.addEventListener("change", function () {
+      var player = sel.getAttribute("data-player") || "";
+      var val = String(sel.value || "")
+        .trim()
+        .toUpperCase();
+      if (val) squadBadgesCache[player] = val;
+      else delete squadBadgesCache[player];
+    });
+  });
+}
+
+function wireSquadBadges() {
+  var ta = document.getElementById("playerEditor");
+  if (!ta || ta._svBadgeWire) return;
+  ta._svBadgeWire = true;
+  ta.addEventListener("input", function () {
+    clearTimeout(ta._svBadgeTimer);
+    ta._svBadgeTimer = setTimeout(renderSquadBadgesPanel, 200);
+  });
+  renderSquadBadgesPanel();
+}
+
+function wireAdminSectionTabs() {
+  var nav = document.getElementById("adminSectionTabs");
+  if (!nav || nav._svWired) return;
+  nav._svWired = true;
+  var panels = document.querySelectorAll("[data-admin-panel]");
+  function show(tab) {
+    nav.querySelectorAll("button[data-tab]").forEach(function (btn) {
+      var on = btn.getAttribute("data-tab") === tab;
+      btn.classList.toggle("active", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    panels.forEach(function (p) {
+      p.hidden = p.getAttribute("data-admin-panel") !== tab;
+    });
+    if (tab === "team") {
+      import("./ground-map-picker.js?tag=v140")
+        .then(function (mod) {
+          mod.initGroundMapPicker().then(function () {
+            mod.syncMapFromInputs();
+          });
+        })
+        .catch(function () {});
+    }
+  }
+  nav.querySelectorAll("button[data-tab]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      show(btn.getAttribute("data-tab") || "team");
+    });
+  });
+  show("team");
+}
+
+function wireGroundMapOnRoundChange() {
+  var roundSel = document.getElementById("adminMatchRoundSelect");
+  if (!roundSel || roundSel._svMapWire) return;
+  roundSel._svMapWire = true;
+  roundSel.addEventListener("change", function () {
+    setTimeout(function () {
+      import("./ground-map-picker.js?tag=v140")
+        .then(function (mod) {
+          mod.syncMapFromInputs();
+        })
+        .catch(function () {});
+    }, 350);
+  });
+}
+
 function wireLineupNameNormalize() {
   var roots = [document.getElementById("lineupCard"), document.getElementById("lineupEditorGrid")].filter(Boolean);
   if (!roots.length) return;
@@ -1416,6 +1569,9 @@ var adminObs = new MutationObserver(function () {
   try {
     wireWhoHasntVoted();
     ensureLineupSharePackButton();
+    wireSquadBadges();
+    wireAdminSectionTabs();
+    wireGroundMapOnRoundChange();
   } catch (e) {
     adminEnhanceWired = false;
     console.warn("[voter-enhancements] admin wire failed", e);

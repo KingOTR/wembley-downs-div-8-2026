@@ -2,8 +2,8 @@
  * FotMob-style public lineup view (single team, dark pitch, circular nodes).
  * Shared display logic for public tab + PNG export.
  */
-import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v139";
-import { fetchMatchWeather, weatherPanelHtml } from "./weather-forecast.js?tag=v139";
+import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v140";
+import { fetchMatchWeather, weatherPanelHtml } from "./weather-forecast.js?tag=v140";
 
 export const FORMATION_ROLES = {
   "4-3-3": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "CM", "LW", "ST", "RW"],
@@ -42,17 +42,19 @@ export function lineupLabel(name, number) {
   return num ? num + " " + surname : surname;
 }
 
-/** C / VC / GK badge stored on starter or lineup.badges map. */
+/** C / VC / GK badge from squad config (team.squadBadges). */
 export function resolvePlayerBadge(player, badgesMap) {
   if (!player) return "";
+  var name = canonicalPlayerName(displayPlayerName(player.name || ""));
   var b = "";
-  if (player.badge) b = player.badge;
-  else if (Array.isArray(player.badges) && player.badges.length) b = player.badges[0];
-  if (!b && badgesMap && player.name) {
-    var key = canonicalPlayerName(displayPlayerName(player.name));
-    if (badgesMap[key]) b = badgesMap[key];
+  if (typeof window !== "undefined" && window.__svSquadBadgeForName) {
+    b = window.__svSquadBadgeForName(name) || "";
+  }
+  if (!b && badgesMap && name) {
+    if (badgesMap[name]) b = badgesMap[name];
     else if (badgesMap[player.name]) b = badgesMap[player.name];
   }
+  if (!b && player.badge) b = player.badge;
   b = String(b || "")
     .trim()
     .toUpperCase();
@@ -295,7 +297,7 @@ export function prepareLineupDisplay(lineup, setupKey, clamp) {
       badge: badge,
       label: lineupLabel(p.name, p.number),
       leftPct: clamp(p.x) * 100,
-      topPct: displayRowY(starters, formation, i, gkIdx, clamp) * 100,
+      topPct: clamp(p.y) * 100,
       ringText: role || String(p.number || "").trim() || "—",
       isGk: role === "GK" || i === gkIdx || badge === "GK",
     };
@@ -425,6 +427,8 @@ export function renderLineupTab(ctx, teamId) {
       kickoff: entry.kickoff,
       date: entry.date,
       venue: entry.venue,
+      lat: entry.lat,
+      lng: entry.lng,
     })
       .then(function (data) {
         if (weatherMount.parentNode) weatherMount.outerHTML = weatherPanelHtml(data);

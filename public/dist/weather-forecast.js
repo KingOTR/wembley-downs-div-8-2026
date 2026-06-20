@@ -116,7 +116,7 @@ async function geocode(suburb, groundName) {
 }
 
 /**
- * @param {{ suburb?: string, groundName?: string, kickoff?: string, date?: string, venue?: string }} match
+ * @param {{ suburb?: string, groundName?: string, kickoff?: string, date?: string, venue?: string, lat?: number, lng?: number }} match
  */
 export async function fetchMatchWeather(match) {
   var suburb = String((match && match.suburb) || "").trim();
@@ -128,11 +128,18 @@ export async function fetchMatchWeather(match) {
   if (!kickoff) {
     return { ok: false, reason: "no_kickoff", message: "Set kickoff time in Coach / admin to see match weather." };
   }
-  if (!suburb && !groundName) {
-    return { ok: false, reason: "no_location", message: "Set suburb or ground in Coach / admin for weather." };
-  }
 
-  var geo = await geocode(suburb, groundName);
+  var lat = match && match.lat != null ? Number(match.lat) : NaN;
+  var lng = match && match.lng != null ? Number(match.lng) : NaN;
+  var geo = null;
+  if (isFinite(lat) && isFinite(lng)) {
+    geo = { lat: lat, lon: lng, label: groundName || suburb || "Ground pin" };
+  } else {
+    if (!suburb && !groundName) {
+      return { ok: false, reason: "no_location", message: "Set suburb, ground, or pick a location on the map." };
+    }
+    geo = await geocode(suburb, groundName);
+  }
   if (!geo) {
     var label = groundName && suburb ? groundName + ", " + suburb : groundName || suburb || "venue";
     return {
