@@ -8,7 +8,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v145: SvMerge helpers before qc, cache bust -->
+  <!-- v146: compact weather UI + WA location search -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,7 +20,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v145" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v146" />
   <style>
     /* Sporty theme is the permanent default. */
     :root {
@@ -706,8 +706,8 @@
 
     #matchCard #matchWeatherBlock .lineup-weather {
       margin-top: 0.45rem;
-      border-color: rgba(238, 43, 51, 0.14);
-      background: rgba(255, 255, 255, 0.72);
+      border-color: rgba(238, 43, 51, 0.22);
+      background: #fff;
     }
 
     #matchCard #matchWeatherBlock .lineup-weather-title {
@@ -1579,10 +1579,163 @@
     }
 
     .lineup-weather {
-      padding: 0.55rem 0.65rem;
+      padding: 0.5rem 0.6rem;
       border-radius: 12px;
-      border: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid rgba(238, 43, 51, 0.18);
+      background: #fff;
+      color: #0f172a;
+    }
+
+    .lineup-weather--compact .lineup-weather-title {
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #b91c1c;
+      margin: 0;
+      line-height: 1.25;
+    }
+
+    .lineup-weather-loc {
+      margin: 0.2rem 0 0.35rem;
+      font-size: 0.72rem;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .lineup-weather-hero {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.35rem;
+    }
+
+    .lineup-weather-hero-icon {
+      font-size: 1.45rem;
+      line-height: 1;
+    }
+
+    .lineup-weather-hero-temp {
+      font-size: 1.15rem;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+
+    .lineup-weather-hero-cond {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .lineup-weather-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .lineup-weather-metric {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #1e293b;
+      background: rgba(15, 23, 42, 0.06);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      padding: 0.18rem 0.45rem;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .lineup-weather-metric--ht {
+      background: rgba(238, 43, 51, 0.08);
+      border-color: rgba(238, 43, 51, 0.15);
+      color: #991b1b;
+    }
+
+    .lineup-weather-metric-ico {
+      font-size: 0.85em;
+    }
+
+    .lineup-weather-details {
+      margin-top: 0.15rem;
+    }
+
+    .lineup-weather-details summary {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #64748b;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+
+    .lineup-weather-details summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .lineup-weather-details summary::before {
+      content: "▸ ";
+      color: #EE2B33;
+    }
+
+    .lineup-weather-details[open] summary::before {
+      content: "▾ ";
+    }
+
+    .lineup-weather-hourly-strip {
+      display: flex;
+      gap: 0.35rem;
+      overflow-x: auto;
+      padding: 0.35rem 0 0.15rem;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+
+    .lineup-weather-hour-chip {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 3.4rem;
+      padding: 0.3rem 0.4rem;
+      border-radius: 8px;
+      background: #f1f5f9;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      color: #0f172a;
+    }
+
+    .lineup-weather-hour-chip-time {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    .lineup-weather-hour-chip-icon {
+      font-size: 1rem;
+      line-height: 1.1;
+    }
+
+    .lineup-weather-hour-chip-temp {
+      font-size: 0.8rem;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .lineup-weather-hour-chip-rain {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: #0369a1;
+    }
+
+    .lineup-weather-empty-msg {
+      margin: 0;
+      font-size: 0.82rem;
+      color: #475569;
+      font-weight: 600;
     }
 
     .lineup-weather-title {
@@ -1592,58 +1745,6 @@
       text-transform: uppercase;
       color: rgba(127, 29, 29, 0.82);
       margin-bottom: 0.25rem;
-    }
-
-    .lineup-weather-loc {
-      margin: 0 0 0.35rem;
-      font-size: 0.82rem;
-    }
-
-    .lineup-weather-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-      margin-bottom: 0.35rem;
-    }
-
-    .lineup-weather-chip {
-      font-size: 0.78rem;
-      font-weight: 700;
-      padding: 0.2rem 0.5rem;
-      border-radius: 999px;
-      background: rgba(185, 28, 28, 0.08);
-      color: var(--text);
-    }
-
-    .lineup-weather-hourly {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-    }
-
-    .lineup-weather-hour {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-width: 3.2rem;
-      padding: 0.25rem 0.35rem;
-      border-radius: 8px;
-      background: rgba(15, 23, 42, 0.04);
-      font-size: 0.72rem;
-    }
-
-    .lineup-weather-hour-time {
-      font-weight: 700;
-      opacity: 0.75;
-    }
-
-    .lineup-weather-hour-temp {
-      font-weight: 900;
-      font-size: 0.85rem;
-    }
-
-    .lineup-weather-hour-rain {
-      opacity: 0.7;
     }
 
     @media (max-width: 520px) {
@@ -1704,7 +1805,38 @@
     }
 
     html[data-theme="dark"] .lineup-weather {
-      background: rgba(15, 23, 42, 0.55);
+      background: rgba(15, 23, 42, 0.88);
+      border-color: rgba(239, 68, 68, 0.25);
+      color: #f8fafc;
+    }
+
+    html[data-theme="dark"] .lineup-weather--compact .lineup-weather-title {
+      color: #fca5a5;
+    }
+
+    html[data-theme="dark"] .lineup-weather-loc {
+      color: #94a3b8;
+    }
+
+    html[data-theme="dark"] .lineup-weather-hero-temp,
+    html[data-theme="dark"] .lineup-weather-hero-cond {
+      color: #f1f5f9;
+    }
+
+    html[data-theme="dark"] .lineup-weather-metric {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+    }
+
+    html[data-theme="dark"] .lineup-weather-hour-chip {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: #f8fafc;
+    }
+
+    html[data-theme="dark"] .lineup-weather-hour-chip-temp {
+      color: #fff;
     }
 
     #lineupCard .lineup-xi-name,
@@ -2790,7 +2922,7 @@
       left: 0;
       right: 0;
       top: calc(100% + 4px);
-      max-height: 240px;
+      max-height: 320px;
       overflow-y: auto;
       border-radius: 10px;
       border: 1px solid var(--border);
@@ -2827,6 +2959,15 @@
       color: #52525b;
     }
 
+    .location-result--typed {
+      border-top: 1px dashed rgba(238, 43, 51, 0.25);
+      background: rgba(238, 43, 51, 0.04);
+    }
+
+    .location-result--typed .location-result-name {
+      color: var(--red-dark);
+    }
+
     .location-selected {
       margin: 0.35rem 0 0.5rem;
       font-weight: 700;
@@ -2838,69 +2979,34 @@
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 0.5rem;
+      gap: 0.35rem;
       flex-wrap: wrap;
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.15rem;
     }
 
     .weather-units-toggle {
       display: inline-flex;
-      border-radius: 8px;
+      border-radius: 6px;
       overflow: hidden;
-      border: 1px solid var(--border);
+      border: 1px solid rgba(15, 23, 42, 0.12);
       flex-shrink: 0;
+      transform: scale(0.92);
+      transform-origin: top right;
     }
 
     .weather-units-btn {
-      padding: 0.25rem 0.5rem;
-      font-size: 0.72rem;
+      padding: 0.18rem 0.4rem;
+      font-size: 0.65rem;
       font-weight: 800;
       border: none;
       background: transparent;
-      color: var(--text);
+      color: #334155;
       cursor: pointer;
     }
 
     .weather-units-btn.active {
-      background: rgba(238, 43, 51, 0.12);
-      color: var(--red-dark);
-    }
-
-    .lineup-weather-stats {
-      display: grid;
-      gap: 0.35rem;
-      margin: 0.45rem 0 0.55rem;
-    }
-
-    .lineup-weather-stat {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.75rem;
-      font-size: 0.86rem;
-    }
-
-    .lineup-weather-stat-label {
-      color: #52525b;
-      font-weight: 600;
-    }
-
-    .lineup-weather-stat-value {
-      font-weight: 800;
-      text-align: right;
-    }
-
-    .lineup-weather-hourly-label {
-      font-size: 0.72rem;
-      font-weight: 800;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: #71717a;
-      margin-bottom: 0.35rem;
-    }
-
-    .lineup-weather-hour-wind {
-      font-size: 0.68rem;
-      color: #71717a;
+      background: rgba(238, 43, 51, 0.14);
+      color: #b91c1c;
     }
 
     .squad-badges-panel .squad-badges-head {
@@ -3870,9 +3976,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v145"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v145"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v145"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v146"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v146"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v146"></script>
   <script>
     (function () {
       var loaded = false;
@@ -3886,7 +3992,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v145").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v146").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
@@ -3933,7 +4039,7 @@
           try { location.reload(); } catch (e) {}
         });
 
-        navigator.serviceWorker.register("/sw.js?v=145").then(function (reg) {
+        navigator.serviceWorker.register("/sw.js?v=146").then(function (reg) {
           try { reg.update(); } catch (e) {}
           if (reg.waiting) {
             try { reg.waiting.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}

@@ -1,14 +1,20 @@
 /**
- * Location search autocomplete (Open-Meteo Geocoding, no API key).
- * Replaces Leaflet map picker — stores lat/lng for accurate weather.
+ * Location search — curated WA grounds + Open-Meteo, Nominatim, Photon (all free).
  */
+import { searchCuratedGrounds } from "./wa-grounds-data.js?tag=v146";
+
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
-const SEARCH_DEBOUNCE_MS = 400;
+const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
+const PHOTON_URL = "https://photon.komoot.io/api/";
+const SEARCH_DEBOUNCE_MS = 320;
 const MIN_QUERY_LEN = 2;
+const MAX_RESULTS = 15;
+const USER_AGENT = "WembleyDownsVoter/1.0 (wembley-downs-div-8-2026.web.app)";
 
 var searchTimer = null;
 var inflight = null;
 var lastResults = [];
+var lastQuery = "";
 
 function els() {
   return {
@@ -31,24 +37,157 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
-function formatPlace(hit) {
+function normKey(hit) {
+  var lat = Math.round(Number(hit.latitude) * 1000);
+  var lng = Math.round(Number(hit.longitude) * 1000);
+  var name = String(hit.name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  return name + "|" + lat + "|" + lng;
+}
+
+function formatDisplay(hit) {
   if (!hit) return "";
-  var parts = [hit.name];
+  var suburb = String(hit.admin2 || hit.admin1 || "").trim();
+  if (suburb === "Western Australia") suburb = "";
+  if (suburb) return hit.name + " · " + suburb + ", WA";
+  return hit.name + ", WA";
+}
+
+function formatMeta(hit) {
+  if (!hit) return "";
+  if (hit.source === "curated") return "Saved WA ground";
+  if (hit.source === "typed") return "Use this address";
+  var parts = [];
   if (hit.admin2 && hit.admin2 !== hit.name) parts.push(hit.admin2);
-  else if (hit.admin1) parts.push(hit.admin1);
-  if (hit.country_code === "AU") parts.push("WA");
-  else if (hit.country) parts.push(hit.country);
-  return parts.filter(Boolean).join(", ");
+  if (hit.admin1) parts.push(hit.admin1);
+  if (hit.country_code === "AU" && parts.indexOf("Western Australia") < 0) parts.push("Australia");
+  return parts.join(", ") || "Western Australia";
 }
 
 function extractSuburb(hit) {
   if (!hit) return "";
-  return String(hit.admin2 || hit.admin1 || "").trim();
+  var s = String(hit.admin2 || "").trim();
+  if (s && s !== "Western Australia") return s;
+  return String(hit.admin1 === "Western Australia" ? "" : hit.admin1 || "").trim();
+}
+
+function scoreHit(hit, query) {
+  var q = String(query || "").toLowerCase();
+  var score = hit.score || 0;
+  if (hit.admin1 === "Western Australia") score += 45;
+  else if (hit.country_code === "AU") score += 20;
+  if (hit.admin2 && /perth|subiaco|fremantle|joondalup|mandurah|rockingham/i.test(hit.admin2)) score += 12;
+  var name = String(hit.name || "").toLowerCase();
+  if (name.indexOf(q) >= 0) score += 35;
+  if (/park|reserve|oval|stadium|ground|recreation|sport|complex|field/i.test(name)) score += 18;
+  if (hit.source === "curated") score += 55;
+  if (hit.source === "openmeteo") score += 8;
+  hit.score = score;
+  return score;
+}
+
+function dedupeMerge(lists, query) {
+  var seen = Object.create(null);
+  var all = [];
+  lists.forEach(function (list) {
+    (list || []).forEach(function (hit) {
+      if (!hit || hit.latitude == null || hit.longitude == null) return;
+      var key = normKey(hit);
+      if (seen[key]) {
+        if ((hit.score || 0) > (seen[key].score || 0)) seen[key] = hit;
+        return;
+      }
+      seen[key] = hit;
+    });
+  });
+  Object.keys(seen).forEach(function (k) {
+    all.push(seen[k]);
+  });
+  all.forEach(function (h) {
+    scoreHit(h, query);
+  });
+  all.sort(function (a, b) {
+    return (b.score || 0) - (a.score || 0);
+  });
+  return all.slice(0, MAX_RESULTS);
+}
+
+async function fetchOpenMeteo(query, signal) {
+  var url =
+    GEO_URL +
+    "?name=" +
+    encodeURIComponent(query + " Western Australia") +
+    "&count=15&language=en&format=json&countryCode=AU";
+  var res = await fetch(url, { signal: signal });
+  if (!res.ok) return [];
+  var data = await res.json();
+  return (data.results || []).map(function (r) {
+    return {
+      name: r.name,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      admin1: r.admin1,
+      admin2: r.admin2,
+      country_code: r.country_code,
+      source: "openmeteo",
+    };
+  });
+}
+
+async function fetchNominatim(query, signal) {
+  var url =
+    NOMINATIM_URL +
+    "?q=" +
+    encodeURIComponent(query + ", Western Australia, Australia") +
+    "&format=json&limit=15&countrycodes=au&addressdetails=1";
+  var res = await fetch(url, {
+    signal: signal,
+    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+  });
+  if (!res.ok) return [];
+  var data = await res.json();
+  return (data || []).map(function (r) {
+    var addr = r.address || {};
+    return {
+      name: r.name || addr.leisure || addr.road || addr.suburb || query,
+      latitude: parseFloat(r.lat),
+      longitude: parseFloat(r.lon),
+      admin1: addr.state || "Western Australia",
+      admin2: addr.suburb || addr.city || addr.town || addr.village || "",
+      country_code: "AU",
+      source: "nominatim",
+    };
+  });
+}
+
+async function fetchPhoton(query, signal) {
+  var url =
+    PHOTON_URL +
+    "?q=" +
+    encodeURIComponent(query + " Perth WA") +
+    "&limit=15&lang=en";
+  var res = await fetch(url, { signal: signal });
+  if (!res.ok) return [];
+  var data = await res.json();
+  return (data.features || []).map(function (f) {
+    var p = f.properties || {};
+    var coords = f.geometry && f.geometry.coordinates ? f.geometry.coordinates : [];
+    return {
+      name: p.name || p.street || query,
+      latitude: coords[1],
+      longitude: coords[0],
+      admin1: p.state || "Western Australia",
+      admin2: p.city || p.district || p.locality || "",
+      country_code: (p.countrycode || "au").toUpperCase(),
+      source: "photon",
+    };
+  });
 }
 
 function setSelected(hit, labelOverride) {
   var e = els();
-  var label = labelOverride || (hit ? formatPlace(hit) : "");
+  var label = labelOverride || (hit ? formatDisplay(hit) : "");
   if (e.label) e.label.value = label;
   if (e.selected) {
     e.selected.textContent = label ? "📍 " + label : "";
@@ -97,7 +236,7 @@ function hideResults() {
   }
 }
 
-function showResults(items) {
+function showResults(items, query) {
   var e = els();
   if (!e.results) return;
   if (!items.length) {
@@ -106,23 +245,49 @@ function showResults(items) {
     return;
   }
   e.results.hidden = false;
-  e.results.innerHTML = items
+  var html = items
     .map(function (hit, idx) {
       return (
         "<button type='button' class='location-result' data-idx='" +
         idx +
         "'>" +
         "<span class='location-result-name'>" +
-        escapeHtml(hit.name) +
+        escapeHtml(formatDisplay(hit)) +
         "</span>" +
         "<span class='location-result-meta'>" +
-        escapeHtml(formatPlace(hit)) +
+        escapeHtml(formatMeta(hit)) +
         "</span></button>"
       );
     })
     .join("");
+
+  var q = String(query || "").trim();
+  if (q.length >= MIN_QUERY_LEN) {
+    html +=
+      "<button type='button' class='location-result location-result--typed' data-use-typed='1'>" +
+      "<span class='location-result-name'>Use typed address</span>" +
+      "<span class='location-result-meta'>" +
+      escapeHtml(q + ", WA") +
+      "</span></button>";
+  }
+
+  e.results.innerHTML = html;
   e.results.querySelectorAll(".location-result").forEach(function (btn) {
     btn.addEventListener("click", function () {
+      if (btn.getAttribute("data-use-typed") === "1") {
+        setSelected(
+          {
+            name: q,
+            latitude: null,
+            longitude: null,
+            admin1: "Western Australia",
+            admin2: "",
+            source: "typed",
+          },
+          q + ", WA"
+        );
+        return;
+      }
       var idx = parseInt(btn.getAttribute("data-idx"), 10);
       if (isFinite(idx) && lastResults[idx]) setSelected(lastResults[idx]);
     });
@@ -131,6 +296,7 @@ function showResults(items) {
 
 async function searchPlaces(query) {
   var q = String(query || "").trim();
+  lastQuery = q;
   if (q.length < MIN_QUERY_LEN) {
     hideResults();
     return;
@@ -141,28 +307,38 @@ async function searchPlaces(query) {
     } catch {}
   }
   inflight = new AbortController();
-  var url =
-    GEO_URL +
-    "?name=" +
-    encodeURIComponent(q) +
-    "&count=10&language=en&format=json&countryCode=AU";
+  var signal = inflight.signal;
+
   try {
-    var res = await fetch(url, { signal: inflight.signal });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    var data = await res.json();
-    var hits = (data.results || []).slice();
-    hits.sort(function (a, b) {
-      var aw = a.admin1 === "Western Australia" ? 0 : 1;
-      var bw = b.admin1 === "Western Australia" ? 0 : 1;
-      if (aw !== bw) return aw - bw;
-      return (b.population || 0) - (a.population || 0);
-    });
-    lastResults = hits;
-    showResults(hits);
+    var curated = searchCuratedGrounds(q, MAX_RESULTS);
+    var results = await Promise.allSettled([
+      fetchOpenMeteo(q, signal),
+      fetchNominatim(q, signal),
+      fetchPhoton(q, signal),
+    ]);
+    if (signal.aborted) return;
+
+    var apiLists = results
+      .filter(function (r) {
+        return r.status === "fulfilled";
+      })
+      .map(function (r) {
+        return r.value;
+      });
+
+    var merged = dedupeMerge([curated].concat(apiLists), q);
+    lastResults = merged;
+    showResults(merged, q);
   } catch (err) {
     if (err && err.name === "AbortError") return;
     console.warn("[location-autocomplete] search failed", err);
-    hideResults();
+    var fallback = searchCuratedGrounds(q, MAX_RESULTS);
+    if (fallback.length) {
+      lastResults = fallback;
+      showResults(fallback, q);
+    } else {
+      hideResults();
+    }
   } finally {
     inflight = null;
   }
@@ -184,8 +360,8 @@ function syncFromMatchEntry(entry) {
   var suburb = String(entry.suburb || "").trim();
   var label = String(entry.locationLabel || "").trim();
   if (!label) {
-    if (ground && suburb) label = ground + ", " + suburb + ", WA";
-    else if (ground) label = ground + (suburb ? ", " + suburb : "") + ", WA";
+    if (ground && suburb) label = ground + " · " + suburb + ", WA";
+    else if (ground) label = ground + ", WA";
     else if (suburb) label = suburb + ", WA";
   }
   if (e.label && document.activeElement !== e.label) e.label.value = label;
@@ -203,7 +379,7 @@ function syncFromMatchEntry(entry) {
   if (e.ground && ground && document.activeElement !== e.ground) e.ground.value = ground;
   if (e.suburb && suburb && document.activeElement !== e.suburb) e.suburb.value = suburb;
   if (e.search && document.activeElement !== e.search && !e.search.value.trim() && (ground || label)) {
-    e.search.value = ground || label.split(",")[0] || "";
+    e.search.value = ground || label.split("·")[0].split(",")[0].trim() || "";
   }
 }
 
@@ -223,7 +399,8 @@ export function initLocationAutocomplete() {
   });
 
   e.search.addEventListener("focus", function () {
-    if (lastResults.length && e.search.value.trim().length >= MIN_QUERY_LEN) showResults(lastResults);
+    if (e.search.value.trim().length >= MIN_QUERY_LEN) searchPlaces(e.search.value);
+    else if (lastResults.length) showResults(lastResults, lastQuery);
   });
 
   document.addEventListener("click", function (ev) {

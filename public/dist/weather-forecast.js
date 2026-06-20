@@ -48,6 +48,29 @@ function wmoLabel(code) {
   return "Mixed";
 }
 
+function wmoEmoji(code) {
+  var c = Number(code);
+  if (c === 0) return "\u2600\uFE0F";
+  if (c === 1) return "\uD83C\uDF24\uFE0F";
+  if (c === 2) return "\u26C5";
+  if (c === 3) return "\u2601\uFE0F";
+  if (c <= 48) return "\uD83C\uDF2B\uFE0F";
+  if (c <= 57) return "\uD83C\uDF26\uFE0F";
+  if (c <= 67) return "\uD83C\uDF27\uFE0F";
+  if (c <= 77) return "\u2744\uFE0F";
+  if (c <= 82) return "\uD83C\uDF27\uFE0F";
+  if (c <= 86) return "\uD83C\uDF28\uFE0F";
+  if (c <= 99) return "\u26C8\uFE0F";
+  return "\uD83C\uDF21\uFE0F";
+}
+
+function windArrow(deg) {
+  var d = Number(deg);
+  if (!isFinite(d)) return "";
+  var arrows = ["\u2191", "\u2197", "\u2192", "\u2198", "\u2193", "\u2199", "\u2190", "\u2196"];
+  return arrows[Math.round(d / 45) % 8];
+}
+
 function windDir(deg) {
   var d = Number(deg);
   if (!isFinite(d)) return "";
@@ -390,15 +413,19 @@ export async function fetchMatchWeather(match) {
 
 export function weatherPanelHtml(data, units) {
   units = units || getWeatherUnits();
+  var midCode =
+    data && data.slots && data.slots.length
+      ? data.slots[Math.floor(data.slots.length / 2)].code
+      : null;
 
   if (!data || !data.ok) {
     return (
-      "<div class='lineup-weather lineup-weather--empty'>" +
+      "<div class='lineup-weather lineup-weather--compact lineup-weather--empty'>" +
       "<div class='lineup-weather-head'>" +
       "<div class='lineup-weather-title'>Match weather</div>" +
       weatherUnitsToggleHtml(units) +
       "</div>" +
-      "<p class='hint' style='margin:0'>" +
+      "<p class='lineup-weather-empty-msg'>" +
       escapeHtml((data && data.message) || "Weather unavailable.") +
       "</p></div>"
     );
@@ -407,95 +434,106 @@ export function weatherPanelHtml(data, units) {
   var s = data.summary || {};
   var tempRange =
     s.tempMin != null && s.tempMax != null && s.tempMin !== s.tempMax
-      ? fmtTemp(s.tempMin, units) + " – " + fmtTemp(s.tempMax, units)
-      : fmtTemp(s.tempMax, units);
-  var feels =
+      ? fmtTemp(s.tempMin, units) + "–" + fmtTemp(s.tempMax, units)
+      : fmtTemp(s.tempMax != null ? s.tempMax : s.tempMin, units);
+  var feelsShort =
     s.feelsMin != null && s.feelsMax != null
-      ? "Feels " +
-        (s.feelsMin !== s.feelsMax
-          ? fmtTemp(s.feelsMin, units) + "–" + fmtTemp(s.feelsMax, units)
-          : fmtTemp(s.feelsMax, units))
+      ? s.feelsMin !== s.feelsMax
+        ? fmtTemp(s.feelsMin, units) + "–" + fmtTemp(s.feelsMax, units)
+        : fmtTemp(s.feelsMax, units)
       : "";
-  var rain = s.rainMax != null ? Math.round(s.rainMax) + "% rain chance" : "";
-  var precip = s.precipMax != null && s.precipMax > 0 ? fmtRainMm(s.precipMax, units) + " expected" : "";
-  var wind =
+  var rainPct = s.rainMax != null ? Math.round(s.rainMax) + "%" : "";
+  var windStr =
     s.windMax != null
-      ? fmtWind(s.windMax, units) + (s.windDir != null ? " " + windDir(s.windDir) : "")
+      ? fmtWind(s.windMax, units) + (s.windDir != null ? " " + windArrow(s.windDir) + " " + windDir(s.windDir) : "")
       : "";
-  var humid = s.humidity != null ? s.humidity + "% humidity" : "";
+  var humidStr = s.humidity != null ? s.humidity + "%" : "";
+  var cond = s.condition || "—";
+  var icon = wmoEmoji(midCode);
 
-  var stats =
-    "<div class='lineup-weather-stats'>" +
-    statRow("Temperature", tempRange) +
-    (feels ? statRow("Feels like", feels.replace(/^Feels /, "")) : "") +
-    statRow("Conditions", s.condition || "—") +
-    (rain ? statRow("Rain", rain) : "") +
-    (precip ? statRow("Precipitation", precip) : "") +
-    (wind ? statRow("Wind", wind) : "") +
-    (humid ? statRow("Humidity", humid) : "") +
-    (s.halftime && s.halftime.temp != null
-      ? statRow(
-          "Halftime (~45′)",
-          fmtTemp(s.halftime.temp, units) +
-            (s.halftime.rain != null ? ", " + Math.round(s.halftime.rain) + "% rain" : "") +
-            (s.halftime.wind != null ? ", " + fmtWind(s.halftime.wind, units) : "")
-        )
-      : "") +
-    "</div>";
+  var metrics = "";
+  if (feelsShort) metrics += metricChip("\uD83C\uDF21\uFE0F", feelsShort + " feels");
+  if (rainPct) metrics += metricChip("\uD83C\uDF27\uFE0F", rainPct);
+  if (windStr) metrics += metricChip("\uD83D\uDCA8", windStr);
+  if (humidStr) metrics += metricChip("\uD83D\uDCA7", humidStr);
+  if (s.halftime && s.halftime.temp != null) {
+    var ht =
+      "HT " +
+      fmtTemp(s.halftime.temp, units) +
+      (s.halftime.rain != null ? " " + Math.round(s.halftime.rain) + "%" : "") +
+      (s.halftime.wind != null ? " " + fmtWind(s.halftime.wind, units) : "");
+    metrics += "<span class='lineup-weather-metric lineup-weather-metric--ht'>\u23F1\uFE0F " + escapeHtml(ht) + "</span>";
+  }
 
   var hourly = "";
   if (data.slots && data.slots.length) {
     hourly =
-      "<div class='lineup-weather-hourly-label'>Hourly (kickoff → full time)</div>" +
-      "<div class='lineup-weather-hourly'>" +
+      "<details class='lineup-weather-details'>" +
+      "<summary>Hourly forecast</summary>" +
+      "<div class='lineup-weather-hourly-strip'>" +
       data.slots
-        .slice(0, 10)
+        .slice(0, 12)
         .map(function (slot) {
           var t = new Date(slot.time);
           var label = t.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
           return (
-            "<span class='lineup-weather-hour'>" +
-            "<span class='lineup-weather-hour-time'>" +
+            "<span class='lineup-weather-hour-chip'>" +
+            "<span class='lineup-weather-hour-chip-time'>" +
             escapeHtml(label) +
             "</span>" +
-            "<span class='lineup-weather-hour-temp'>" +
+            "<span class='lineup-weather-hour-chip-icon' aria-hidden='true'>" +
+            wmoEmoji(slot.code) +
+            "</span>" +
+            "<span class='lineup-weather-hour-chip-temp'>" +
             (slot.temp != null ? fmtTemp(slot.temp, units) : "—") +
             "</span>" +
-            (slot.rain != null ? "<span class='lineup-weather-hour-rain'>" + Math.round(slot.rain) + "%</span>" : "") +
-            (slot.wind != null ? "<span class='lineup-weather-hour-wind'>" + fmtWind(slot.wind, units) + "</span>" : "") +
+            (slot.rain != null && slot.rain > 0
+              ? "<span class='lineup-weather-hour-chip-rain'>" + Math.round(slot.rain) + "%</span>"
+              : "") +
             "</span>"
           );
         })
         .join("") +
-      "</div>";
+      "</div></details>";
   }
 
   return (
-    "<div class='lineup-weather'>" +
+    "<div class='lineup-weather lineup-weather--compact'>" +
     "<div class='lineup-weather-head'>" +
     "<div class='lineup-weather-title'>Match weather" +
     (data.kickoffLabel ? " · " + escapeHtml(data.kickoffLabel) : "") +
     "</div>" +
     weatherUnitsToggleHtml(units) +
     "</div>" +
-    "<div class='lineup-weather-loc hint'>" +
-    "Forecast for " +
+    "<div class='lineup-weather-loc'>Forecast for " +
     escapeHtml(data.location || "ground") +
     (data.locationSource === "pin" ? " (saved pin)" : "") +
     "</div>" +
-    stats +
+    "<div class='lineup-weather-hero'>" +
+    "<span class='lineup-weather-hero-icon' aria-hidden='true'>" +
+    icon +
+    "</span>" +
+    "<span class='lineup-weather-hero-temp'>" +
+    escapeHtml(tempRange) +
+    "</span>" +
+    "<span class='lineup-weather-hero-cond'>" +
+    escapeHtml(cond) +
+    "</span>" +
+    "</div>" +
+    (metrics ? "<div class='lineup-weather-metrics'>" + metrics + "</div>" : "") +
     hourly +
     "</div>"
   );
 }
 
-function statRow(label, value) {
+function metricChip(icon, text) {
   return (
-    "<div class='lineup-weather-stat'><span class='lineup-weather-stat-label'>" +
-    escapeHtml(label) +
-    "</span><span class='lineup-weather-stat-value'>" +
-    escapeHtml(value) +
-    "</span></div>"
+    "<span class='lineup-weather-metric'>" +
+    "<span class='lineup-weather-metric-ico' aria-hidden='true'>" +
+    icon +
+    "</span> " +
+    escapeHtml(text) +
+    "</span>"
   );
 }
 
