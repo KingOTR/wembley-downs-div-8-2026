@@ -19,6 +19,12 @@ Thumbs.db
 
 # Debug / temp artifacts
 .tmp-*
+.tmp-syntax.mjs
 .tmp-attachments/
 public/_review-screens/
 public/dist/app.min.v*.js
+public/dist-built/
+tools/revert-*.js
+tools/show-listener.js
+tools/test-listener-only.js
+tools/test-v*-patches.js

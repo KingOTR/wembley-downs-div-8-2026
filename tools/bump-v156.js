@@ -1,3 +1,4 @@
+/** @deprecated Use `node tools/bump-version.js <NNN>` instead. */
 const fs = require("fs");
 const path = require("path");
 

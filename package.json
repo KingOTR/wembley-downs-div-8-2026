@@ -5,7 +5,14 @@
   "main": "index.js",
   "scripts": {
     "validate": "node tools/ci-validate.js",
-    "test": "node tools/ci-validate.js"
+    "test": "node tools/ci-validate.js",
+    "test:name-match": "node tools/test-name-match.mjs",
+    "test:rules": "npx -y firebase-tools@latest emulators:exec --only firestore --project wembley-downs-rules-test \"node tools/test-firestore-rules.mjs\"",
+    "test:browser": "node tools/browser-test.js",
+    "test:visual": "node tools/visual-qa.js",
+    "test:smoke": "node tools/smoke-fetch.js",
+    "build": "node tools/build-app.mjs",
+    "bump": "node tools/bump-version.js"
   },
   "repository": {
     "type": "git",
@@ -18,5 +25,9 @@
   "bugs": {
     "url": "https://github.com/KingOTR/wembley-downs-div-8-2026/issues"
   },
-  "homepage": "https://github.com/KingOTR/wembley-downs-div-8-2026#readme"
+  "homepage": "https://github.com/KingOTR/wembley-downs-div-8-2026#readme",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "esbuild": "^0.25.0"
+  }
 }

@@ -8,14 +8,23 @@ service cloud.firestore {
 
     function isValidVote() {
       return request.resource.data.keys().hasAll([
-          'teamId', 'voterName', 'round', 'picks', 'submittedAt'
+          'teamId', 'voterName', 'voterNameKey', 'round', 'picks', 'submittedAt'
         ])
-        && (!('voterNameKey' in request.resource.data)
-          || request.resource.data.voterNameKey is string)
         && request.resource.data.picks is list
         && request.resource.data.picks.size() == 3
         && request.resource.data.voterName is string
+        && request.resource.data.voterNameKey is string
+        && request.resource.data.voterNameKey.size() > 0
+        && request.resource.data.voterNameKey.size() <= 80
+        && request.resource.data.voterNameKey.matches('^[a-z0-9-]+$')
         && request.resource.data.round is string;
+    }
+
+    /** Doc id t{team}_r{roundKey}_v{voterKey} must match payload voterNameKey + teamId. */
+    function voteIdMatchesPayload(voteId, data) {
+      return voteId.matches('t[0-9]+_r.+_v.+')
+        && voteId.matches('t' + string(data.teamId) + '_r.+_v.+')
+        && voteId.matches('.*_v' + data.voterNameKey + '$');
     }
 
     function isValidCoachVote() {
@@ -33,8 +42,12 @@ service cloud.firestore {
 
     match /votes/{voteId} {
       allow read: if true;
-      allow create, update: if voteId.matches('t[0-9]+_r.+_v.+')
-        && (isValidVote() || isSuperAdmin());
+      allow create: if voteIdMatchesPayload(voteId, request.resource.data)
+        && isValidVote();
+      allow update: if isSuperAdmin()
+        || (voteIdMatchesPayload(voteId, request.resource.data)
+          && isValidVote()
+          && resource.data.voterNameKey == request.resource.data.voterNameKey);
       allow delete: if isSuperAdmin();
     }
 

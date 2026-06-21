@@ -1,5 +1,6 @@
 /**
  * v156: voteMetaByRound (exclusions + ballot aliases) + cloud sync hooks for who-voted panel.
+ * @deprecated Patch chain frozen at v156. Use src/ + npm run build. See tools/patch-app.mjs
  */
 const fs = require("fs");
 const path = require("path");
