@@ -1,11 +1,12 @@
 {
   "teamId": 1,
   "squadi": {
-    "fixtureUrl": "https://registration.squadi.com/liveScoreSeasonFixture?organisationKey=27a1f3ab-90c1-4412-853f-d85c9b27967c&yearId=7&competitionUniqueKey=aab7d734-373a-4104-afac-7c816cf39b53&divisionId=6300",
-    "organisationKey": "27a1f3ab-90c1-4412-853f-d85c9b27967c",
-    "yearId": 7,
-    "competitionUniqueKey": "aab7d734-373a-4104-afac-7c816cf39b53",
-    "divisionId": 6300,
+    "fixtureUrl": "https://registration.squadi.com/competitions?yearId=8&organisationKey=062d9386-ac59-4dd3-8692-7ff894465aa0&competitionUniqueKey=018c199d-a0b6-4e0a-be23-a7be9b68c0b0&divisionId=11766&teamId=107247",
+    "organisationKey": "062d9386-ac59-4dd3-8692-7ff894465aa0",
+    "yearId": 8,
+    "competitionUniqueKey": "018c199d-a0b6-4e0a-be23-a7be9b68c0b0",
+    "divisionId": 11766,
+    "teamId": 107247,
     "teamNameFilter": "Wembley Downs"
   }
 }

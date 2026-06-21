@@ -12,11 +12,14 @@ export function parseSquadiFixtureUrl(url) {
   try {
     var u = new URL(String(url || "").trim());
     if (!/squadi\.com/i.test(u.hostname)) return null;
+    var teamIdRaw = u.searchParams.get("teamId") || u.searchParams.get("teamRefId") || "";
+    var teamId = teamIdRaw ? parseInt(teamIdRaw, 10) : 0;
     return {
       organisationKey: u.searchParams.get("organisationKey") || u.searchParams.get("organisationUniqueKey") || "",
       yearId: parseInt(u.searchParams.get("yearId") || u.searchParams.get("yearRefId") || "0", 10) || 0,
       competitionUniqueKey: u.searchParams.get("competitionUniqueKey") || "",
       divisionId: u.searchParams.get("divisionId") || "All",
+      teamId: isFinite(teamId) && teamId > 0 ? teamId : null,
     };
   } catch {
     return null;
@@ -26,11 +29,15 @@ export function parseSquadiFixtureUrl(url) {
 export function normalizeSquadiConfig(raw) {
   var c = raw || {};
   var fromUrl = c.fixtureUrl ? parseSquadiFixtureUrl(c.fixtureUrl) : null;
+  var teamIdRaw = c.teamId != null && c.teamId !== "" ? c.teamId : c.squadiTeamId;
+  if ((teamIdRaw == null || teamIdRaw === "") && fromUrl && fromUrl.teamId) teamIdRaw = fromUrl.teamId;
+  var teamId = teamIdRaw != null && teamIdRaw !== "" ? parseInt(teamIdRaw, 10) : null;
   return {
     organisationKey: c.organisationKey || (fromUrl && fromUrl.organisationKey) || FOOTBALL_WEST_ORG,
     yearId: Number(c.yearId || (fromUrl && fromUrl.yearId) || 0),
     competitionUniqueKey: c.competitionUniqueKey || (fromUrl && fromUrl.competitionUniqueKey) || "",
     divisionId: c.divisionId != null && c.divisionId !== "" ? c.divisionId : fromUrl ? fromUrl.divisionId : "All",
+    teamId: isFinite(teamId) && teamId > 0 ? teamId : null,
     teamNameFilter: String(c.teamNameFilter || c.squadiTeamName || "Wembley Downs").trim(),
     fixtureUrl: c.fixtureUrl || "",
   };
@@ -38,6 +45,7 @@ export function normalizeSquadiConfig(raw) {
 
 function cleanTeamName(name) {
   return String(name || "")
+    .replace(/\s+-\s+WLN\s+D\d+\s*$/i, "")
     .replace(/\s+-\s+Reserves\s*$/i, "")
     .replace(/\s+SC\s*$/i, " SC")
     .trim();
@@ -47,6 +55,28 @@ function teamMatchesFilter(name, filter) {
   var n = String(name || "").toLowerCase();
   var f = String(filter || "").toLowerCase();
   return f && n.indexOf(f) >= 0;
+}
+
+function matchIncludesTeamId(match, teamId) {
+  if (!teamId) return false;
+  return match.team1Id === teamId || match.team2Id === teamId;
+}
+
+function ourTeamSide(match, cfg) {
+  if (cfg.teamId && matchIncludesTeamId(match, cfg.teamId)) {
+    return match.team1Id === cfg.teamId ? "team1" : "team2";
+  }
+  var t1 = match.team1 && match.team1.name;
+  var t2 = match.team2 && match.team2.name;
+  if (teamMatchesFilter(t1, cfg.teamNameFilter)) return "team1";
+  if (teamMatchesFilter(t2, cfg.teamNameFilter)) return "team2";
+  return null;
+}
+
+function ourTeamId(match, cfg, side) {
+  if (side === "team1") return match.team1Id;
+  if (side === "team2") return match.team2Id;
+  return cfg.teamId || null;
 }
 
 /** UTC ISO → Perth wall YYYY-MM-DDTHH:mm (matches app kickoff storage). */
@@ -117,12 +147,14 @@ export function extractGoalScorers(events, wembleyTeamId) {
   return out;
 }
 
-export function mapSquadiMatchToApp(match, roundName, teamFilter, scorers) {
+export function mapSquadiMatchToApp(match, roundName, cfg, scorers) {
+  var c = typeof cfg === "string" ? { teamNameFilter: cfg } : normalizeSquadiConfig(cfg || {});
+  var side = ourTeamSide(match, c);
+  if (!side) return null;
+
   var t1 = match.team1 || {};
   var t2 = match.team2 || {};
-  var wembleyIsTeam1 = teamMatchesFilter(t1.name, teamFilter);
-  var wembleyIsTeam2 = teamMatchesFilter(t2.name, teamFilter);
-  if (!wembleyIsTeam1 && !wembleyIsTeam2) return null;
+  var wembleyIsTeam1 = side === "team1";
 
   var opponent = wembleyIsTeam1 ? cleanTeamName(t2.name) : cleanTeamName(t1.name);
   if (!opponent || /^bye$/i.test(opponent)) return null;
@@ -174,12 +206,10 @@ export async function fetchWembleyFixtures(cfg, opts) {
     var round = data.rounds[ri];
     for (var mi = 0; mi < (round.matches || []).length; mi++) {
       var m = round.matches[mi];
-      var t1 = m.team1 && m.team1.name;
-      var t2 = m.team2 && m.team2.name;
-      if (!teamMatchesFilter(t1, c.teamNameFilter) && !teamMatchesFilter(t2, c.teamNameFilter)) continue;
+      var side = ourTeamSide(m, c);
+      if (!side) continue;
 
-      var wembleyTeamId =
-        teamMatchesFilter(t1, c.teamNameFilter) ? m.team1Id : teamMatchesFilter(t2, c.teamNameFilter) ? m.team2Id : null;
+      var wembleyTeamId = ourTeamId(m, c, side);
 
       var scorers = [];
       if (includeScorers && m.resultStatus === "FINAL" && m.id) {
@@ -191,7 +221,7 @@ export async function fetchWembleyFixtures(cfg, opts) {
         }
       }
 
-      var mapped = mapSquadiMatchToApp(m, round.name, c.teamNameFilter, scorers);
+      var mapped = mapSquadiMatchToApp(m, round.name, c, scorers);
       if (mapped) results.push(mapped);
     }
   }

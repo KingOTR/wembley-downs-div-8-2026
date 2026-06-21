@@ -4,17 +4,20 @@
 import { fetchWembleyFixtures, normalizeSquadiConfig } from "./squadi-lib.mjs";
 
 var cfg = normalizeSquadiConfig({
-  organisationKey: "27a1f3ab-90c1-4412-853f-d85c9b27967c",
-  yearId: 7,
-  competitionUniqueKey: "aab7d734-373a-4104-afac-7c816cf39b53",
-  divisionId: 6300,
+  fixtureUrl:
+    "https://registration.squadi.com/competitions?yearId=8&organisationKey=062d9386-ac59-4dd3-8692-7ff894465aa0&competitionUniqueKey=018c199d-a0b6-4e0a-be23-a7be9b68c0b0&divisionId=11766&teamId=107247",
+  teamId: 107247,
   teamNameFilter: "Wembley Downs",
 });
 
 var fixtures = await fetchWembleyFixtures(cfg, { skipScorers: true });
 if (!fixtures.length) throw new Error("expected Wembley fixtures");
+if (fixtures.length !== 14) throw new Error("expected 14 fixtures for teamId 107247, got " + fixtures.length);
 var withOpp = fixtures.filter(function (f) {
   return f.opponent && f.round;
 });
 if (!withOpp.length) throw new Error("expected mapped opponents");
-console.log("squadi test OK —", fixtures.length, "fixtures,", withOpp[0].round, "vs", withOpp[0].opponent);
+console.log("squadi test OK —", fixtures.length, "fixtures");
+withOpp.slice(0, 4).forEach(function (f) {
+  console.log(" ", f.round, "vs", f.opponent, f.kickoff, f.groundName, f.ourScore != null ? f.ourScore + "-" + f.oppScore : "scheduled");
+});

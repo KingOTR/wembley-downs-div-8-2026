@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#EE2B33" />
   <meta name="color-scheme" content="light dark" />
-  <meta name="sv-app-version" content="163" />
+  <meta name="sv-app-version" content="164" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v163: Squadi fixture sync admin + CLI -->
+  <!-- v164: Squadi teamId filter + WLN Div 8 URL -->
   <script>
     (function () {
       try {
@@ -108,7 +108,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v163" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v164" />
   <style>
     /* Iwanoff-inspired design system — warm concrete, terracotta, charcoal */
     :root {
@@ -4349,18 +4349,20 @@
         <div class="subcard" id="squadiSyncCard" style="padding:0.85rem; margin: 0.85rem 0 0.25rem">
           <h3 style="margin:0 0 0.35rem; font-size: 0.95rem; color: var(--red-dark)">Squadi sync (fixtures &amp; results)</h3>
           <p class="hint" style="margin:0 0 0.5rem">
-            Paste your Squadi <strong>Draws</strong> page URL from
-            <a href="https://registration.squadi.com/liveScoreSeasonFixture" target="_blank" rel="noopener noreferrer">registration.squadi.com</a>
-            (Football West → your competition → division). Imports Wembley matches only: opponent, kickoff, venue, score, our goalscorers.
+            Paste your Squadi competition or <strong>Draws</strong> page URL from
+            <a href="https://registration.squadi.com/competitions" target="_blank" rel="noopener noreferrer">registration.squadi.com</a>
+            (Football West → WLN Div 8). Include <code>teamId</code> in the URL when filtered to Wembley for precise matching.
           </p>
-          <label class="field" for="squadiFixtureUrl">Squadi fixture page URL</label>
-          <input type="url" id="squadiFixtureUrl" placeholder="https://registration.squadi.com/liveScoreSeasonFixture?organisationKey=…" spellcheck="false" />
-          <label class="field" for="squadiTeamFilter">Team name filter</label>
+          <label class="field" for="squadiFixtureUrl">Squadi page URL</label>
+          <input type="url" id="squadiFixtureUrl" placeholder="https://registration.squadi.com/competitions?yearId=8&amp;organisationKey=…&amp;teamId=107247" spellcheck="false" />
+          <label class="field" for="squadiTeamFilter">Team name filter (fallback)</label>
           <input type="text" id="squadiTeamFilter" value="Wembley Downs" placeholder="e.g. Wembley Downs" />
           <details style="margin:0.5rem 0">
             <summary class="hint" style="cursor:pointer">Advanced IDs (auto-filled from URL)</summary>
+            <label class="field" for="squadiTeamId">Squadi team ID</label>
+            <input type="text" id="squadiTeamId" inputmode="numeric" placeholder="e.g. 107247" />
             <label class="field" for="squadiYearId">Year ID</label>
-            <input type="text" id="squadiYearId" inputmode="numeric" placeholder="e.g. 7" />
+            <input type="text" id="squadiYearId" inputmode="numeric" placeholder="e.g. 8" />
             <label class="field" for="squadiCompetitionKey">Competition key</label>
             <input type="text" id="squadiCompetitionKey" placeholder="UUID from URL" spellcheck="false" />
             <label class="field" for="squadiDivisionId">Division ID</label>
@@ -4759,10 +4761,10 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v163"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v163"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v163"></script>
-  <script type="module" defer src="dist/squadi-admin.js?tag=v163"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v164"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v164"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v164"></script>
+  <script type="module" defer src="dist/squadi-admin.js?tag=v164"></script>
   <script>
     (function () {
       var loaded = false;
@@ -4776,7 +4778,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v163").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v164").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");

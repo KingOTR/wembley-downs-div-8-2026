@@ -6,7 +6,7 @@ import {
   normalizeSquadiConfig,
   fetchWembleyFixtures,
   mergeFixturesIntoMatchesByRound,
-} from "./squadi-client.js?tag=v163";
+} from "./squadi-client.js?tag=v164";
 
 var STORAGE_KEY = "soccerVoteApp_v2";
 
@@ -42,11 +42,13 @@ function getTeam(data, teamId) {
 function readSquadiForm() {
   var urlEl = document.getElementById("squadiFixtureUrl");
   var filterEl = document.getElementById("squadiTeamFilter");
+  var teamIdEl = document.getElementById("squadiTeamId");
   var yearEl = document.getElementById("squadiYearId");
   var compEl = document.getElementById("squadiCompetitionKey");
   var divEl = document.getElementById("squadiDivisionId");
   var raw = {
     fixtureUrl: urlEl ? urlEl.value.trim() : "",
+    teamId: teamIdEl ? teamIdEl.value.trim() : "",
     yearId: yearEl ? yearEl.value.trim() : "",
     competitionUniqueKey: compEl ? compEl.value.trim() : "",
     divisionId: divEl ? divEl.value.trim() : "",
@@ -59,11 +61,13 @@ function fillSquadiForm(squadi) {
   var s = squadi || {};
   var urlEl = document.getElementById("squadiFixtureUrl");
   var filterEl = document.getElementById("squadiTeamFilter");
+  var teamIdEl = document.getElementById("squadiTeamId");
   var yearEl = document.getElementById("squadiYearId");
   var compEl = document.getElementById("squadiCompetitionKey");
   var divEl = document.getElementById("squadiDivisionId");
   if (urlEl) urlEl.value = s.fixtureUrl || "";
   if (filterEl) filterEl.value = s.teamNameFilter || "Wembley Downs";
+  if (teamIdEl) teamIdEl.value = s.teamId != null ? String(s.teamId) : "";
   if (yearEl) yearEl.value = s.yearId != null ? String(s.yearId) : "";
   if (compEl) compEl.value = s.competitionUniqueKey || "";
   if (divEl) divEl.value = s.divisionId != null ? String(s.divisionId) : "";
@@ -178,12 +182,16 @@ function wireSquadiAdmin() {
           var d = document.getElementById("squadiDivisionId");
           if (d) d.value = String(parsed.divisionId);
         }
+        if (parsed.teamId) {
+          var tid = document.getElementById("squadiTeamId");
+          if (tid) tid.value = String(parsed.teamId);
+        }
       }
       persistSquadiOnTeam();
     });
   }
 
-  ["squadiTeamFilter", "squadiYearId", "squadiCompetitionKey", "squadiDivisionId"].forEach(function (id) {
+  ["squadiTeamFilter", "squadiTeamId", "squadiYearId", "squadiCompetitionKey", "squadiDivisionId"].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener("change", persistSquadiOnTeam);
   });
