@@ -67,7 +67,7 @@ async function writeFirestore(teamId, squadi) {
     }
   }
 
-  var fixtures = await fetchWembleyFixtures(squadi);
+  var fixtures = (await fetchWembleyFixtures(squadi)).fixtures;
   var db = admin.firestore();
   var ref = db.doc("config/main");
   var snap = await ref.get();
@@ -96,8 +96,17 @@ async function main() {
   console.log("Squadi sync — team", cfg.teamId, cfg.squadi.teamNameFilter);
   console.log("Competition:", cfg.squadi.competitionUniqueKey, "division", cfg.squadi.divisionId);
 
-  var fixtures = await fetchWembleyFixtures(cfg.squadi);
-  console.log("Found", fixtures.length, "Wembley fixture(s)");
+  var syncOut = await fetchWembleyFixtures(cfg.squadi);
+  var fixtures = syncOut.fixtures;
+  console.log("Found", fixtures.length, "Wembley fixture(s) (Round", syncOut.minRound, "+)");
+  if (syncOut.skippedGradingRounds) {
+    console.log(
+      "Skipped",
+      syncOut.skippedGradingRounds,
+      "grading round(s) before Round",
+      syncOut.minRound
+    );
+  }
 
   var matchesByRound = mergeFixturesIntoMatchesByRound({}, fixtures);
 

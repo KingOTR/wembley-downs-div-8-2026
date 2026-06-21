@@ -1,23 +1,56 @@
 /**
  * Smoke test Squadi public API (no credentials).
  */
-import { fetchWembleyFixtures, normalizeSquadiConfig } from "./squadi-lib.mjs";
+import {
+  fetchWembleyFixtures,
+  normalizeSquadiConfig,
+  parseRoundNumber,
+  isCompetitiveRound,
+} from "./squadi-lib.mjs";
+
+if (parseRoundNumber("Round 7") !== 7) throw new Error("parseRoundNumber Round 7");
+if (parseRoundNumber("Round 8") !== 8) throw new Error("parseRoundNumber Round 8");
+if (isCompetitiveRound("Round 7", 8)) throw new Error("Round 7 should be grading");
+if (!isCompetitiveRound("Round 8", 8)) throw new Error("Round 8 should be competitive");
+if (!isCompetitiveRound("Semi Final", 8)) throw new Error("named finals should pass through");
+
+if (isCompetitiveRound("Round 1", 8) || isCompetitiveRound("Round 7", 8)) {
+  throw new Error("rounds 1-7 must be excluded");
+}
+
+var cfgMin1 = normalizeSquadiConfig({
+  fixtureUrl:
+    "https://registration.squadi.com/competitions?yearId=8&organisationKey=062d9386-ac59-4dd3-8692-7ff894465aa0&competitionUniqueKey=018c199d-a0b6-4e0a-be23-a7be9b68c0b0&divisionId=11766&teamId=107247",
+  teamId: 107247,
+  minRound: 1,
+});
+var allOut = await fetchWembleyFixtures(cfgMin1, { skipScorers: true });
+if (allOut.fixtures.length < 14) throw new Error("minRound 1 should include all team fixtures");
 
 var cfg = normalizeSquadiConfig({
   fixtureUrl:
     "https://registration.squadi.com/competitions?yearId=8&organisationKey=062d9386-ac59-4dd3-8692-7ff894465aa0&competitionUniqueKey=018c199d-a0b6-4e0a-be23-a7be9b68c0b0&divisionId=11766&teamId=107247",
   teamId: 107247,
   teamNameFilter: "Wembley Downs",
+  minRound: 8,
 });
 
-var fixtures = await fetchWembleyFixtures(cfg, { skipScorers: true });
+if (cfg.minRound !== 8) throw new Error("expected minRound 8");
+
+var out = await fetchWembleyFixtures(cfg, { skipScorers: true });
+var fixtures = out.fixtures;
 if (!fixtures.length) throw new Error("expected Wembley fixtures");
-if (fixtures.length !== 14) throw new Error("expected 14 fixtures for teamId 107247, got " + fixtures.length);
-var withOpp = fixtures.filter(function (f) {
-  return f.opponent && f.round;
+
+fixtures.forEach(function (f) {
+  var n = parseRoundNumber(f.round);
+  if (n != null && n < 8) throw new Error("grading round imported: " + f.round);
 });
-if (!withOpp.length) throw new Error("expected mapped opponents");
-console.log("squadi test OK —", fixtures.length, "fixtures");
-withOpp.slice(0, 4).forEach(function (f) {
+
+if (fixtures.length !== 14) {
+  throw new Error("expected 14 competitive fixtures (Round 8+), got " + fixtures.length);
+}
+
+console.log("squadi test OK —", fixtures.length, "imported,", out.skippedGradingRounds, "grading rounds skipped");
+fixtures.slice(0, 4).forEach(function (f) {
   console.log(" ", f.round, "vs", f.opponent, f.kickoff, f.groundName, f.ourScore != null ? f.ourScore + "-" + f.oppScore : "scheduled");
 });

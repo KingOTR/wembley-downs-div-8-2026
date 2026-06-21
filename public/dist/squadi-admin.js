@@ -6,7 +6,7 @@ import {
   normalizeSquadiConfig,
   fetchWembleyFixtures,
   mergeFixturesIntoMatchesByRound,
-} from "./squadi-client.js?tag=v164";
+} from "./squadi-client.js?tag=v165";
 
 var STORAGE_KEY = "soccerVoteApp_v2";
 
@@ -113,7 +113,8 @@ async function importFromSquadi() {
       setSquadiStatus("Paste a Squadi fixture page URL or fill competition + year.", false);
       return;
     }
-    var fixtures = await fetchWembleyFixtures(squadi);
+    var syncOut = await fetchWembleyFixtures(squadi);
+    var fixtures = syncOut.fixtures;
     if (!fixtures.length) {
       setSquadiStatus("No matches found for “" + squadi.teamNameFilter + "”. Check competition URL.", false);
       return;
@@ -143,10 +144,17 @@ async function importFromSquadi() {
     } catch (e) {}
 
     window.dispatchEvent(new CustomEvent("sv-match-saved", { detail: { source: "squadi" } }));
-    setSquadiStatus(
-      "Imported " + fixtures.length + " round(s). Click Save team & round to push to cloud.",
-      true
-    );
+    var statusMsg = "Imported " + fixtures.length + " round(s) (Round " + syncOut.minRound + "+).";
+    if (syncOut.skippedGradingRounds) {
+      statusMsg +=
+        " Skipped " +
+        syncOut.skippedGradingRounds +
+        " grading round(s) (before Round " +
+        syncOut.minRound +
+        ").";
+    }
+    statusMsg += " Click Save team & round to push to cloud.";
+    setSquadiStatus(statusMsg, true);
 
     try {
       if (typeof window.__svRefreshMatchForm === "function") window.__svRefreshMatchForm();

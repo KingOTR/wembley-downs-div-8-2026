@@ -39,6 +39,7 @@ export function normalizeSquadiConfig(raw) {
     divisionId: c.divisionId != null && c.divisionId !== "" ? c.divisionId : fromUrl ? fromUrl.divisionId : "All",
     teamId: isFinite(teamId) && teamId > 0 ? teamId : null,
     teamNameFilter: String(c.teamNameFilter || c.squadiTeamName || "Wembley Downs").trim(),
+    minRound: c.minRound != null && c.minRound !== "" ? Number(c.minRound) : 8,
     fixtureUrl: c.fixtureUrl || "",
   };
 }
@@ -195,19 +196,43 @@ function normalizeRoundLabel(c) {
   return l.replace(/\s+/g, " ").trim();
 }
 
+/** Parse "Round 9" → 9; null if not a numbered round (e.g. "Semi Final"). */
+export function parseRoundNumber(roundName) {
+  var l = String(roundName || "").trim();
+  var m = l.match(/^round\s*(\d+(?:\.\d+)?)$/i);
+  if (m) return parseFloat(m[1]);
+  m = l.match(/^(\d+(?:\.\d+)?)$/);
+  if (m) return parseFloat(m[1]);
+  return null;
+}
+
+export function isCompetitiveRound(roundName, minRound) {
+  var n = parseRoundNumber(roundName);
+  if (n == null) return true;
+  return n >= minRound;
+}
+
 export async function fetchWembleyFixtures(cfg, opts) {
   var c = normalizeSquadiConfig(cfg);
   var fetchImpl = opts && opts.fetch;
   var includeScorers = !(opts && opts.skipScorers);
+  var minRound = c.minRound != null && !isNaN(c.minRound) ? c.minRound : 8;
   var data = await fetchRoundMatches(c, fetchImpl);
   var results = [];
+  var skippedGradingRounds = 0;
 
   for (var ri = 0; ri < (data.rounds || []).length; ri++) {
     var round = data.rounds[ri];
+    var isGrading = !isCompetitiveRound(round.name, minRound);
+    var hadOurMatch = false;
+
     for (var mi = 0; mi < (round.matches || []).length; mi++) {
       var m = round.matches[mi];
       var side = ourTeamSide(m, c);
       if (!side) continue;
+
+      hadOurMatch = true;
+      if (isGrading) continue;
 
       var wembleyTeamId = ourTeamId(m, c, side);
 
@@ -224,9 +249,11 @@ export async function fetchWembleyFixtures(cfg, opts) {
       var mapped = mapSquadiMatchToApp(m, round.name, c, scorers);
       if (mapped) results.push(mapped);
     }
+
+    if (isGrading && hadOurMatch) skippedGradingRounds++;
   }
 
-  return results;
+  return { fixtures: results, skippedGradingRounds: skippedGradingRounds, minRound: minRound };
 }
 
 /** Merge Squadi fixtures into matchesByRound; preserve lineup/review/manual fields. */
