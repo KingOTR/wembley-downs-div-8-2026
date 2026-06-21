@@ -1,7 +1,12 @@
 /**
  * Quick smoke test for matchSquadToVoters (v156 participation logic).
  */
-const nm = await import("../public/dist/name-match.js");
+import { pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const nm = await import(pathToFileURL(join(here, "../public/dist/name-match.js")).href);
 const { matchSquadToVoters, normalizeName } = nm;
 
 const squad = ["Jay", "Uli", "Sarah", "Sarah Goalkeeper", "Anna", "Erin", "Lauren"];
