@@ -2,7 +2,7 @@
 
 Static single-page app for team player-of-the-match voting, hosted on [Firebase Hosting](https://wembley-downs-div-8-2026.web.app/).
 
-**Current version:** v160
+**Current version:** v162
 
 ## Build workflow (new — prefer over patch chain)
 
@@ -83,8 +83,41 @@ src/
 
 ## Prerequisites
 
-- Node.js 20+ (for `npx` / CI scripts)
-- Firebase CLI access to project `wembley-downs-div-8-2026` (`firebase login`)
+- **Node.js 20+** (for `npx` / CI scripts)
+- **Java 21+** (required for `npm run test:rules` — Firestore emulator)
+- Firebase CLI access to project `wembley-downs-div-8-2026` (`firebase login`) — only for deploy, not for rules tests
+
+### Install Java 21 (Windows)
+
+The Firestore emulator bundled with `firebase-tools` requires **JDK 21 or newer**. Java 17 will fail with:
+`firebase-tools no longer supports Java version before 21`.
+
+```powershell
+winget install Microsoft.OpenJDK.21
+```
+
+Alternatives: `winget install EclipseAdoptium.Temurin.21.JDK` or `choco install temurin21`.
+
+After install, **open a new terminal** and verify:
+
+```powershell
+java -version
+# openjdk version "21.x" ...
+```
+
+If `java -version` still shows 17, ensure `C:\Program Files\Microsoft\jdk-21.*\bin` appears **before** any JDK 17 path in your user or system `PATH`.
+
+### Credentials — what is and isn't needed
+
+| Task | Credentials |
+|------|-------------|
+| `npm run test:rules` | **None** — local Firestore emulator only (`wembley-downs-rules-test` fake project) |
+| `npm run validate`, `test:name-match`, `test:browser` | **None** |
+| `firebase deploy` | Firebase CLI login (`firebase login`) |
+| `tools/admin-check.js` | **None** — Playwright against live/local site; super-admin unlock is manual in browser |
+| Production Firestore reads/writes in the app | Firebase web API key in `app.min.js` (public, restricted by rules) |
+
+Do **not** commit `serviceAccount*.json`, `.env`, or credential JSON files. See `.env.example`.
 
 ## Local development
 
@@ -99,13 +132,14 @@ Open http://localhost:5000
 ```bash
 npm install
 node tools/ci-validate.js
-npm run test:rules           # Firestore rules (requires npm install)
+npm run test:rules           # Firestore rules — Java 21+ required (emulator, no prod creds)
 node tools/test-name-match.mjs
+node tools/test-tally.mjs
 ```
 
 Checks required files exist, manifest theme color, version tags in sync, and `app.min.js` parses.
 
-GitHub Actions runs `ci-validate.js` and `test:rules` on every push to `master`/`main`.
+GitHub Actions runs `ci-validate.js` and `test:rules` on every push to `master`/`main` (CI installs Java 21 automatically).
 
 ## Security
 
@@ -206,7 +240,7 @@ node tools/visual-qa.js
 | Tool | Command | What it reports |
 |------|---------|-----------------|
 | CI validate | `node tools/ci-validate.js` | Version tag sync across `index.html`, `sw.js`, dist bundles |
-| Firestore rules | `npm run test:rules` | Vote doc-id binding (needs Java 21+ for local emulator) |
+| Firestore rules | `npm run test:rules` | Vote doc-id binding via local emulator (Java 21+; no credentials) |
 | Smoke fetch | `node tools/smoke-fetch.js` | Live HTML/logo/manifest checks (no browser) |
 | Browser smoke | `node tools/browser-test.js` | Playwright: fatal banner, logo, admin panel, vote tab |
 | Visual QA | `node tools/visual-qa.js` | Playwright: theme toggle, lineup/vote tabs, admin panel |

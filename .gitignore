@@ -16,6 +16,9 @@ Thumbs.db
 # Env / secrets
 .env
 .env.*
+!.env.example
+serviceAccount*.json
+*credentials*.json
 
 # Debug / temp artifacts
 .tmp-*
