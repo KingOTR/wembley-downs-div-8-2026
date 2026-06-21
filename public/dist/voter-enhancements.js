@@ -21,7 +21,7 @@ import {
   findDuplicateBallotPickNames,
   dedupeBallotPicks,
   ballotPicksNeedDedupe,
-} from "./name-match.js?tag=v171";
+} from "./name-match.js?tag=v172";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -35,7 +35,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v171";
+  return "v172";
 }
 
 function distImport(path) {
@@ -2422,6 +2422,15 @@ function wireAdminSectionTabs() {
           syncAdminLocationFromStore();
         })
         .catch(function () {});
+    }
+    if (tab === "lineup") {
+      try {
+        if (typeof window.__svRefreshLineupEditor === "function") {
+          window.__svRefreshLineupEditor();
+        }
+      } catch (e) {
+        console.warn("[lineup-tab]", e);
+      }
     }
   }
   nav.querySelectorAll("button[data-tab]").forEach(function (btn) {

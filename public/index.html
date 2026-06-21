@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#EE2B33" />
   <meta name="color-scheme" content="light dark" />
-  <meta name="sv-app-version" content="171" />
+  <meta name="sv-app-version" content="172" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v171: fix squadi-client.js invalid escape syntax -->
+  <!-- v172: fix squadi-client.js invalid escape syntax -->
   <script>
     (function () {
       try {
@@ -108,7 +108,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v171" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v172" />
   <style>
     /* Iwanoff-inspired design system — warm concrete, terracotta, charcoal */
     :root {
@@ -4771,10 +4771,10 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v171"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v171"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v171"></script>
-  <script type="module" defer src="dist/squadi-admin.js?tag=v171"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v172"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v172"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v172"></script>
+  <script type="module" defer src="dist/squadi-admin.js?tag=v172"></script>
   <script>
     (function () {
       var loaded = false;
@@ -4788,7 +4788,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v171").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v172").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
