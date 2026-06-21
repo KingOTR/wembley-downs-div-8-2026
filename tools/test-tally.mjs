@@ -409,4 +409,44 @@ if (rawRoundPts.Bob !== 3) {
   throw new Error("round label '9' should tally after normalize, got " + JSON.stringify(rawRoundPts));
 }
 
+// Regression: in-memory U.votes empty but local ballots exist (cloud listener wiped U.votes).
+var eightRoundNine = [
+  "Jay", "Anna", "Uli", "Bob", "Carol", "Dave", "Eve", "Frank",
+].map(function (name, i) {
+  return {
+    id: "t1_rround-9_v" + name.toLowerCase(),
+    teamId: 1,
+    round: "Round 9",
+    voterName: name,
+    submittedAt: "2026-06-01T10:0" + i + ":00.000Z",
+    picks: ["Bob", "Carol", "Dave"],
+    nameMatchStatus: "matched",
+    tallyExcluded: false,
+  };
+});
+function dedupeWithLocalMerge(teamId, round, inMemoryVotes) {
+  var merged = inMemoryVotes || [];
+  merged = dedupeForTally(teamId, round, mergeVotesLists(eightRoundNine, merged));
+  return merged;
+}
+function mergeVotesLists() {
+  var byId = Object.create(null);
+  for (var i = 0; i < arguments.length; i++) {
+    (arguments[i] || []).forEach(function (v) {
+      if (!v) return;
+      var id = v.id || "t" + v.teamId + "|" + v.voterName + "|" + (v.round || "");
+      byId[id] = v;
+    });
+  }
+  return Object.keys(byId).map(function (k) {
+    return byId[k];
+  });
+}
+var emptyMemoryPts = tallyPoints(dedupeWithLocalMerge(1, "Round 9", []));
+if (emptyMemoryPts.Bob !== 24) {
+  throw new Error(
+    "8 Round 9 ballots with empty in-memory list should tally Bob:24, got " + JSON.stringify(emptyMemoryPts)
+  );
+}
+
 console.log("tally regression OK");
