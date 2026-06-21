@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const nm = await import(pathToFileURL(join(here, "../public/dist/name-match.js")).href);
-const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad } = nm;
+const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad, resolveCoachSlotForVoterName } = nm;
 
 const squad = ["Jay", "Uli", "Sarah", "Sarah Goalkeeper", "Anna", "Erin", "Lauren"];
 const votes = [
@@ -65,5 +65,11 @@ if (deduped.votesForTally.length !== 1) throw new Error("dedupe should keep one 
 var matchedDup = matchSquadToVoters(["Uli", "Jay"], dupVotes, 1, "Round 9", voteRoundLabel);
 if (!matchedDup.duplicates || matchedDup.duplicates.length !== 1) throw new Error("match should report duplicates");
 if (matchedDup.countedBallots !== 1) throw new Error("countedBallots should be 1");
+
+var team = { coach1Name: "Will", coach2Name: "Chris" };
+var willSlot = resolveCoachSlotForVoterName("Will", team);
+var chrisSlot = resolveCoachSlotForVoterName("Chris", team);
+if (!willSlot || willSlot.slot !== 1) throw new Error("Will should be coach slot 1");
+if (!chrisSlot || chrisSlot.slot !== 2) throw new Error("Chris should be coach slot 2");
 
 console.log("name-match smoke test OK");

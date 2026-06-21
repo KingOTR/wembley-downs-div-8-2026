@@ -277,6 +277,25 @@ export function resolveBallotAlias(voterName, aliases) {
   return { ballot: vn, matchAs: vn, aliased: false };
 }
 
+/**
+ * If voter name matches a configured coach (coach1Name → slot 1, coach2Name → slot 2).
+ * Chris / Will convention: coach1=Will slot 1, coach2=Chris slot 2 when set in config.
+ */
+export function resolveCoachSlotForVoterName(voterName, team) {
+  if (!team) return null;
+  var base = displayPlayerName(voterName);
+  if (!base) return null;
+  var coach1 = displayPlayerName(team.coach1Name || "Coach 1");
+  var coach2 = displayPlayerName(team.coach2Name || "Coach 2");
+  var th = 0.88;
+  if (nameSimilarity(base, coach1) >= th) return { slot: 1, label: coach1 };
+  if (nameSimilarity(base, coach2) >= th) return { slot: 2, label: coach2 };
+  var key = normalizeName(base);
+  if (key === "will" || key === "william") return { slot: 1, label: coach1 };
+  if (key === "chris" || (key.length >= 5 && key.indexOf("chris") === 0)) return { slot: 2, label: coach2 };
+  return null;
+}
+
 /** Filter squad to players expected to vote (exclude didn't play / didn't watch). */
 export function eligibleSquadPlayers(squad, excluded) {
   var skip = Object.create(null);

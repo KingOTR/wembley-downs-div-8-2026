@@ -12,8 +12,9 @@ import {
   findSquadMatch,
   eligibleSquadPlayers,
   dedupeVotesOnePerSquad,
+  resolveCoachSlotForVoterName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v157";
+} from "./name-match.js?tag=v158";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -267,14 +268,9 @@ function getTeamCoachNames(teamId) {
 }
 
 function isCoachVoterName(name, teamId) {
-  var base = displayPlayerName(name);
-  if (!base) return false;
-  var key = qo(base);
-  if (key === "chris" || key.indexOf("chris") === 0) return true;
-  var coaches = getTeamCoachNames(teamId);
-  if (nameSimilarity(base, coaches.coach1) >= 0.88) return true;
-  if (nameSimilarity(base, coaches.coach2) >= 0.88) return true;
-  return false;
+  var data = loadLocalData();
+  var team = getTeamFromData(data, teamId);
+  return !!resolveCoachSlotForVoterName(name, team);
 }
 
 function coachVoteRedirectMessage(teamId) {
@@ -283,9 +279,124 @@ function coachVoteRedirectMessage(teamId) {
     coaches.coach1 +
     " and " +
     coaches.coach2 +
-    " vote as coaches (Coach / admin tab), not in the player pool."
+    " can vote here — ballots route to coach results automatically."
   );
 }
+
+function findExistingCoachVote(teamId, slot, roundLabel) {
+  var round = voteRoundLabel({ round: roundLabel });
+  var data = loadLocalData();
+  return (
+    (data.coachVotes || []).find(function (v) {
+      if (!v) return false;
+      return (
+        String(v.teamId) === String(teamId) &&
+        parseInt(v.slot, 10) === parseInt(slot, 10) &&
+        voteRoundLabel(v) === round
+      );
+    }) || null
+  );
+}
+
+async function submitCoachVoteRest(payload) {
+  if (!projectId()) throw new Error("Cloud not ready");
+  var url = firestoreUrl("coachVotes");
+  if (!url) throw new Error("Cloud not ready");
+  var res = await fetch(url, {
+    method: "POST",
+    headers: await restHeaders(),
+    body: JSON.stringify({
+      fields: {
+        teamId: fsValue(payload.teamId),
+        slot: fsValue(payload.slot),
+        round: fsValue(payload.round),
+        picks: fsValue(payload.picks),
+        submittedAt: fsValue(payload.submittedAt),
+      },
+    }),
+  });
+  if (!res.ok) {
+    var body = await res.json().catch(function () {
+      return {};
+    });
+    throw new Error((body.error && body.error.message) || "Coach vote submit failed");
+  }
+  var json = await res.json().catch(function () {
+    return {};
+  });
+  return json;
+}
+
+function saveCoachVoteLocal(payload, cloudId) {
+  var data = loadLocalData();
+  data.coachVotes = data.coachVotes || [];
+  var round = voteRoundLabel({ round: payload.round });
+  data.coachVotes = data.coachVotes.filter(function (v) {
+    if (!v) return false;
+    return !(
+      String(v.teamId) === String(payload.teamId) &&
+      parseInt(v.slot, 10) === parseInt(payload.slot, 10) &&
+      voteRoundLabel(v) === round
+    );
+  });
+  var localId =
+    cloudId ||
+    "coach_" + payload.teamId + "_s" + payload.slot + "_r" + nameKey(payload.round);
+  data.coachVotes.push(
+    Object.assign({}, payload, {
+      id: localId,
+      submittedAt: payload.submittedAt || new Date().toISOString(),
+    })
+  );
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn("[coach-vote-local]", e);
+  }
+}
+
+window.__svResolveCoachSlot = function (voterName, teamId) {
+  try {
+    var data = loadLocalData();
+    var team = getTeamFromData(data, teamId);
+    return resolveCoachSlotForVoterName(voterName, team);
+  } catch (e) {
+    console.warn("[coach-slot]", e);
+    return null;
+  }
+};
+
+window.__svSubmitCoachVoteFromPlayerUI = async function (opts) {
+  var teamId = opts.teamId;
+  var slot = parseInt(opts.slot, 10);
+  var round = normalizeRoundLabel(opts.round) || opts.round || "Round 1";
+  var picks = (opts.picks || []).map(function (p) {
+    return canonicalPlayerName(p) || displayPlayerName(p);
+  });
+  if (picks.length !== 3) throw new Error("Pick 3 players before submitting.");
+  var payload = {
+    teamId: teamId,
+    slot: slot,
+    round: round,
+    picks: picks,
+    submittedAt: new Date().toISOString(),
+  };
+  var cloudId = null;
+  if (window.__svFirebaseApp && navigator.onLine) {
+    try {
+      var json = await submitCoachVoteRest(payload);
+      cloudId = docPath(json.name) || null;
+    } catch (e) {
+      console.warn("[coach-vote-cloud]", e);
+      throw e;
+    }
+  }
+  saveCoachVoteLocal(payload, cloudId);
+  try {
+    window.dispatchEvent(new CustomEvent("sv-coach-vote-saved", { detail: payload }));
+  } catch (e) {}
+  return payload;
+};
 
 function findExistingVote(teamId, voterName, roundLabel) {
   var key = nameKey(voterName);
@@ -336,6 +447,30 @@ function updateAlreadyVotedBanner() {
   }
   var teamId = getCurrentTeamId();
   var round = getCurrentRound(teamId);
+  var team = getTeamFromData(loadLocalData(), teamId);
+  var coachSlot = resolveCoachSlotForVoterName(name, team);
+  if (coachSlot) {
+    var coachVote = findExistingCoachVote(teamId, coachSlot.slot, round);
+    if (!coachVote) {
+      setBannerVisible(banner, true);
+      banner.innerHTML =
+        "<strong>Coach vote</strong> — ballot for <em>" +
+        escapeHtml(coachSlot.label) +
+        "</em> will go to coach results (slot " +
+        coachSlot.slot +
+        ").";
+      return;
+    }
+    var cpicks = (coachVote.picks || []).join(" · ");
+    setBannerVisible(banner, true);
+    banner.innerHTML =
+      "<strong>You already voted</strong> as coach <em>" +
+      escapeHtml(coachSlot.label) +
+      "</em> this round" +
+      (cpicks ? " — " + escapeHtml(cpicks) + "." : ".") +
+      " Submitting again will replace your coach ballot.";
+    return;
+  }
   var existing = findExistingVote(teamId, name, round);
   if (!existing) {
     setBannerVisible(banner, false);
@@ -377,29 +512,39 @@ function wireDuplicateSubmitGuard() {
       var name = nameInput ? nameInput.value.trim() : "";
       if (!name) return;
       var teamId = getCurrentTeamId();
-      if (isCoachVoterName(name, teamId)) {
-        var msgEl = document.getElementById("voteMsg");
-        var redirectMsg = coachVoteRedirectMessage(teamId);
-        if (msgEl) msgEl.textContent = redirectMsg;
-        alert(redirectMsg);
-        ev.stopImmediatePropagation();
-        ev.preventDefault();
-        return;
-      }
       var round = getCurrentRound(teamId);
-      var existing = findExistingVote(teamId, name, round);
-      if (existing) {
-        var picks = (existing.picks || []).join(" · ");
-        var msg =
-          name +
-          " already has a ballot for " +
-          round +
-          (picks ? " (" + picks + ")." : ".") +
-          "\n\nSubmit again to change your vote?";
-        if (!confirm(msg)) {
-          ev.stopImmediatePropagation();
-          ev.preventDefault();
-          return;
+      var coachSlot = resolveCoachSlotForVoterName(name, getTeamFromData(loadLocalData(), teamId));
+      if (coachSlot) {
+        var existingCoach = findExistingCoachVote(teamId, coachSlot.slot, round);
+        if (existingCoach) {
+          var cpicks = (existingCoach.picks || []).join(" · ");
+          var cmsg =
+            coachSlot.label +
+            " already has a coach ballot for " +
+            round +
+            (cpicks ? " (" + cpicks + ")." : ".") +
+            "\n\nSubmit again to change your coach vote?";
+          if (!confirm(cmsg)) {
+            ev.stopImmediatePropagation();
+            ev.preventDefault();
+            return;
+          }
+        }
+      } else {
+        var existing = findExistingVote(teamId, name, round);
+        if (existing) {
+          var picks = (existing.picks || []).join(" · ");
+          var msg =
+            name +
+            " already has a ballot for " +
+            round +
+            (picks ? " (" + picks + ")." : ".") +
+            "\n\nSubmit again to change your vote?";
+          if (!confirm(msg)) {
+            ev.stopImmediatePropagation();
+            ev.preventDefault();
+            return;
+          }
         }
       }
       submitting = true;
@@ -1200,7 +1345,7 @@ function syncAdminLocationFromStore() {
     window.__svSyncLocationFromMatch(entry);
     return;
   }
-  import("./location-autocomplete.js?tag=v157")
+  import("./location-autocomplete.js?tag=v158")
     .then(function (mod) {
       if (mod.syncLocationFromMatch) mod.syncLocationFromMatch(entry);
       else mod.syncLocationFromInputs();
@@ -1238,7 +1383,7 @@ function wireLineupExportOverride() {
     function (ev) {
       ev.stopImmediatePropagation();
       ev.preventDefault();
-      import("./lineup-export.js?tag=v157")
+      import("./lineup-export.js?tag=v158")
         .then(function (mod) {
           var snap =
             typeof window.__svLineupExportSnapshot === "function"
@@ -1301,7 +1446,7 @@ async function updateMatchCardWeather() {
 
   mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
   try {
-    var mod = await import("./weather-forecast.js?tag=v157");
+    var mod = await import("./weather-forecast.js?tag=v158");
     var units = mod.getWeatherUnits();
     var data = await mod.fetchMatchWeather({
       suburb: entry.suburb,
@@ -1494,7 +1639,7 @@ function wireLineupPublicTabs() {
       advBtn.setAttribute("aria-pressed", advOn ? "true" : "false");
       advBtn.classList.toggle("lineup-tab-overlay-active", advOn);
     }
-    import("./lineup-fotmob.js?tag=v157")
+    import("./lineup-fotmob.js?tag=v158")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1549,7 +1694,7 @@ function wireLineupPublicTabs() {
   }
 
   window.addEventListener("sv-lineup-rendered", function () {
-    import("./lineup-fotmob.js?tag=v157")
+    import("./lineup-fotmob.js?tag=v158")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1821,7 +1966,7 @@ function wireAdminSectionTabs() {
       p.hidden = p.getAttribute("data-admin-panel") !== tab;
     });
     if (tab === "team") {
-      import("./location-autocomplete.js?tag=v157")
+      import("./location-autocomplete.js?tag=v158")
         .then(function (mod) {
           mod.initLocationAutocomplete();
           syncAdminLocationFromStore();
@@ -1843,7 +1988,7 @@ function wireLocationOnRoundChange() {
   roundSel._svLocWire = true;
   roundSel.addEventListener("change", function () {
     setTimeout(function () {
-      import("./location-autocomplete.js?tag=v157")
+      import("./location-autocomplete.js?tag=v158")
         .then(function (mod) {
           mod.initLocationAutocomplete();
           syncAdminLocationFromStore();

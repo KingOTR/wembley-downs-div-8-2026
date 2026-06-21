@@ -42,7 +42,8 @@ const mergeTagVal = mergeTag ? mergeTag[1] : null;
 const swMatch = sw.match(/CACHE_VERSION\s*=\s*"(v\d+)"/);
 const swVer = swMatch ? swMatch[1] : null;
 const swReg = html.match(/sw\.js\?v=(\d+)/);
-const swRegVer = swReg ? "v" + swReg[1] : null;
+const metaVer = html.match(/name="sv-app-version"\s+content="(\d+)"/);
+const swRegVer = swReg ? "v" + swReg[1] : metaVer ? "v" + metaVer[1] : null;
 
 console.log("Tags:", { appTag, enhTag, mergeTag: mergeTagVal, swVer, swRegVer });
 

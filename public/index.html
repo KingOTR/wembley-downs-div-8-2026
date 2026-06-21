@@ -5,9 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#EE2B33" />
   <meta name="color-scheme" content="light dark" />
-  <meta name="sv-app-version" content="157" />
+  <meta name="sv-app-version" content="158" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v157: auto-update SW + stale HTML self-heal -->
+  <!-- v158: auto-update SW + stale HTML self-heal -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("soccerVoteApp_v2_theme");
+        if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
   <script>
     (function () {
       function appVer() {
@@ -78,6 +86,8 @@
         .catch(function () {});
     })();
   </script>
+  <!-- Firebase App Check: enable in Console, then initialize in app bootstrap before Firestore. -->
+  <!-- <script>/* initializeAppCheck(app, { provider: new ReCaptchaV3Provider('SITE_KEY'), isTokenAutoRefreshEnabled: true }); */</script> -->
   <title>Team Player Vote</title>
   <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -94,7 +104,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v157" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v158" />
   <style>
     /* Iwanoff-inspired design system — warm concrete, terracotta, charcoal */
     :root {
@@ -4543,9 +4553,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v157"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v157"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v157"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v158"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v158"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v158"></script>
   <script>
     (function () {
       var loaded = false;
@@ -4559,7 +4569,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v157").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v158").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
@@ -4597,10 +4607,20 @@
     (function () {
       try {
         if (!("serviceWorker" in navigator)) return;
-        var ver = window.__svAppVersion ? window.__svAppVersion() : "154";
-        var SW_URL = "/sw.js?v=157";
+        var ver = window.__svAppVersion ? window.__svAppVersion() : "157";
+        var SW_URL = "/sw.js?v=" + ver;
         var reloaded = false;
         var lastUpdateCheck = 0;
+        var pageLoadAt = Date.now();
+
+        function swReloadAllowed() {
+          try {
+            var key = "sv_sw_reloaded_" + ver;
+            if (sessionStorage.getItem(key) === "1") return false;
+            sessionStorage.setItem(key, "1");
+          } catch (e) {}
+          return true;
+        }
 
         function skipWaitingWorker(reg) {
           if (reg.waiting) {
@@ -4617,6 +4637,8 @@
 
         function onReloadOnce() {
           if (reloaded) return;
+          if (Date.now() - pageLoadAt < 1500) return;
+          if (!swReloadAllowed()) return;
           reloaded = true;
           try { location.reload(); } catch (e) {}
         }
@@ -4648,7 +4670,6 @@
             nw.addEventListener("statechange", function () {
               if (nw.state === "installed") {
                 if (navigator.serviceWorker.controller) skipWaitingWorker(reg);
-                else if (nw === reg.active) onReloadOnce();
               }
             });
           });
