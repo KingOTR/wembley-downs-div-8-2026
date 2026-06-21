@@ -6,6 +6,7 @@ import {
   normalizeSquadiConfig,
   parseRoundNumber,
   isCompetitiveRound,
+  mergeFixturesIntoMatchesByRound,
 } from "./squadi-lib.mjs";
 
 if (parseRoundNumber("Round 7") !== 7) throw new Error("parseRoundNumber Round 7");
@@ -16,6 +17,42 @@ if (!isCompetitiveRound("Semi Final", 8)) throw new Error("named finals should p
 
 if (isCompetitiveRound("Round 1", 8) || isCompetitiveRound("Round 7", 8)) {
   throw new Error("rounds 1-7 must be excluded");
+}
+
+var merged = mergeFixturesIntoMatchesByRound(
+  {
+    "Round 9": {
+      lat: -31.96,
+      lng: 115.82,
+      locationLabel: "Rosalie Park, Subiaco",
+      suburb: "Subiaco",
+      groundName: "Rosalie Park",
+      kickoff: "2026-06-21T10:00",
+    },
+  },
+  [
+    {
+      round: "Round 9",
+      opponent: "Test FC",
+      kickoff: "2026-06-21T11:00",
+      suburb: "",
+      groundName: "Wrong Ground",
+      venue: "Wrong Ground-Field 1",
+      lat: null,
+      lng: null,
+      squadiMatchId: 1,
+      squadiSyncedAt: new Date().toISOString(),
+    },
+  ]
+);
+if (merged["Round 9"].lat !== -31.96 || merged["Round 9"].lng !== 115.82) {
+  throw new Error("Squadi merge must preserve user lat/lng pin");
+}
+if (merged["Round 9"].groundName !== "Rosalie Park") {
+  throw new Error("Squadi merge must preserve user ground when pinned");
+}
+if (merged["Round 9"].kickoff !== "2026-06-21T11:00") {
+  throw new Error("Squadi merge should update kickoff");
 }
 
 var cfgMin1 = normalizeSquadiConfig({

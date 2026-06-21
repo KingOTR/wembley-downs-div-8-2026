@@ -107,6 +107,35 @@ export function perthDateFromKickoff(kickoff) {
   return kickoff ? kickoff.slice(0, 10) : "";
 }
 
+function isValidCoord(lat, lng) {
+  var la = Number(lat);
+  var ln = Number(lng);
+  return (
+    isFinite(la) &&
+    isFinite(ln) &&
+    Math.abs(la) <= 90 &&
+    Math.abs(ln) <= 180 &&
+    !(la === 0 && ln === 0)
+  );
+}
+
+function squadiVenueCoords(vc, venue) {
+  vc = vc || {};
+  venue = venue || {};
+  var latRaw = vc.lat != null && vc.lat !== "" ? vc.lat : venue.lat;
+  var lngRaw = vc.lng != null && vc.lng !== "" ? vc.lng : venue.lng;
+  if (latRaw == null || latRaw === "" || lngRaw == null || lngRaw === "") return { lat: null, lng: null };
+  var lat = parseFloat(latRaw);
+  var lng = parseFloat(lngRaw);
+  return isValidCoord(lat, lng) ? { lat: lat, lng: lng } : { lat: null, lng: null };
+}
+
+function hasUserLocationPin(match) {
+  if (!match) return false;
+  if (match.locationLabel && String(match.locationLabel).trim()) return true;
+  return isValidCoord(match.lat, match.lng);
+}
+
 export async function fetchRoundMatches(cfg, fetchImpl) {
   var c = normalizeSquadiConfig(cfg);
   if (!c.competitionUniqueKey || !c.yearId) {
@@ -168,6 +197,7 @@ export function mapSquadiMatchToApp(match, roundName, cfg, scorers) {
   var groundName = venue.name || venue.shortName || "";
   var pitch = vc.name || (vc.courtNumber != null ? "Field " + vc.courtNumber : "");
   var suburb = venue.suburb || venue.city || "";
+  var coords = squadiVenueCoords(vc, venue);
 
   return {
     round: normalizeRoundLabel(roundName),
@@ -179,8 +209,8 @@ export function mapSquadiMatchToApp(match, roundName, cfg, scorers) {
     groundName: groundName,
     pitchNumber: pitch.replace(/^Field\s+/i, "") || "",
     venue: groundName && pitch ? groundName + "-" + pitch : groundName || pitch,
-    lat: vc.lat != null && vc.lat !== "" ? parseFloat(vc.lat) : null,
-    lng: vc.lng != null && vc.lng !== "" ? parseFloat(vc.lng) : null,
+    lat: coords.lat,
+    lng: coords.lng,
     ourScore: ourScore != null ? ourScore : null,
     oppScore: oppScore != null ? oppScore : null,
     scorers: scorers || [],
@@ -263,22 +293,36 @@ export function mergeFixturesIntoMatchesByRound(existing, fixtures) {
     var key = fx.round;
     if (!key) return;
     var prev = out[key] || {};
-    out[key] = Object.assign({}, prev, {
+    var userPin = hasUserLocationPin(prev);
+    var squadiCoords = isValidCoord(fx.lat, fx.lng);
+    var next = Object.assign({}, prev, {
       opponent: fx.opponent,
       date: fx.date || prev.date,
       kickoff: fx.kickoff || prev.kickoff,
-      suburb: fx.suburb || prev.suburb,
-      groundName: fx.groundName || prev.groundName,
-      pitchNumber: fx.pitchNumber || prev.pitchNumber,
-      venue: fx.venue || prev.venue,
-      lat: fx.lat != null ? fx.lat : prev.lat,
-      lng: fx.lng != null ? fx.lng : prev.lng,
       ourScore: fx.ourScore != null ? fx.ourScore : prev.ourScore,
       oppScore: fx.oppScore != null ? fx.oppScore : prev.oppScore,
       scorers: fx.scorers && fx.scorers.length ? fx.scorers : prev.scorers,
       squadiMatchId: fx.squadiMatchId,
       squadiSyncedAt: fx.squadiSyncedAt,
     });
+    if (userPin) {
+      /* keep suburb/ground/venue/lat/lng/locationLabel from prev */
+    } else if (squadiCoords) {
+      next.suburb = fx.suburb || prev.suburb;
+      next.groundName = fx.groundName || prev.groundName;
+      next.pitchNumber = fx.pitchNumber || prev.pitchNumber;
+      next.venue = fx.venue || prev.venue;
+      next.lat = fx.lat;
+      next.lng = fx.lng;
+    } else {
+      next.suburb = prev.suburb || fx.suburb || "";
+      next.groundName = prev.groundName || fx.groundName || "";
+      next.pitchNumber = prev.pitchNumber || fx.pitchNumber || "";
+      next.venue = prev.venue || fx.venue || "";
+      next.lat = isValidCoord(prev.lat, prev.lng) ? prev.lat : null;
+      next.lng = isValidCoord(prev.lat, prev.lng) ? prev.lng : null;
+    }
+    out[key] = next;
   });
   return out;
 }

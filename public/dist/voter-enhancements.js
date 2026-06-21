@@ -14,7 +14,7 @@ import {
   dedupeVotesOnePerSquad,
   resolveCoachSlotForVoterName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v165";
+} from "./name-match.js?tag=v166";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -28,7 +28,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v165";
+  return "v166";
 }
 
 function distImport(path) {
@@ -2116,6 +2116,37 @@ function wireLineupNameNormalize() {
   });
 }
 
+function parseRoundNumberFromLabel(label) {
+  var l = String(label || "").trim();
+  var m = l.match(/^round\s*(\d+(?:\.\d+)?)$/i);
+  if (m) return parseFloat(m[1]);
+  m = l.match(/^(\d+(?:\.\d+)?)$/);
+  return m ? parseFloat(m[1]) : null;
+}
+
+function wirePublishedRoundControls() {
+  var pubEl = document.getElementById("publishedRoundInput");
+  var roundEl = document.getElementById("roundInput");
+  var btn = document.getElementById("publishNextRoundBtn");
+  if (!pubEl || !btn || btn._svPubWire) return;
+  btn._svPubWire = true;
+  btn.addEventListener("click", function () {
+    var cur = normalizeRoundLabel(pubEl.value || (roundEl && roundEl.value) || "Round 1") || "Round 1";
+    var n = parseRoundNumberFromLabel(cur);
+    if (n == null) {
+      window.alert("Set a numbered public round first (e.g. Round 9).");
+      return;
+    }
+    pubEl.value = "Round " + (n + 1);
+    if (roundEl && !roundEl.value.trim()) roundEl.value = pubEl.value;
+    var err = document.getElementById("adminOpErr");
+    if (err) {
+      err.style.color = "#15803d";
+      err.textContent = "Public round set to " + pubEl.value + " — click Save team & round to publish.";
+    }
+  });
+}
+
 function init() {
   wireNameSuggestDeferUntilFocus();
   wireVoterNameListeners();
@@ -2128,6 +2159,7 @@ function init() {
   wireMatchWeather();
   wireLineupPublicTabs();
   wireSarahDisambiguation();
+  wirePublishedRoundControls();
 }
 
 function safeInit() {
@@ -2158,6 +2190,7 @@ var adminObs = new MutationObserver(function () {
     wireSquadBadges();
     wireAdminSectionTabs();
     wireLocationOnRoundChange();
+    wirePublishedRoundControls();
   } catch (e) {
     adminEnhanceWired = false;
     console.warn("[voter-enhancements] admin wire failed", e);
