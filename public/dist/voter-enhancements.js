@@ -14,7 +14,7 @@ import {
   dedupeVotesOnePerSquad,
   resolveCoachSlotForVoterName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v162";
+} from "./name-match.js?tag=v163";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -28,7 +28,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v162";
+  return "v163";
 }
 
 function distImport(path) {

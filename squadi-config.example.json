@@ -1,0 +1,11 @@
+{
+  "teamId": 1,
+  "squadi": {
+    "fixtureUrl": "https://registration.squadi.com/liveScoreSeasonFixture?organisationKey=27a1f3ab-90c1-4412-853f-d85c9b27967c&yearId=7&competitionUniqueKey=aab7d734-373a-4104-afac-7c816cf39b53&divisionId=6300",
+    "organisationKey": "27a1f3ab-90c1-4412-853f-d85c9b27967c",
+    "yearId": 7,
+    "competitionUniqueKey": "aab7d734-373a-4104-afac-7c816cf39b53",
+    "divisionId": 6300,
+    "teamNameFilter": "Wembley Downs"
+  }
+}

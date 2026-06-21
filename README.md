@@ -290,6 +290,42 @@ Super admin sees a **duplicate ballots** warning in **Results → Who has / hasn
 
 When **Will** or **Chris** (or names matching `coach1Name` / `coach2Name` in config) vote via the normal player UI, their ballot is stored in **`coachVotes/`** (slot 1 or 2), not `votes/`. Other players continue to use `votes/`.
 
+## Squadi fixture sync (v163+)
+
+Auto-import **Wembley Downs** fixtures and results from [Squadi](https://registration.squadi.com) (Football West). No official public API docs — uses the same public JSON endpoints as the Squadi draws page.
+
+### Point to your competition
+
+1. Open Squadi → Football West → your competition → **Draws** (division filter).
+2. Copy the browser URL (contains `organisationKey`, `yearId`, `competitionUniqueKey`, `divisionId`).
+3. Coach / admin → **Team** tab → **Squadi sync** → paste URL → **Import from Squadi**.
+4. Click **Save team & round** to push to Firestore.
+
+Config is stored on the team as `team.squadi` in `config/main`:
+
+| Field | Purpose |
+|-------|---------|
+| `fixtureUrl` | Full Squadi draws page URL |
+| `teamNameFilter` | e.g. `Wembley Downs` (matches team name substring) |
+| `competitionUniqueKey`, `yearId`, `divisionId` | Parsed from URL or advanced fields |
+
+Imported per round into `matchesByRound`: opponent, date, kickoff (Perth), ground, pitch, lat/lng, our/opp score, **our goalscorers** (from public match events). Lineups and match reviews are preserved.
+
+### CLI & daily automation
+
+```bash
+cp squadi-config.example.json squadi-config.json   # edit competition URL/IDs
+npm run test:squadi                                 # smoke test (no creds)
+npm run sync:squadi                                 # dry-run JSON
+npm run sync:squadi:write                           # needs service account
+```
+
+**Credentials:** Squadi fetch needs **no** login. `--write` needs `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS` (Firestore admin), not production user passwords.
+
+**GitHub Actions:** `.github/workflows/squadi-sync.yml` runs daily (~6am Perth) + manual dispatch. Set repo secret `FIREBASE_SERVICE_ACCOUNT_JSON` to enable Firestore push; otherwise dry-run test only.
+
+**Legal:** Squadi has no documented third-party API. This uses public read endpoints the web app calls. Respect Squadi/Football West terms; rate-limit (sync once daily). [FixtureSync](https://fixturesync.com) is a commercial alternative if policies change.
+
 ## Coach slots
 
 Each team has coach **slot 1** and **slot 2** (`coach1PasswordHash` / `coach2PasswordHash` in config). Coach votes are stored in `coachVotes/` with a `slot` field. Super admin can run the Chris coach-slot repair from the admin panel (v136+).

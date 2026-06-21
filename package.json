@@ -11,6 +11,9 @@
     "test:browser": "node tools/browser-test.js",
     "test:visual": "node tools/visual-qa.js",
     "test:smoke": "node tools/smoke-fetch.js",
+    "test:squadi": "node tools/test-squadi.mjs",
+    "sync:squadi": "node tools/squadi-sync.mjs --config squadi-config.json --dry-run",
+    "sync:squadi:write": "node tools/squadi-sync.mjs --config squadi-config.json --write",
     "build": "node tools/build-app.mjs",
     "bump": "node tools/bump-version.js"
   },
@@ -28,6 +31,7 @@
   "homepage": "https://github.com/KingOTR/wembley-downs-div-8-2026#readme",
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "firebase-admin": "^14.0.0"
   }
 }

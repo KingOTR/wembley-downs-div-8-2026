@@ -1,0 +1,35 @@
+name: Squadi sync
+
+on:
+  schedule:
+    # 06:00 Australia/Perth (AWST, UTC+8) ≈ 22:00 UTC previous day
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Squadi dry-run (public API)
+        run: node tools/test-squadi.mjs
+
+      - name: Push fixtures to Firestore (optional)
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "FIREBASE_SERVICE_ACCOUNT_JSON not set — skipping Firestore write"
+            exit 0
+          fi
+          cp squadi-config.example.json squadi-config.json
+          npm install firebase-admin --no-save
+          node tools/squadi-sync.mjs --config squadi-config.json --write

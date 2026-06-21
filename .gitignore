@@ -19,6 +19,7 @@ Thumbs.db
 !.env.example
 serviceAccount*.json
 *credentials*.json
+squadi-config.json
 
 # Debug / temp artifacts
 .tmp-*
