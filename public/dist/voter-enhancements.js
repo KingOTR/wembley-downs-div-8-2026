@@ -21,7 +21,8 @@ import {
   findDuplicateBallotPickNames,
   dedupeBallotPicks,
   ballotPicksNeedDedupe,
-} from "./name-match.js?tag=v172";
+  fixBallotsWithDuplicatePicks,
+} from "./name-match.js?tag=v173";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -35,7 +36,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v172";
+  return "v173";
 }
 
 function distImport(path) {
@@ -328,6 +329,196 @@ function sanitizeVotesWithDuplicatePicks(votes) {
     });
   });
   return out;
+}
+
+var BALLOT_PICK_MIGRATION_KEY = STORAGE_KEY + "_ballot_pick_dedupe_v173";
+var BALLOT_PICK_MIGRATION_REPORT_KEY = STORAGE_KEY + "_ballot_pick_dedupe_report";
+
+function collectMigrationTeamIds(data) {
+  var ids = Object.create(null);
+  (data.teams || []).forEach(function (t) {
+    if (t && t.id != null) ids[String(t.id)] = true;
+  });
+  (data.votes || []).forEach(function (v) {
+    if (v && v.teamId != null) ids[String(v.teamId)] = true;
+  });
+  if (!Object.keys(ids).length) ids["1"] = true;
+  return Object.keys(ids);
+}
+
+function waitForFirebaseReady(maxMs) {
+  return new Promise(function (resolve) {
+    if (window.__svFirebaseApp && projectId()) return resolve(true);
+    var t0 = Date.now();
+    var iv = setInterval(function () {
+      if (window.__svFirebaseApp && projectId()) {
+        clearInterval(iv);
+        resolve(true);
+      } else if (Date.now() - t0 >= maxMs) {
+        clearInterval(iv);
+        resolve(false);
+      }
+    }, 250);
+  });
+}
+
+function patchLocalVotesBatch(votesById) {
+  var data = loadLocalData();
+  var changed = false;
+  data.votes = (data.votes || []).map(function (v) {
+    if (!v) return v;
+    var patch = votesById[v.id];
+    if (!patch) return v;
+    changed = true;
+    return Object.assign({}, v, patch);
+  });
+  if (changed) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn("[ballot-pick-migration] local save", e);
+    }
+  }
+  return changed;
+}
+
+async function migrateAllBallotDuplicatePicks(opts) {
+  var force = !!(opts && opts.force);
+  if (!force) {
+    try {
+      if (localStorage.getItem(BALLOT_PICK_MIGRATION_KEY) === "1") {
+        var cached = localStorage.getItem(BALLOT_PICK_MIGRATION_REPORT_KEY);
+        if (cached) window.__svBallotPickDedupeReport = JSON.parse(cached);
+        return window.__svBallotPickDedupeReport;
+      }
+    } catch (e) {}
+  }
+
+  var data = loadLocalData();
+  var teamIds = collectMigrationTeamIds(data);
+  var allVotes = (data.votes || []).slice();
+  var report = {
+    fixed: 0,
+    byRound: {},
+    at: new Date().toISOString(),
+    version: assetTag(),
+    cloud: false,
+  };
+
+  var cloudReady = await waitForFirebaseReady(8000);
+  if (cloudReady) {
+    report.cloud = true;
+    try {
+      var configTeams = await fetchConfigTeams();
+      configTeams.forEach(function (t) {
+        if (t && t.id != null) teamIds.push(String(t.id));
+      });
+    } catch (e) {}
+    var seenTeam = Object.create(null);
+    teamIds = teamIds.filter(function (id) {
+      if (seenTeam[id]) return false;
+      seenTeam[id] = true;
+      return true;
+    });
+    for (var ti = 0; ti < teamIds.length; ti++) {
+      try {
+        var cv = await fetchCloudVotes(teamIds[ti], true);
+        allVotes = mergeVotesLists(allVotes, cv);
+      } catch (e) {
+        console.warn("[ballot-pick-migration] cloud fetch", teamIds[ti], e);
+      }
+    }
+  }
+
+  var toFix = [];
+  allVotes.forEach(function (v) {
+    if (v && ballotPicksNeedDedupe(v.picks)) toFix.push(v);
+  });
+
+  var persistTasks = [];
+  var localPatch = Object.create(null);
+  toFix.forEach(function (v) {
+    var cleaned = dedupeBallotPicks(v.picks);
+    var rk = String(v.teamId) + "|" + voteRoundLabel(v);
+    report.fixed++;
+    report.byRound[rk] = (report.byRound[rk] || 0) + 1;
+    if (v.id) {
+      localPatch[v.id] = { picks: cleaned };
+      persistTasks.push(persistCleanedBallotPicks(v, cleaned));
+    }
+  });
+
+  if (Object.keys(localPatch).length) patchLocalVotesBatch(localPatch);
+
+  await Promise.all(
+    persistTasks.map(function (p) {
+      return p.catch(function (e) {
+        console.warn("[ballot-pick-migration] persist", e);
+      });
+    })
+  );
+
+  try {
+    localStorage.setItem(BALLOT_PICK_MIGRATION_KEY, "1");
+    localStorage.setItem(BALLOT_PICK_MIGRATION_REPORT_KEY, JSON.stringify(report));
+  } catch (e) {}
+  window.__svBallotPickDedupeReport = report;
+  if (report.fixed) {
+    console.info("[ballot-pick-migration] fixed " + report.fixed + " ballot(s)", report.byRound);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent("sv-ballot-pick-migration-done", { detail: report }));
+  } catch (e) {}
+  return report;
+}
+
+window.__svMigrateBallotDuplicatePicks = migrateAllBallotDuplicatePicks;
+
+function scheduleBallotPickMigration() {
+  try {
+    if (localStorage.getItem(BALLOT_PICK_MIGRATION_KEY) === "1") {
+      var raw = localStorage.getItem(BALLOT_PICK_MIGRATION_REPORT_KEY);
+      if (raw) window.__svBallotPickDedupeReport = JSON.parse(raw);
+      return;
+    }
+  } catch (e) {}
+  setTimeout(function () {
+    migrateAllBallotDuplicatePicks().catch(function (e) {
+      console.warn("[ballot-pick-migration]", e);
+    });
+  }, 1500);
+}
+
+function ensureBallotPickMigrationHint() {
+  if (!isSuperAdminUnlocked()) return;
+  var rep = window.__svBallotPickDedupeReport;
+  if (!rep) return;
+  var mount = document.getElementById("resultsBallotsWrap");
+  if (!mount || !mount.parentNode) return;
+  var el = document.getElementById("ballotPickMigrationHint");
+  if (!el) {
+    el = document.createElement("p");
+    el.id = "ballotPickMigrationHint";
+    el.className = "hint";
+    mount.parentNode.insertBefore(el, mount);
+  }
+  if (!rep.fixed) {
+    el.textContent = "Ballot pick scan (" + (rep.version || assetTag()) + "): no duplicate 3/2/1 picks found.";
+    return;
+  }
+  var rounds = Object.keys(rep.byRound)
+    .map(function (k) {
+      return k + ": " + rep.byRound[k];
+    })
+    .join("; ");
+  el.textContent =
+    "Ballot pick cleanup (" +
+    (rep.version || assetTag()) +
+    "): fixed " +
+    rep.fixed +
+    " ballot(s)" +
+    (rounds ? " — " + rounds : "") +
+    ".";
 }
 
 function getPublicPrefs() {
@@ -1600,9 +1791,11 @@ function wireWhoHasntVoted() {
       debouncedUpdateWhoHasntVoted();
       debouncedUpdateAdminBallots();
     });
+    window.addEventListener("sv-ballot-pick-migration-done", ensureBallotPickMigrationHint);
   }
   updateWhoHasntVoted();
   debouncedUpdateAdminBallots();
+  ensureBallotPickMigrationHint();
 }
 
 function ensureLineupSharePackButton() {
@@ -2521,6 +2714,7 @@ function init() {
   wireLineupPublicTabs();
   wireSarahDisambiguation();
   wirePublishedRoundControls();
+  scheduleBallotPickMigration();
 }
 
 function safeInit() {

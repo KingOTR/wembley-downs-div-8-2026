@@ -190,4 +190,41 @@ if (!findDuplicateBallotPickNames(["Bob", "Bob", "Carol"]).includes("Bob")) {
   throw new Error("findDuplicateBallotPickNames should list Bob");
 }
 
+var { fixBallotsWithDuplicatePicks } = nm;
+var migrationSample = [
+  {
+    id: "m1",
+    teamId: 1,
+    round: "Round 3",
+    voterName: "Alice",
+    picks: ["Bob", "Bob", "Bob"],
+  },
+  {
+    id: "m2",
+    teamId: 1,
+    round: "Round 5",
+    voterName: "Carol",
+    picks: ["Dave", "Eve", "Frank"],
+  },
+  {
+    id: "m3",
+    teamId: 2,
+    round: "Round 3",
+    voterName: "Bob",
+    picks: ["Alice", "Alice", "Dave"],
+  },
+];
+var migrationResult = fixBallotsWithDuplicatePicks(migrationSample, function (v) {
+  return String(v.round || "");
+});
+if (migrationResult.fixed !== 2) {
+  throw new Error("migration should fix 2 ballots, got " + migrationResult.fixed);
+}
+if (migrationResult.byRound["1|Round 3"] !== 1 || migrationResult.byRound["2|Round 3"] !== 1) {
+  throw new Error("migration byRound counts wrong: " + JSON.stringify(migrationResult.byRound));
+}
+if (migrationResult.votes[0].picks[0] !== "Bob" || migrationResult.votes[0].picks[1]) {
+  throw new Error("migration should dedupe Bob triple to 3pt slot");
+}
+
 console.log("tally regression OK");

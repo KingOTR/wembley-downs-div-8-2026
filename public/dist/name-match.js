@@ -681,19 +681,30 @@ export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLa
 
 var BALLOT_SLOT_POINTS = [3, 2, 1];
 
-/** Canonical key for duplicate-pick detection on one ballot. */
-export function ballotPickKey(name) {
+function resolveBallotPickCanonical(name, squad) {
   var display = displayPlayerName(name);
   if (!display) return "";
-  return normalizeName(canonicalPlayerName(display));
+  var canonical = canonicalPlayerName(display);
+  if (squad && squad.length) {
+    var hit = findSquadMatch(canonical, squad, STRICT_SQUAD_THRESHOLD);
+    if (hit && hit.match) canonical = canonicalPlayerName(displayPlayerName(hit.match));
+  }
+  return canonical || display;
+}
+
+/** Canonical key for duplicate-pick detection on one ballot. */
+export function ballotPickKey(name, squad) {
+  var canonical = resolveBallotPickCanonical(name, squad);
+  if (!canonical) return "";
+  return normalizeName(canonical);
 }
 
 /** True when the same player appears in more than one pick slot. */
-export function ballotPicksHaveDuplicates(picks) {
+export function ballotPicksHaveDuplicates(picks, squad) {
   var seen = Object.create(null);
   var list = picks || [];
   for (var i = 0; i < list.length; i++) {
-    var key = ballotPickKey(list[i]);
+    var key = ballotPickKey(list[i], squad);
     if (!key) continue;
     if (seen[key]) return true;
     seen[key] = true;
@@ -702,13 +713,13 @@ export function ballotPicksHaveDuplicates(picks) {
 }
 
 /** Display names of players picked more than once (for validation messages). */
-export function findDuplicateBallotPickNames(picks) {
+export function findDuplicateBallotPickNames(picks, squad) {
   var seen = Object.create(null);
   var dups = [];
   (picks || []).forEach(function (name) {
-    var key = ballotPickKey(name);
+    var key = ballotPickKey(name, squad);
     if (!key) return;
-    var label = canonicalPlayerName(name) || displayPlayerName(name);
+    var label = resolveBallotPickCanonical(name, squad);
     if (seen[key]) {
       if (dups.indexOf(label) === -1) dups.push(label);
     } else {
@@ -716,6 +727,23 @@ export function findDuplicateBallotPickNames(picks) {
     }
   });
   return dups;
+}
+
+/** User-facing error when duplicate picks are detected. */
+export function formatBallotDuplicatePickError(picks, squad) {
+  var dups = findDuplicateBallotPickNames(picks, squad);
+  if (!dups.length) return "";
+  return (
+    "Each player can only appear once on your ballot. You picked " +
+    dups.join(", ") +
+    " more than once — change your 3 / 2 / 1 picks and try again."
+  );
+}
+
+/** Empty string when valid; otherwise an error message for #voteMsg. */
+export function validateBallotPicks(picks, squad) {
+  if (!ballotPicksHaveDuplicates(picks, squad)) return "";
+  return formatBallotDuplicatePickError(picks, squad);
 }
 
 /**
@@ -749,13 +777,4 @@ export function dedupeBallotPicks(picks) {
 
 /** True when dedupeBallotPicks would change the ballot. */
 export function ballotPicksNeedDedupe(picks) {
-  if (!ballotPicksHaveDuplicates(picks)) return false;
-  var cleaned = dedupeBallotPicks(picks);
-  var src = (picks || []).slice(0, 3);
-  while (src.length < 3) src.push("");
-  for (var i = 0; i < 3; i++) {
-    if (ballotPickKey(src[i]) !== ballotPickKey(cleaned[i])) return true;
-    if (displayPlayerName(src[i]) !== displayPlayerName(cleaned[i])) return true;
-  }
-  return false;
-}
+  if (!ballotPicksHaveDuplicates(picks))
