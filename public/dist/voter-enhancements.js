@@ -27,7 +27,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v174";
+} from "./name-match.js?tag=v175";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -41,7 +41,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v174";
+  return "v175";
 }
 
 function distImport(path) {
@@ -1026,19 +1026,18 @@ function updateAlreadyVotedBanner() {
     if (!coachVote) {
       setBannerVisible(banner, true);
       banner.innerHTML =
-        "<strong>Coach vote</strong> — ballot for <em>" +
+        "<strong>Coach ballot</strong> — counts for <em>" +
         escapeHtml(coachSlot.label) +
-        "</em> will go to coach results (slot " +
+        "</em> (slot " +
         coachSlot.slot +
         ").";
       return;
     }
     setBannerVisible(banner, true);
     banner.innerHTML =
-      "<strong>You already voted</strong> as coach <em>" +
+      "<strong>Already voted</strong> as coach <em>" +
       escapeHtml(coachSlot.label) +
-      "</em> this round." +
-      " Submitting again will replace your coach ballot.";
+      "</em>. Submit again to replace.";
     return;
   }
   var existing = findExistingVote(teamId, name, round);
@@ -1048,10 +1047,9 @@ function updateAlreadyVotedBanner() {
   }
   setBannerVisible(banner, true);
   banner.innerHTML =
-    "<strong>You already voted</strong> this round as <em>" +
+    "<strong>Already voted</strong> as <em>" +
     escapeHtml(name) +
-    "</em>." +
-    " Submitting again will replace your ballot.";
+    "</em>. Submit again to replace.";
 }
 
 function escapeHtml(s) {
@@ -1099,7 +1097,7 @@ function wireBallotPickDuplicateHint() {
   var picksRow = document.getElementById("picksRow");
   if (!picksRow || picksRow._svDupHint) return;
   picksRow._svDupHint = true;
-  var debounced = debounce(updateBallotPickDuplicateHint, 120);
+  var debounced = debounce(updateBallotPickDuplicateHint, 60);
   var obs = new MutationObserver(function () {
     debounced();
   });
@@ -1132,9 +1130,9 @@ function wireDuplicateSubmitGuard() {
         if (existingCoach) {
           var cmsg =
             coachSlot.label +
-            " already has a coach ballot for " +
+            " already voted for " +
             round +
-            ".\n\nSubmit again to change your coach vote?";
+            ".\n\nReplace coach ballot?";
           if (!confirm(cmsg)) {
             ev.stopImmediatePropagation();
             ev.preventDefault();
@@ -1146,9 +1144,9 @@ function wireDuplicateSubmitGuard() {
         if (existing) {
           var msg =
             name +
-            " already has a ballot for " +
+            " already voted for " +
             round +
-            ".\n\nSubmit again to change your vote?";
+            ".\n\nReplace ballot?";
           if (!confirm(msg)) {
             ev.stopImmediatePropagation();
             ev.preventDefault();
@@ -2142,7 +2140,7 @@ var debouncedUpdateAdminBallots = debounce(function () {
 
 var debouncedUpdateAlreadyVotedBanner = debounce(function () {
   updateAlreadyVotedBanner();
-}, 300);
+}, 150);
 
 var whoHasntVotedWired = false;
 
@@ -3075,11 +3073,31 @@ function wirePublishedRoundControls() {
   });
 }
 
+function wireSubmitReadyState() {
+  var btn = document.getElementById("submitVote");
+  var nameInput = document.getElementById("voterNameInput");
+  var picksRow = document.getElementById("picksRow");
+  if (!btn || !nameInput || !picksRow || btn._svReadyWire) return;
+  btn._svReadyWire = true;
+  function refresh() {
+    var name = nameInput.value.trim();
+    var picks = readPicksFromDom();
+    if (picks.length !== 3 || !name) return;
+    var err = validatePicksForSubmit(picks, getCurrentTeamId());
+    if (!err) btn.disabled = false;
+  }
+  nameInput.addEventListener("input", debounce(refresh, 80));
+  var obs = new MutationObserver(debounce(refresh, 60));
+  obs.observe(picksRow, { childList: true, subtree: true, characterData: true });
+  refresh();
+}
+
 function init() {
   wireNameSuggestDeferUntilFocus();
   wireVoterNameListeners();
   wireDuplicatePickGuard();
   wireBallotPickDuplicateHint();
+  wireSubmitReadyState();
   wireDuplicateSubmitGuard();
   wireOfflineQueue();
   wireThemeToggle();
@@ -3102,10 +3120,18 @@ function safeInit() {
   }
 }
 
+function bootEnhancements() {
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(safeInit, { timeout: 900 });
+  } else {
+    setTimeout(safeInit, 0);
+  }
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", safeInit, { once: true });
+  document.addEventListener("DOMContentLoaded", bootEnhancements, { once: true });
 } else {
-  safeInit();
+  bootEnhancements();
 }
 
 var adminEnhanceWired = false;

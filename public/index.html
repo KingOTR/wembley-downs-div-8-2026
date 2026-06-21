@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#EE2B33" />
   <meta name="color-scheme" content="light dark" />
-  <meta name="sv-app-version" content="174" />
+  <meta name="sv-app-version" content="175" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v174: full-screen layout; ballot doc dedupe migration; coach slot dedupe -->
+  <!-- v175: fix coach tally ReferenceError; faster boot; compact voting UX -->
   <script>
     (function () {
       try {
@@ -102,13 +102,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" media="print" onload="this.media='all'" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" /></noscript>
   <link rel="dns-prefetch" href="//www.gstatic.com" />
-  <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v174" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v175" />
   <style>
     /* Iwanoff-inspired design system — warm concrete, terracotta, charcoal */
     :root {
@@ -251,6 +249,7 @@
     body {
       margin: 0;
       font-family: var(--font-body);
+      font-size-adjust: 0.52;
       background: var(--gray);
       background-color: var(--gray);
       color: var(--text);
@@ -4209,27 +4208,27 @@
         <span id="participationText"></span>
         <span class="participation-bar" aria-hidden="true"><span class="participation-fill" id="participationFill" style="width:0%"></span></span>
       </div>
-      <p class="hint">Tap in order: 1st = 3 pts, 2nd = 2, 3rd = 1. Tap again to remove.</p>
+      <p class="hint">Pick 3 players — 3 · 2 · 1 pts. Tap again to remove.</p>
       <label class="field" for="voterNameInput">Your name</label>
       <div class="vote-name-wrap">
         <input
           type="text"
           id="voterNameInput"
           class="vote-name-input"
-          placeholder="Enter your name before voting"
+          placeholder="Your name"
           autocomplete="off"
           aria-autocomplete="list"
         />
         <datalist id="voterNameSuggest"></datalist>
         <div id="voterNameSuggestPanel" class="voter-suggest-panel" role="listbox" hidden aria-label="Name suggestions"></div>
       </div>
-      <div class="banner" id="offlineBanner">You're offline. You can still pick players; votes queue until you're back online.</div>
+      <div class="banner" id="offlineBanner">Offline — picks queue until you're back online.</div>
       <div class="picks-panel" id="picksPanel" aria-label="Your picks">
         <div style="font-size:0.85rem; font-weight:800; color: var(--text);">Your picks</div>
         <div class="picks-row" id="picksRow"></div>
-        <div class="hint" style="margin:0">Drag chips to reorder. Tap × to remove.</div>
+        <div class="hint" style="margin:0">Drag to reorder · tap × to remove</div>
       </div>
-      <input type="text" id="playerSearch" class="vote-search" placeholder="Search players?" autocomplete="off" spellcheck="false" />
+      <input type="text" id="playerSearch" class="vote-search" placeholder="Search squad" autocomplete="off" spellcheck="false" />
       <div class="player-list" id="playerList" aria-live="polite"></div>
       <div class="subcard" style="padding: 0.65rem 0.75rem; margin: 0.65rem 0 0">
         <label class="field" for="guestPlayerInput" style="margin-bottom: 0.35rem">Guest / fill-in (not on squad)</label>
@@ -4248,7 +4247,7 @@
           <button type="button" class="ghost" id="addGuestToPicks">Add to picks</button>
         </div>
         <p class="hint" style="margin: 0.35rem 0 0">
-          Uses one pick slot (same 3 / 2 / 1 points). Reorder or remove in "Your picks" above. Counts in round totals; the "Over rounds" graph only traces the saved squad list.
+          Guest uses one pick slot (3 / 2 / 1). Counts in round totals.
         </p>
       </div>
       <div class="actions">
@@ -4817,26 +4816,36 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v174"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v174"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v174"></script>
-  <script type="module" defer src="dist/squadi-admin.js?tag=v174"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v175"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v175"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v175"></script>
   <script>
     (function () {
-      var loaded = false;
+      var mergeLoaded = false;
+      var squadiLoaded = false;
       var mergeObs = null;
+
+      function loadSquadiAdmin() {
+        if (squadiLoaded) return;
+        squadiLoaded = true;
+        import("./dist/squadi-admin.js?tag=v175").catch(function (e) {
+          console.warn("squadi-admin module failed to load", e);
+          squadiLoaded = false;
+        });
+      }
+
       function loadMergeRounds() {
-        if (loaded) return;
-        loaded = true;
+        if (mergeLoaded) return;
+        mergeLoaded = true;
         if (mergeObs) {
           try {
             mergeObs.disconnect();
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v174").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v175").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
-          loaded = false;
+          mergeLoaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
           if (errEl) errEl.textContent = "Merge module failed to load: " + (e.message || String(e));
           var hint = document.getElementById("mergeRoundsHint");
@@ -4846,16 +4855,21 @@
           }
         });
       }
+
       function hook() {
         var btn = document.getElementById("showAdminBtn");
         if (btn && !btn._svMergeHook) {
           btn._svMergeHook = true;
-          btn.addEventListener("click", loadMergeRounds);
+          btn.addEventListener("click", function () {
+            loadMergeRounds();
+            loadSquadiAdmin();
+          });
         }
         var mount = document.getElementById("adminDeferredMount");
         if (mount && !mergeObs) {
           mergeObs = new MutationObserver(function () {
             if (document.getElementById("mergeSourceRound")) loadMergeRounds();
+            if (document.getElementById("squadiFixtureUrl")) loadSquadiAdmin();
           });
           mergeObs.observe(mount, { childList: true, subtree: true });
         }
