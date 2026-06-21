@@ -2,7 +2,7 @@
 
 Static single-page app for team player-of-the-match voting, hosted on [Firebase Hosting](https://wembley-downs-div-8-2026.web.app/).
 
-**Current version:** v159
+**Current version:** v160
 
 ## Build workflow (new — prefer over patch chain)
 

@@ -463,14 +463,23 @@ export async function fetchMatchWeather(match) {
   }
 }
 
-export function weatherPanelHtml(data, units) {
+export function weatherPanelHtml(data, units, opts) {
   units = units || getWeatherUnits();
+  opts = opts || {};
   var midCode =
     data && data.slots && data.slots.length
       ? data.slots[Math.floor(data.slots.length / 2)].code
       : null;
 
   if (!data || !data.ok) {
+    if (opts.strip) {
+      return (
+        "<div class='lineup-weather lineup-weather--strip lineup-weather--empty'>" +
+        "<span class='lineup-weather-strip-msg'>" +
+        escapeHtml((data && data.message) || "Weather unavailable") +
+        "</span></div>"
+      );
+    }
     return (
       "<div class='lineup-weather lineup-weather--compact lineup-weather--empty'>" +
       "<div class='lineup-weather-head'>" +
@@ -494,15 +503,32 @@ export function weatherPanelHtml(data, units) {
         ? fmtTemp(s.feelsMin, units) + "–" + fmtTemp(s.feelsMax, units)
         : fmtTemp(s.feelsMax, units)
       : "";
-  var rainPct = s.rainMax != null ? Math.round(s.rainMax) + "%" : "";
+  var rainPct = s.rainMax != null ? Math.round(s.rainMax) + "% rain" : "";
   var windStr =
     s.windMax != null
-      ? fmtWind(s.windMax, units) + (s.windDir != null ? " " + windArrow(s.windDir) + " " + windDir(s.windDir) : "")
+      ? fmtWind(s.windMax, units) + (s.windDir != null ? " " + windDir(s.windDir) : "")
       : "";
-  var humidStr = s.humidity != null ? s.humidity + "%" : "";
   var cond = s.condition || "—";
   var icon = wmoEmoji(midCode);
 
+  if (opts.strip) {
+    var bits = [icon + " " + tempRange, cond];
+    if (rainPct) bits.push(rainPct);
+    if (windStr) bits.push(windStr);
+    return (
+      "<div class='lineup-weather lineup-weather--strip'>" +
+      "<span class='lineup-weather-strip-main' aria-label='Match weather'>" +
+      escapeHtml(bits.join(" · ")) +
+      "</span>" +
+      (data.location
+        ? "<span class='lineup-weather-strip-loc'>" + escapeHtml(data.location) + "</span>"
+        : "") +
+      weatherUnitsToggleHtml(units) +
+      "</div>"
+    );
+  }
+
+  var humidStr = s.humidity != null ? s.humidity + "%" : "";
   var metrics = "";
   if (feelsShort) metrics += metricChip("\uD83C\uDF21\uFE0F", feelsShort + " feels");
   if (rainPct) metrics += metricChip("\uD83C\uDF27\uFE0F", rainPct);

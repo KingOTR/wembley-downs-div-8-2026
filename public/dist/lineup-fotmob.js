@@ -2,8 +2,8 @@
  * FotMob-style public lineup view (single team, dark pitch, circular nodes).
  * Shared display logic for public tab + PNG export.
  */
-import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v159";
-import { fetchMatchWeather, weatherPanelHtml, getWeatherUnits, wireWeatherUnitsToggle } from "./weather-forecast.js?tag=v159";
+import { displayPlayerName, canonicalPlayerName } from "./name-match.js?tag=v160";
+import { fetchMatchWeather, weatherPanelHtml, getWeatherUnits, wireWeatherUnitsToggle } from "./weather-forecast.js?tag=v160";
 
 export const FORMATION_ROLES = {
   "4-3-3": ["GK", "LB", "CB", "CB", "RB", "CM", "CM", "CM", "LW", "ST", "RW"],
@@ -215,9 +215,10 @@ export function subName(sub) {
   return canonicalPlayerName(displayPlayerName(sub.name || ""));
 }
 
-var DISPLAY_GK_Y = 0.8;
-var DISPLAY_TOP_Y = 0.13;
-var DISPLAY_BOTTOM_Y = 0.8;
+var DISPLAY_GK_Y = 0.88;
+var DISPLAY_TOP_Y = 0.1;
+var DISPLAY_BOTTOM_Y = 0.88;
+var DISPLAY_X_MARGIN = 0.1;
 
 function spreadDataY(starters, playerIdx, gkIdx, clamp) {
   var ys = [];
@@ -262,6 +263,38 @@ export function displayRowY(starters, formation, playerIdx, gkIdx, clamp) {
   return DISPLAY_TOP_Y + (rowFromTop / steps) * (DISPLAY_BOTTOM_Y - DISPLAY_TOP_Y);
 }
 
+function rowIndexForOrder(order, splits) {
+  var cursor = 0;
+  for (var r = 0; r < splits.length; r++) {
+    if (order < cursor + splits[r]) return { row: r, start: cursor, size: splits[r] };
+    cursor += splits[r];
+  }
+  return { row: splits.length - 1, start: cursor - (splits[splits.length - 1] || 1), size: splits[splits.length - 1] || 1 };
+}
+
+/** Even horizontal spacing per formation row (FotMob-style). */
+export function displayRowX(starters, formation, playerIdx, gkIdx, clamp) {
+  if (playerIdx === gkIdx) return 0.5;
+
+  var splits = FORMATION_SPLITS[formation];
+  if (!splits || formation === "custom") return clamp(starters[playerIdx].x);
+
+  var indices = sortedIndices(starters, clamp);
+  var order = indices.indexOf(playerIdx);
+  if (order < 0) order = playerIdx;
+
+  var ri = rowIndexForOrder(order, splits);
+  var rowIndices = indices.slice(ri.start, ri.start + ri.size);
+  rowIndices.sort(function (a, b) {
+    return clamp(starters[a].x) - clamp(starters[b].x);
+  });
+  var slot = rowIndices.indexOf(playerIdx);
+  var n = rowIndices.length;
+  if (n <= 1) return 0.5;
+  var span = 1 - DISPLAY_X_MARGIN * 2;
+  return DISPLAY_X_MARGIN + (slot / (n - 1)) * span;
+}
+
 export function findGkIndex(starters, clamp) {
   var gkIdx = 0;
   var maxY = -1;
@@ -289,6 +322,8 @@ export function prepareLineupDisplay(lineup, setupKey, clamp) {
   var units = starters.map(function (p, i) {
     var role = (p.role && String(p.role).trim()) || roles[i] || "";
     var badge = resolvePlayerBadge(p, badgesMap);
+    var dispX = displayRowX(starters, formation, i, gkIdx, clamp);
+    var dispY = displayRowY(starters, formation, i, gkIdx, clamp);
     return {
       index: i,
       name: p.name,
@@ -296,8 +331,8 @@ export function prepareLineupDisplay(lineup, setupKey, clamp) {
       role: role,
       badge: badge,
       label: lineupLabel(p.name, p.number),
-      leftPct: clamp(p.x) * 100,
-      topPct: clamp(p.y) * 100,
+      leftPct: dispX * 100,
+      topPct: dispY * 100,
       ringText: role || String(p.number || "").trim() || "—",
       isGk: role === "GK" || i === gkIdx || badge === "GK",
     };
@@ -403,17 +438,17 @@ export function renderLineupTab(ctx, teamId) {
     "<div class='lineup-fotmob-header'>" +
     "<div class='lineup-fotmob-setup'>" +
     esc(view.setupLabel) +
-    "</div>" +
+    " setup</div>" +
     "<div class='lineup-fotmob-formation'>" +
     esc(view.formLabel) +
     "</div>" +
     "</div>" +
-    "<div id='lineupWeatherMount' class='lineup-weather-mount' aria-live='polite'></div>" +
     "<div class='pitch pitch--public lineup-pitch-fotmob' aria-label='Starting lineup'>" +
     pitchMarkup() +
     chipsMarkup(view.units, esc) +
     "</div>" +
     subsMarkup(view.subs, esc) +
+    "<div id='lineupWeatherMount' class='lineup-weather-mount lineup-weather-mount--footer' aria-live='polite'></div>" +
     "</div>";
 
   syncPitchOverlay(wrap);
@@ -433,7 +468,7 @@ export function renderLineupTab(ctx, teamId) {
     })
       .then(function (data) {
         if (!weatherMount.parentNode) return;
-        weatherMount.innerHTML = weatherPanelHtml(data, getWeatherUnits());
+        weatherMount.innerHTML = weatherPanelHtml(data, getWeatherUnits(), { strip: true });
         wireWeatherUnitsToggle(weatherMount, function () {
           try {
             renderLineupTab(ctx, teamId);

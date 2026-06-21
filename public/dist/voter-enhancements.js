@@ -920,6 +920,7 @@ function ensureWhoHasntVotedBlock() {
   var details = document.createElement("details");
   details.id = "whoHasntVotedBlock";
   details.className = "subcard who-vote-panel";
+  details.open = true;
   details.style.cssText = "padding:0.65rem 0.75rem; margin:0.5rem 0 0";
   details.innerHTML =
     "<summary style='cursor:pointer;font-weight:800;color:var(--red-dark)'>Who has / hasn't voted?</summary>" +
@@ -930,15 +931,60 @@ function ensureWhoHasntVotedBlock() {
     "<div id='whoVoteExclusions' style='margin-top:0.55rem;font-size:0.88rem;line-height:1.45'></div>" +
     "<p id='whoVoteStatusHint' class='hint' style='margin:0.35rem 0 0'></p>";
   results.insertAdjacentElement("afterend", details);
+  if (!details._svExclWire) {
+    details._svExclWire = true;
+    details.addEventListener("change", function (e) {
+      var t = e.target;
+      if (!t || !t.matches || !t.matches("input[data-excl-player]")) return;
+      collectAndSaveExclusions();
+    });
+  }
+}
+
+var exclSaveTimer = null;
+
+function collectAndSaveExclusions() {
+  if (exclSaveTimer) clearTimeout(exclSaveTimer);
+  exclSaveTimer = setTimeout(function () {
+    exclSaveTimer = null;
+    var box = document.getElementById("whoVoteExclusions");
+  var teamSel = document.getElementById("resultsTeamSelect");
+  var roundSel = document.getElementById("resultsRoundSelect");
+  if (!box || !teamSel || !roundSel || !isSuperAdminUnlocked()) return;
+  var teamId = parseInt(teamSel.value, 10) || 1;
+  var round = normalizeRoundLabel(roundSel.value) || roundSel.value || "Round 1";
+  var next = [];
+  box.querySelectorAll("input[data-excl-player]:checked").forEach(function (cb) {
+    next.push(cb.getAttribute("data-excl-player"));
+  });
+  saveVoteMeta(teamId, round, { excluded: next });
+  var hint = document.getElementById("whoVoteStatusHint");
+  if (hint) hint.textContent = "Exclusions saved for " + round + ".";
+  updateWhoHasntVoted(true);
+  }, 300);
+}
+
+function readPendingExclusions(box) {
+  if (!box) return null;
+  var inputs = box.querySelectorAll("input[data-excl-player]");
+  if (!inputs.length) return null;
+  var pending = [];
+  inputs.forEach(function (cb) {
+    if (cb.checked) pending.push(cb.getAttribute("data-excl-player"));
+  });
+  return pending;
 }
 
 function renderWhoVoteExclusions(teamId, round, squad, meta) {
   var box = document.getElementById("whoVoteExclusions");
-  if (!box || !isSuperAdminUnlocked()) {
-    if (box) box.innerHTML = "";
+  if (!box) return;
+  if (!isSuperAdminUnlocked()) {
+    box.innerHTML =
+      "<p class='hint' style='margin:0'>Unlock <strong>super admin</strong> to mark who didn't play/watch this round.</p>";
     return;
   }
-  var excluded = meta.excluded || [];
+  var pending = readPendingExclusions(box);
+  var excluded = pending || meta.excluded || [];
   var html =
     "<div class='who-vote-excl-head' style='font-weight:800;color:var(--terracotta-deep);margin-bottom:0.35rem'>Excluded this round (didn't play / watch)</div>" +
     "<div class='who-vote-excl-list' style='display:flex;flex-direction:column;gap:0.25rem'>";
@@ -960,20 +1006,8 @@ function renderWhoVoteExclusions(teamId, round, squad, meta) {
   });
   html += "</div>";
   html +=
-    "<button type='button' class='ghost' id='whoVoteExclSave' style='margin-top:0.45rem;padding:0.35rem 0.65rem;font-size:0.8rem'>Save exclusions</button>";
+    "<p class='hint' style='margin:0.35rem 0 0;font-size:0.78rem'>Check players who didn't play or watch — saves automatically.</p>";
   box.innerHTML = html;
-  var saveBtn = document.getElementById("whoVoteExclSave");
-  if (saveBtn && !saveBtn._svBound) {
-    saveBtn._svBound = true;
-    saveBtn.addEventListener("click", function () {
-      var next = [];
-      box.querySelectorAll("input[data-excl-player]:checked").forEach(function (cb) {
-        next.push(cb.getAttribute("data-excl-player"));
-      });
-      saveVoteMeta(teamId, round, { excluded: next });
-      updateWhoHasntVoted();
-    });
-  }
 }
 
 function renderWhoVoteUnmatched(teamId, round, squad, matched) {
@@ -1046,7 +1080,7 @@ function renderWhoVoteUnmatched(teamId, round, squad, matched) {
   });
 }
 
-async function updateWhoHasntVoted() {
+async function updateWhoHasntVoted(skipExclRender) {
   ensureWhoHasntVotedBlock();
   var votedEl = document.getElementById("whoVotedList");
   var listEl = document.getElementById("whoHasntVotedList");
@@ -1127,7 +1161,7 @@ async function updateWhoHasntVoted() {
   }
 
   renderWhoVoteUnmatched(teamId, round, squad, matched);
-  renderWhoVoteExclusions(teamId, round, squad, meta);
+  if (!skipExclRender) renderWhoVoteExclusions(teamId, round, squad, meta);
 
   var hints = [];
   hints.push(matched.ballotCount + " ballot(s)");
@@ -1965,6 +1999,14 @@ function wireAdminSectionTabs() {
     panels.forEach(function (p) {
       p.hidden = p.getAttribute("data-admin-panel") !== tab;
     });
+    if (tab === "votes") {
+      try {
+        ensureWhoHasntVotedBlock();
+        updateWhoHasntVoted();
+      } catch (e) {
+        console.warn("[who-vote]", e);
+      }
+    }
     if (tab === "team") {
       import("./location-autocomplete.js?tag=v159")
         .then(function (mod) {
