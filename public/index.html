@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#EE2B33" />
   <meta name="color-scheme" content="light dark" />
-  <meta name="sv-app-version" content="158" />
+  <meta name="sv-app-version" content="159" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v158: auto-update SW + stale HTML self-heal -->
+  <!-- v159: faster boot, smoother reveal, SW reload guard -->
   <script>
     (function () {
       try {
@@ -75,13 +75,18 @@
         var sm = String(preload.getAttribute("href") || "").match(/tag=v(\d+)/);
         if (sm && sm[1] !== ver) purgeAndReload("preload");
       }
-      if (navigator.onLine === false) return;
+      var skipLive = false;
+      try { skipLive = sessionStorage.getItem("sv_verified_" + ver) === "1"; } catch (e) {}
+      if (skipLive || navigator.onLine === false) return;
       fetch("/sw.js?v=" + ver + "&t=" + Date.now(), { cache: "no-store", credentials: "same-origin" })
         .then(function (r) { return r.ok ? r.text() : ""; })
         .then(function (txt) {
           var m = txt && txt.match(/CACHE_VERSION\s*=\s*"v(\d+)"/);
           var live = m ? m[1] : "";
           if (live && live !== ver) purgeAndReload("live");
+          else if (live === ver) {
+            try { sessionStorage.setItem("sv_verified_" + ver, "1"); } catch (e) {}
+          }
         })
         .catch(function () {});
     })();
@@ -104,7 +109,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v158" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v159" />
   <style>
     /* Iwanoff-inspired design system — warm concrete, terracotta, charcoal */
     :root {
@@ -164,6 +169,10 @@
       --radius-soft: 4px;
       --grid-line: rgba(44, 42, 40, 0.06);
       --touch-min: 2.75rem;
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+      --dur-fast: 180ms;
+      --dur-med: 280ms;
       -webkit-tap-highlight-color: transparent;
     }
 
@@ -337,6 +346,7 @@
       letter-spacing: 0.02em;
       line-height: 1.15;
       font-weight: 800;
+      min-height: 2.4em;
       text-transform: uppercase;
     }
 
@@ -750,6 +760,8 @@
       padding: 1.25rem 1.1rem 1.25rem;
       text-align: left;
       font-family: var(--font-body);
+      min-height: 8.5rem;
+      transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out);
     }
 
     #matchCard::before {
@@ -2665,6 +2677,12 @@
       body.booting #matchCard::after { animation: none; }
       .admin-loading { animation: none; }
       .match-pulse { animation: none; }
+      #voteSection.tab-reveal,
+      #lineupCard.tab-reveal { animation: none; }
+      body.boot-reveal #matchCard > *,
+      body.is-ready #matchCard > *,
+      body.boot-reveal #matchCard::after,
+      .participation-pill { transition: none; }
     }
 
     button.ghost {
@@ -3006,11 +3024,7 @@
       width: 100%;
     }
 
-    /* Smooth boot: show a blank/skeleton match card until round loads */
-    #matchCard {
-      transition: opacity 240ms ease, transform 240ms ease;
-    }
-
+    /* Smooth boot: skeleton match card until round data paints */
     body.booting #matchCard {
       opacity: 1;
       transform: translateY(0);
@@ -3020,6 +3034,12 @@
       opacity: 0;
     }
 
+    body.boot-reveal #matchCard > *,
+    body.is-ready #matchCard > * {
+      opacity: 1;
+      transition: opacity var(--dur-med) var(--ease-out);
+    }
+
     body.booting #matchCard::after {
       content: "";
       position: absolute;
@@ -3027,17 +3047,24 @@
       z-index: 2;
       pointer-events: none;
       background:
-        /* title line */
         linear-gradient(90deg, rgba(148,163,184,0.16) 0%, rgba(148,163,184,0.26) 35%, rgba(148,163,184,0.16) 70%) 1.1rem 1.35rem / 180px 14px no-repeat,
-        /* meta line */
         linear-gradient(90deg, rgba(148,163,184,0.14) 0%, rgba(148,163,184,0.24) 35%, rgba(148,163,184,0.14) 70%) 1.1rem 2.65rem / 240px 10px no-repeat,
-        /* opponent line */
         linear-gradient(90deg, rgba(148,163,184,0.14) 0%, rgba(148,163,184,0.24) 35%, rgba(148,163,184,0.14) 70%) 1.1rem 3.15rem / 260px 12px no-repeat,
-        /* score pill placeholder */
         linear-gradient(90deg, rgba(148,163,184,0.16) 0%, rgba(148,163,184,0.26) 35%, rgba(148,163,184,0.16) 70%) calc(100% - 1.1rem) 2.1rem / 140px 56px no-repeat;
       opacity: 0.9;
       filter: saturate(0.9);
       animation: match-skeleton 1200ms ease-in-out infinite;
+      transition: opacity var(--dur-med) var(--ease-out);
+    }
+
+    body.boot-reveal #matchCard::after,
+    body.is-ready #matchCard::after {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body.is-ready #matchCard::after {
+      content: none;
     }
 
     @keyframes match-skeleton {
@@ -3752,22 +3779,32 @@
     }
 
     .participation-pill {
-      display: none;
+      display: flex;
       align-items: center;
       gap: 0.55rem;
-      margin: 0 0 0.85rem;
-      padding: 0.55rem 0.75rem;
+      margin: 0;
+      padding: 0 0.75rem;
+      max-height: 0;
+      overflow: hidden;
       border-radius: var(--radius-soft);
-      border: 2px solid var(--border);
+      border: 0 solid var(--border);
       background: var(--concrete-deep);
       font-size: 0.88rem;
       font-weight: 650;
       color: var(--text);
       line-height: 1.4;
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: opacity var(--dur-med) var(--ease-out), transform var(--dur-med) var(--ease-out), max-height var(--dur-med) var(--ease-out), margin var(--dur-med) var(--ease-out), padding var(--dur-med) var(--ease-out), border-width var(--dur-med) var(--ease-out);
     }
 
     .participation-pill.is-visible {
-      display: flex;
+      opacity: 1;
+      transform: none;
+      max-height: 4rem;
+      margin: 0 0 0.85rem;
+      padding: 0.55rem 0.75rem;
+      border-width: 2px;
     }
 
     .participation-pill .participation-bar {
@@ -3783,7 +3820,27 @@
       height: 100%;
       border-radius: var(--radius);
       background: linear-gradient(90deg, var(--terracotta) 0%, var(--club-red) 100%);
-      transition: width 0.35s ease;
+      transition: width 0.35s var(--ease-out);
+    }
+
+    #adminDeferredMount {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 420px;
+    }
+
+    body.main-tab-lineup #voteSection,
+    body.main-tab-vote #lineupCard {
+      content-visibility: auto;
+    }
+
+    #voteSection.tab-reveal,
+    #lineupCard.tab-reveal {
+      animation: tab-reveal var(--dur-med) var(--ease-out);
+    }
+
+    @keyframes tab-reveal {
+      from { opacity: 0; transform: translate3d(0, 6px, 0); }
+      to { opacity: 1; transform: none; }
     }
 
     .admin-loading {
@@ -3859,11 +3916,57 @@
 </head>
 <body class="booting">
   <script>
-    // If app.js is slow to download, don't leave the match card blank.
-    // app.js will still render/replace content when it loads.
-    setTimeout(function () {
-      try { document.body.classList.remove("booting"); } catch (e) {}
-    }, 700);
+    (function () {
+      var ended = false;
+      function endBoot() {
+        if (ended) return;
+        ended = true;
+        var b = document.body;
+        if (!b || !b.classList.contains("booting")) return;
+        b.classList.add("boot-reveal");
+        requestAnimationFrame(function () {
+          b.classList.remove("booting");
+          b.classList.add("is-ready");
+        });
+        setTimeout(function () {
+          try { b.classList.remove("boot-reveal"); } catch (e) {}
+        }, 360);
+      }
+      window.__svEndBoot = endBoot;
+
+      function matchCardPopulated() {
+        var opp = document.getElementById("matchOpponentLine");
+        var our = document.getElementById("matchScoreOur");
+        var meta = document.getElementById("matchMetaLine");
+        if (opp && String(opp.textContent || "").trim() !== "?") return true;
+        if (our && String(our.textContent || "").trim() !== "?") return true;
+        if (meta && String(meta.textContent || "").trim() !== "?" && String(meta.textContent || "").trim().length > 2) return true;
+        return false;
+      }
+
+      function watchMatchCard() {
+        if (matchCardPopulated()) {
+          endBoot();
+          return;
+        }
+        var mc = document.getElementById("matchCard");
+        if (!mc) return;
+        var obs = new MutationObserver(function () {
+          if (matchCardPopulated()) {
+            try { obs.disconnect(); } catch (e) {}
+            endBoot();
+          }
+        });
+        obs.observe(mc, { childList: true, subtree: true, characterData: true });
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", watchMatchCard, { once: true });
+      } else {
+        watchMatchCard();
+      }
+      setTimeout(endBoot, 1600);
+    })();
   </script>
   <script>
     (function () {
@@ -3982,6 +4085,10 @@
       <div class="vote-flow-head">
         <span class="step-label">Step 1</span>
         <h2 style="margin:0">Your vote</h2>
+      </div>
+      <div id="participationCounter" class="participation-pill" role="status" aria-live="polite">
+        <span id="participationText"></span>
+        <span class="participation-bar" aria-hidden="true"><span class="participation-fill" id="participationFill" style="width:0%"></span></span>
       </div>
       <p class="hint">Tap in order: 1st = 3 pts, 2nd = 2, 3rd = 1. Tap again to remove.</p>
       <label class="field" for="voterNameInput">Your name</label>
@@ -4553,9 +4660,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v158"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v158"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v158"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v159"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v159"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v159"></script>
   <script>
     (function () {
       var loaded = false;
@@ -4569,7 +4676,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v158").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v159").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
@@ -4643,9 +4750,11 @@
           try { location.reload(); } catch (e) {}
         }
 
-        navigator.serviceWorker.addEventListener("controllerchange", onReloadOnce);
         navigator.serviceWorker.addEventListener("message", function (e) {
-          if (e.data && e.data.type === "SV_ACTIVATED") onReloadOnce();
+          if (!e.data || e.data.type !== "SV_ACTIVATED") return;
+          var live = String(e.data.version || "").replace(/^v/i, "");
+          var cur = window.__svAppVersion ? window.__svAppVersion() : "";
+          if (live && cur && live !== cur) onReloadOnce();
         });
 
         document.addEventListener("visibilitychange", function () {
@@ -4660,25 +4769,33 @@
           if (e.persisted && window.__svSwReg) checkForUpdates(window.__svSwReg);
         });
 
-        navigator.serviceWorker.register(SW_URL).then(function (reg) {
-          window.__svSwReg = reg;
-          checkForUpdates(reg);
-          skipWaitingWorker(reg);
-          reg.addEventListener("updatefound", function () {
-            var nw = reg.installing;
-            if (!nw) return;
-            nw.addEventListener("statechange", function () {
-              if (nw.state === "installed") {
-                if (navigator.serviceWorker.controller) skipWaitingWorker(reg);
-              }
+        function registerSw() {
+          navigator.serviceWorker.register(SW_URL).then(function (reg) {
+            window.__svSwReg = reg;
+            checkForUpdates(reg);
+            skipWaitingWorker(reg);
+            reg.addEventListener("updatefound", function () {
+              var nw = reg.installing;
+              if (!nw) return;
+              nw.addEventListener("statechange", function () {
+                if (nw.state === "installed") {
+                  if (navigator.serviceWorker.controller) skipWaitingWorker(reg);
+                }
+              });
             });
+            if (reg.active && !navigator.serviceWorker.controller) {
+              try { reg.active.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}
+            }
+          }).catch(function () {
+            if (window.__svPurgeAndReload) window.__svPurgeAndReload("register");
           });
-          if (reg.active && !navigator.serviceWorker.controller) {
-            try { reg.active.postMessage({ type: "SKIP_WAITING" }); } catch (e) {}
-          }
-        }).catch(function () {
-          if (window.__svPurgeAndReload) window.__svPurgeAndReload("register");
-        });
+        }
+
+        if (typeof requestIdleCallback === "function") {
+          requestIdleCallback(registerSw, { timeout: 4000 });
+        } else {
+          window.addEventListener("load", registerSw, { once: true });
+        }
       } catch (e) {}
     })();
   </script>
@@ -4704,6 +4821,13 @@
 
         voteSection.style.display = isVote ? "" : "none";
         lineupCard.style.display = isVote ? "none" : "";
+
+        try {
+          var showEl = isVote ? voteSection : lineupCard;
+          showEl.classList.remove("tab-reveal");
+          void showEl.offsetWidth;
+          showEl.classList.add("tab-reveal");
+        } catch (e) {}
 
         try {
           sessionStorage.setItem("mainTab", isVote ? "vote" : "lineup");

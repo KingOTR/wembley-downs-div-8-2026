@@ -2,11 +2,11 @@
 
 Static single-page app for team player-of-the-match voting, hosted on [Firebase Hosting](https://wembley-downs-div-8-2026.web.app/).
 
-**Current version:** v156
+**Current version:** v159
 
 ## Build workflow (new — prefer over patch chain)
 
-The **patch chain is frozen at v156** (`tools/patch-app-v*.js`). New logic goes in `src/`:
+The **patch chain is frozen at v158** (`tools/patch-app-v*.js` — no new patch files). New logic goes in `src/`:
 
 ```bash
 npm install
@@ -245,6 +245,16 @@ Do **not** add new `patch-app-vNNN.js` files — edit `src/` instead.
 ## Participation exclusions (v156+)
 
 Super admin can mark squad members **Excluded (didn't play / watch)** per round. Stored in `team.voteMetaByRound[round].excluded`. Participation pill and hasn't-voted denominator use eligible squad only.
+
+## One ballot per squad member (v157+)
+
+Results tally counts **at most one ballot per squad player**. If fuzzy matching links multiple ballot names to the same person, **only the latest ballot counts** (by timestamp).
+
+Super admin sees a **duplicate ballots** warning in **Results → Who has / hasn't voted?** when two or more ballots map to one squad member (e.g. accidental double submit under different spellings).
+
+## Coach vote routing (v158+)
+
+When **Will** or **Chris** (or names matching `coach1Name` / `coach2Name` in config) vote via the normal player UI, their ballot is stored in **`coachVotes/`** (slot 1 or 2), not `votes/`. Other players continue to use `votes/`.
 
 ## Coach slots
 
