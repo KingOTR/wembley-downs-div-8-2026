@@ -14,13 +14,37 @@ import {
   dedupeVotesOnePerSquad,
   resolveCoachSlotForVoterName,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v159";
+} from "./name-match.js?tag=v162";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
 const PUBLIC_PREFS = STORAGE_KEY + "_public_prefs";
 const OFFLINE_QUEUE_KEY = STORAGE_KEY + "_offline_vote_queue";
 const THEME_KEY = STORAGE_KEY + "_theme";
+
+function assetTag() {
+  try {
+    var m = document.querySelector('meta[name="sv-app-version"]');
+    var n = m ? String(m.getAttribute("content") || "").trim() : "";
+    if (n) return "v" + n;
+  } catch (e) {}
+  return "v162";
+}
+
+function distImport(path) {
+  return import(path + "?tag=" + assetTag());
+}
+
+function debounce(fn, ms) {
+  var t = 0;
+  return function () {
+    clearTimeout(t);
+    var args = arguments;
+    t = setTimeout(function () {
+      fn.apply(null, args);
+    }, ms);
+  };
+}
 
 function qo(c) {
   return normalizeName(c);
@@ -650,7 +674,10 @@ async function flushOfflineQueue() {
   if (!navigator.onLine) return;
   var q = loadOfflineQueue();
   if (!q.length) return;
-  if (!window.__svFirebaseApp) return;
+  if (!window.__svFirebaseApp) {
+    scheduleOfflineQueueFlush();
+    return;
+  }
   var remaining = [];
   var flushed = 0;
   for (var i = 0; i < q.length; i++) {
@@ -676,6 +703,28 @@ async function flushOfflineQueue() {
       }, 4000);
     }
   }
+}
+
+var offlineFlushTimer = 0;
+
+function scheduleOfflineQueueFlush() {
+  if (!navigator.onLine || !loadOfflineQueue().length) return;
+  if (window.__svFirebaseApp) {
+    flushOfflineQueue().catch(function () {});
+    return;
+  }
+  if (offlineFlushTimer) return;
+  var tries = 0;
+  function attempt() {
+    offlineFlushTimer = 0;
+    if (!navigator.onLine || !loadOfflineQueue().length) return;
+    if (window.__svFirebaseApp) {
+      flushOfflineQueue().catch(function () {});
+      return;
+    }
+    if (tries++ < 40) offlineFlushTimer = setTimeout(attempt, 500);
+  }
+  offlineFlushTimer = setTimeout(attempt, 500);
 }
 
 function updateOfflineBanner() {
@@ -754,10 +803,14 @@ function wireOfflineQueue() {
     flushOfflineQueue().catch(function (e) {
       console.warn("[offline-queue]", e);
     });
+    scheduleOfflineQueueFlush();
   });
   window.addEventListener("offline", updateOfflineBanner);
   updateOfflineBanner();
-  if (navigator.onLine) flushOfflineQueue().catch(function () {});
+  if (navigator.onLine) {
+    flushOfflineQueue().catch(function () {});
+    scheduleOfflineQueueFlush();
+  }
 }
 
 var cloudVotesCache = Object.create(null);
@@ -1173,6 +1226,14 @@ async function updateWhoHasntVoted(skipExclRender) {
   if (statusEl) statusEl.textContent = hints.join(" · ");
 }
 
+var debouncedUpdateWhoHasntVoted = debounce(function () {
+  updateWhoHasntVoted();
+}, 300);
+
+var debouncedUpdateAlreadyVotedBanner = debounce(function () {
+  updateAlreadyVotedBanner();
+}, 300);
+
 var whoHasntVotedWired = false;
 
 function wireWhoHasntVoted() {
@@ -1182,13 +1243,13 @@ function wireWhoHasntVoted() {
   ensureWhoHasntVotedBlock();
   if (!whoHasntVotedWired) {
     whoHasntVotedWired = true;
-    teamSel.addEventListener("change", updateWhoHasntVoted);
-    roundSel.addEventListener("change", updateWhoHasntVoted);
+    teamSel.addEventListener("change", debouncedUpdateWhoHasntVoted);
+    roundSel.addEventListener("change", debouncedUpdateWhoHasntVoted);
     window.addEventListener("sv-votes-merged", function () {
       Object.keys(cloudVotesCache).forEach(function (k) {
         delete cloudVotesCache[k];
       });
-      setTimeout(updateWhoHasntVoted, 300);
+      debouncedUpdateWhoHasntVoted();
     });
   }
   updateWhoHasntVoted();
@@ -1379,7 +1440,7 @@ function syncAdminLocationFromStore() {
     window.__svSyncLocationFromMatch(entry);
     return;
   }
-  import("./location-autocomplete.js?tag=v159")
+  distImport("./location-autocomplete.js")
     .then(function (mod) {
       if (mod.syncLocationFromMatch) mod.syncLocationFromMatch(entry);
       else mod.syncLocationFromInputs();
@@ -1417,7 +1478,7 @@ function wireLineupExportOverride() {
     function (ev) {
       ev.stopImmediatePropagation();
       ev.preventDefault();
-      import("./lineup-export.js?tag=v159")
+      distImport("./lineup-export.js")
         .then(function (mod) {
           var snap =
             typeof window.__svLineupExportSnapshot === "function"
@@ -1480,7 +1541,7 @@ async function updateMatchCardWeather() {
 
   mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
   try {
-    var mod = await import("./weather-forecast.js?tag=v159");
+    var mod = await distImport("./weather-forecast.js");
     var units = mod.getWeatherUnits();
     var data = await mod.fetchMatchWeather({
       suburb: entry.suburb,
@@ -1529,17 +1590,15 @@ function wireVoterNameListeners() {
   var input = document.getElementById("voterNameInput");
   if (!input || input._svEnhance) return;
   input._svEnhance = true;
-  input.addEventListener("input", updateAlreadyVotedBanner);
-  input.addEventListener("change", updateAlreadyVotedBanner);
+  input.addEventListener("input", debouncedUpdateAlreadyVotedBanner);
+  input.addEventListener("change", debouncedUpdateAlreadyVotedBanner);
   var teamSel = document.getElementById("publicTeamSelect");
   var roundSel = document.getElementById("publicRoundSelect");
-  if (teamSel) teamSel.addEventListener("change", updateAlreadyVotedBanner);
-  if (roundSel) roundSel.addEventListener("change", updateAlreadyVotedBanner);
-  window.addEventListener("sv-votes-merged", function () {
-    setTimeout(updateAlreadyVotedBanner, 300);
-  });
+  if (teamSel) teamSel.addEventListener("change", debouncedUpdateAlreadyVotedBanner);
+  if (roundSel) roundSel.addEventListener("change", debouncedUpdateAlreadyVotedBanner);
+  window.addEventListener("sv-votes-merged", debouncedUpdateAlreadyVotedBanner);
   window.addEventListener("storage", function (ev) {
-    if (ev.key === STORAGE_KEY) updateAlreadyVotedBanner();
+    if (ev.key === STORAGE_KEY) debouncedUpdateAlreadyVotedBanner();
   });
   updateAlreadyVotedBanner();
 }
@@ -1613,7 +1672,7 @@ function wireParticipationCounter() {
   ensureParticipationCounter();
   var teamSel = document.getElementById("publicTeamSelect");
   var roundSel = document.getElementById("publicRoundSelect");
-  var refresh = function () {
+  var refresh = debounce(function () {
     if (participationInflight) return;
     participationInflight = updateParticipationCounter()
       .catch(function (e) {
@@ -1622,7 +1681,7 @@ function wireParticipationCounter() {
       .finally(function () {
         participationInflight = null;
       });
-  };
+  }, 400);
   if (teamSel && !teamSel._svParticipation) {
     teamSel._svParticipation = true;
     teamSel.addEventListener("change", refresh);
@@ -1631,9 +1690,7 @@ function wireParticipationCounter() {
     roundSel._svParticipation = true;
     roundSel.addEventListener("change", refresh);
   }
-  window.addEventListener("sv-votes-merged", function () {
-    setTimeout(refresh, 400);
-  });
+  window.addEventListener("sv-votes-merged", refresh);
   refresh();
 }
 
@@ -1673,7 +1730,7 @@ function wireLineupPublicTabs() {
       advBtn.setAttribute("aria-pressed", advOn ? "true" : "false");
       advBtn.classList.toggle("lineup-tab-overlay-active", advOn);
     }
-    import("./lineup-fotmob.js?tag=v159")
+    distImport("./lineup-fotmob.js")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1728,7 +1785,7 @@ function wireLineupPublicTabs() {
   }
 
   window.addEventListener("sv-lineup-rendered", function () {
-    import("./lineup-fotmob.js?tag=v159")
+    distImport("./lineup-fotmob.js")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -2008,7 +2065,7 @@ function wireAdminSectionTabs() {
       }
     }
     if (tab === "team") {
-      import("./location-autocomplete.js?tag=v159")
+      distImport("./location-autocomplete.js")
         .then(function (mod) {
           mod.initLocationAutocomplete();
           syncAdminLocationFromStore();
@@ -2030,7 +2087,7 @@ function wireLocationOnRoundChange() {
   roundSel._svLocWire = true;
   roundSel.addEventListener("change", function () {
     setTimeout(function () {
-      import("./location-autocomplete.js?tag=v159")
+      distImport("./location-autocomplete.js")
         .then(function (mod) {
           mod.initLocationAutocomplete();
           syncAdminLocationFromStore();

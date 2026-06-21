@@ -45,6 +45,7 @@ function bumpText(t) {
   let out = t;
   const tagRe = new RegExp("\\?tag=" + oldTag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
   out = out.replace(tagRe, "?tag=" + newTag);
+  out = out.replace(/\?tag=v\d+/g, "?tag=" + newTag);
   out = out.replace(
     new RegExp('CACHE_VERSION = "' + oldTag + '"', "g"),
     'CACHE_VERSION = "' + newTag + '"'
@@ -60,6 +61,7 @@ function bumpText(t) {
   const oldComment = oldTag + ": ";
   const newComment = newTag + ": ";
   out = out.split(oldComment).join(newComment);
+  out = out.replace(/return "v\d+";/g, 'return "' + newTag + '";');
   return out;
 }
 

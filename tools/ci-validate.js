@@ -60,6 +60,30 @@ if (!swRegVer || swRegVer !== appTag) {
   failed = true;
 }
 
+function checkDistTags(expectedTag) {
+  const distDir = path.join(publicDir, "dist");
+  function walk(d) {
+    for (const f of fs.readdirSync(d)) {
+      const p = path.join(d, f);
+      if (fs.statSync(p).isDirectory()) walk(p);
+      else if (f.endsWith(".js")) {
+        const raw = fs.readFileSync(p, "utf8");
+        const tags = raw.match(/\?tag=(v\d+)/g) || [];
+        tags.forEach(function (t) {
+          const tag = t.replace("?tag=", "");
+          if (tag !== expectedTag) {
+            console.error("Stale ?tag= in", path.relative(root, p) + ":", tag, "expected", expectedTag);
+            failed = true;
+          }
+        });
+      }
+    }
+  }
+  walk(distDir);
+}
+
+if (appTag) checkDistTags(appTag);
+
 if (!html.includes("<!DOCTYPE html>")) {
   console.error("index.html missing DOCTYPE");
   failed = true;
