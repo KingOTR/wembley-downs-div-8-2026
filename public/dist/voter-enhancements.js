@@ -13,8 +13,11 @@ import {
   eligibleSquadPlayers,
   dedupeVotesOnePerSquad,
   resolveCoachSlotForVoterName,
+  voterNameKey,
+  classifyBallotNameMatch,
+  isVoteExcludedFromTally,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v168";
+} from "./name-match.js?tag=v170";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -28,7 +31,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v168";
+  return "v170";
 }
 
 function distImport(path) {
@@ -51,12 +54,7 @@ function qo(c) {
 }
 
 function nameKey(c) {
-  return (
-    qo(c)
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "x"
-  );
+  return voterNameKey(c);
 }
 
 function normalizeRoundLabel(c) {
@@ -186,6 +184,14 @@ function syncVotesReceivedCount(ballotCount) {
 function resolveSquadSync(teamId, data) {
   var team = getTeamFromData(data, teamId);
   var squad = (team && Array.isArray(team.players) ? team.players : []).filter(Boolean);
+  if (!squad.length) {
+    try {
+      if (typeof window.__svTeamPlayers === "function") {
+        var fromApp = window.__svTeamPlayers(teamId);
+        if (fromApp && fromApp.length) squad = fromApp.filter(Boolean);
+      }
+    } catch (e) {}
+  }
   return { team: team, squad: squad };
 }
 
@@ -196,9 +202,14 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
     var resolved = resolveSquadSync(teamId, data);
     if (!resolved.squad.length) return votes || [];
     var meta = getVoteMeta(resolved.team, round);
+    var merged = votes || [];
+    var cached = cloudVotesCache[String(teamId)];
+    if (cached && cached.votes && cached.votes.length) {
+      merged = mergeVotesLists(merged, cached.votes);
+    }
     var out = dedupeVotesOnePerSquad(
       resolved.squad,
-      votes || [],
+      merged,
       teamId,
       round,
       voteRoundLabel,
@@ -209,6 +220,26 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
   } catch (e) {
     console.warn("[dedupe-tally]", e);
     return votes || [];
+  }
+};
+
+window.__svEnrichVotePayload = function (voterName, teamId, payload) {
+  try {
+    var data = loadLocalData();
+    var team = getTeamFromData(data, teamId);
+    var squad = (team && team.players ? team.players : []).filter(Boolean);
+    var meta = getVoteMeta(team, payload && payload.round);
+    var cls = classifyBallotNameMatch(voterName, squad, { aliases: meta.aliases });
+    return {
+      nameMatchStatus: cls.nameMatchStatus,
+      tallyExcluded: cls.tallyExcluded,
+      adminApproved: cls.adminApproved,
+      matchedPlayer: cls.matchedPlayer || null,
+      nameMatchReason: cls.reason || "",
+    };
+  } catch (e) {
+    console.warn("[vote-enrich]", e);
+    return {};
   }
 };
 
@@ -648,19 +679,23 @@ async function submitVoteRest(docId, payload) {
   if (!projectId()) throw new Error("Cloud not ready");
   var url = firestoreUrl("votes/" + encodeURIComponent(docId));
   if (!url) throw new Error("Cloud not ready");
+  var fields = {
+    teamId: fsValue(payload.teamId),
+    voterName: fsValue(payload.voterName),
+    voterNameKey: fsValue(payload.voterNameKey),
+    round: fsValue(payload.round),
+    picks: fsValue(payload.picks),
+    submittedAt: fsValue(payload.submittedAt),
+  };
+  if (payload.nameMatchStatus != null) fields.nameMatchStatus = fsValue(payload.nameMatchStatus);
+  if (payload.tallyExcluded != null) fields.tallyExcluded = fsValue(payload.tallyExcluded);
+  if (payload.adminApproved != null) fields.adminApproved = fsValue(payload.adminApproved);
+  if (payload.matchedPlayer != null) fields.matchedPlayer = fsValue(payload.matchedPlayer);
+  if (payload.nameMatchReason != null) fields.nameMatchReason = fsValue(payload.nameMatchReason);
   var res = await fetch(url, {
     method: "PATCH",
     headers: await restHeaders(),
-    body: JSON.stringify({
-      fields: {
-        teamId: fsValue(payload.teamId),
-        voterName: fsValue(payload.voterName),
-        voterNameKey: fsValue(payload.voterNameKey),
-        round: fsValue(payload.round),
-        picks: fsValue(payload.picks),
-        submittedAt: fsValue(payload.submittedAt),
-      },
-    }),
+    body: JSON.stringify({ fields: fields }),
   });
   if (!res.ok) {
     var body = await res.json().catch(function () {
@@ -781,6 +816,13 @@ function wireOfflineQueue() {
         picks: picks,
         submittedAt: new Date().toISOString(),
       };
+      try {
+        if (typeof window.__svEnrichVotePayload === "function") {
+          Object.assign(payload, window.__svEnrichVotePayload(name, teamId, payload));
+        }
+      } catch (e) {
+        console.warn("[offline-enrich]", e);
+      }
       var q = loadOfflineQueue().filter(function (x) {
         return x.docId !== docId;
       });
@@ -916,6 +958,190 @@ function formatBallotWhen(iso) {
     return String(iso);
   }
 }
+
+function voteTallyBadge(vote) {
+  if (!vote) return "";
+  if (vote.adminApproved) return "admin approved";
+  if (vote.nameMatchStatus === "matched") return "matched";
+  if (vote.nameMatchStatus === "fuzzy") return "fuzzy match";
+  if (vote.nameMatchStatus === "unmatched" || vote.tallyExcluded) return "name not matched";
+  return "";
+}
+
+function voteCountsInTally(vote) {
+  return !isVoteExcludedFromTally(vote);
+}
+
+function patchLocalVote(voteId, patch) {
+  var data = loadLocalData();
+  var found = false;
+  data.votes = (data.votes || []).map(function (v) {
+    if (v && (v.id === voteId || String(v.id) === String(voteId))) {
+      found = true;
+      return Object.assign({}, v, patch);
+    }
+    return v;
+  });
+  if (found) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn("[vote-patch-local]", e);
+    }
+  }
+  return found;
+}
+
+async function patchVoteTallyApproval(vote, includeInTally) {
+  if (!vote || !vote.id) return;
+  var patch = {
+    tallyExcluded: !includeInTally,
+    adminApproved: !!includeInTally && vote.nameMatchStatus === "unmatched",
+  };
+  patchLocalVote(vote.id, patch);
+  if (cloudVotesCache[String(vote.teamId)]) {
+    cloudVotesCache[String(vote.teamId)].votes = (cloudVotesCache[String(vote.teamId)].votes || []).map(
+      function (v) {
+        if (v && v.id === vote.id) return Object.assign({}, v, patch);
+        return v;
+      }
+    );
+  }
+  if (window.__svFirebaseApp && projectId() && isSuperAdminUnlocked()) {
+    try {
+      await submitVoteRest(vote.id, Object.assign({}, vote, patch));
+    } catch (e) {
+      console.warn("[vote-tally-patch]", e);
+      throw e;
+    }
+  }
+  try {
+    window.dispatchEvent(new CustomEvent("sv-votes-merged", { detail: { voteId: vote.id } }));
+  } catch (e) {}
+  triggerResultsRefresh();
+}
+
+function triggerResultsRefresh() {
+  try {
+    var teamSel = document.getElementById("resultsTeamSelect");
+    if (teamSel) teamSel.dispatchEvent(new Event("change", { bubbles: true }));
+  } catch (e) {}
+}
+
+async function updateAdminBallotsList(teamId, round) {
+  var wrap = document.getElementById("resultsBallotsWrap");
+  if (!wrap) return;
+  if (!isSuperAdminUnlocked()) {
+    wrap.innerHTML = '<p class="hint" style="margin:0">Unlock super admin to view all ballots.</p>';
+    return;
+  }
+  var rk = normalizeRoundLabel(round) || round || "Round 1";
+  wrap.innerHTML = "<span class='hint admin-loading'>Loading ballots…</span>";
+  var data = loadLocalData();
+  var localVotes = (data.votes || []).filter(function (v) {
+    return v && String(v.teamId) === String(teamId);
+  });
+  var cloudVotes = [];
+  try {
+    cloudVotes = await fetchCloudVotes(teamId, true);
+  } catch (e) {
+    console.warn("[admin-ballots]", e);
+  }
+  var votes = mergeVotesLists(localVotes, cloudVotes)
+    .filter(function (v) {
+      return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === rk;
+    })
+    .sort(function (a, b) {
+      return String(b.submittedAt || "").localeCompare(String(a.submittedAt || ""));
+    });
+
+  if (!votes.length) {
+    wrap.innerHTML = '<p class="empty-state" style="margin:0">No ballots yet for ' + escapeHtml(rk) + ".</p>";
+    return;
+  }
+
+  var html =
+    "<p class='hint' style='margin:0 0 0.45rem'>" +
+    votes.length +
+    " ballot(s) — local + cloud. Unmatched names are excluded from tally until you approve.</p>" +
+    "<div style='display:flex;flex-direction:column;gap:0.45rem'>";
+  votes.forEach(function (v, idx) {
+    var when = formatBallotWhen(v.submittedAt);
+    var picks = (v.picks || []).map(function (p) {
+      return escapeHtml(displayPlayerName(p));
+    }).join(" · ");
+    var badge = voteTallyBadge(v);
+    var counts = voteCountsInTally(v);
+    var statusColor = counts ? "#15803d" : "#b91c1c";
+    var statusText = counts ? "Counts in tally" : "Excluded from tally";
+    var matchLine = "";
+    if (v.matchedPlayer) matchLine = " → squad: " + escapeHtml(v.matchedPlayer);
+    else if (v.nameMatchReason) matchLine = " — " + escapeHtml(String(v.nameMatchReason));
+    html +=
+      "<div class='admin-ballot-row' style='border:1px solid var(--border);border-radius:10px;padding:0.6rem 0.7rem;background:#fff'>" +
+      "<div style='display:flex;justify-content:space-between;gap:0.6rem;align-items:baseline;flex-wrap:wrap'>" +
+      "<div style='font-weight:700;font-size:0.92rem'>" +
+      escapeHtml(displayPlayerName(v.voterName || "Unknown")) +
+      (badge ? " <span style='font-weight:600;font-size:0.78rem;color:#52525b'>(" + escapeHtml(badge) + ")</span>" : "") +
+      "</div>" +
+      "<span style='font-size:0.78rem;color:" +
+      statusColor +
+      ";font-weight:700'>" +
+      escapeHtml(statusText) +
+      "</span></div>" +
+      "<div style='margin-top:0.2rem;font-size:0.82rem;color:#52525b'>" +
+      escapeHtml(when) +
+      matchLine +
+      "</div>" +
+      "<div style='margin-top:0.3rem;font-size:0.9rem'>" +
+      picks +
+      "</div>";
+    if (isSuperAdminUnlocked()) {
+      html +=
+        "<label style='display:flex;align-items:center;gap:0.4rem;margin-top:0.4rem;font-size:0.82rem;cursor:pointer'>" +
+        "<input type='checkbox' data-vote-tally='" +
+        escapeHtml(v.id || "") +
+        "'" +
+        (counts ? " checked" : "") +
+        " /> Count in results tally</label>";
+    }
+    html += "</div>";
+  });
+  html += "</div>";
+  wrap.innerHTML = html;
+  wrap.querySelectorAll("input[data-vote-tally]").forEach(function (cb) {
+    if (cb._svTallyWire) return;
+    cb._svTallyWire = true;
+    cb.addEventListener("change", function () {
+      var id = cb.getAttribute("data-vote-tally");
+      var vote = votes.find(function (x) {
+        return x && x.id === id;
+      });
+      if (!vote) return;
+      cb.disabled = true;
+      patchVoteTallyApproval(vote, cb.checked)
+        .then(function () {
+          updateAdminBallotsList(teamId, rk);
+          updateWhoHasntVoted(true);
+        })
+        .catch(function (e) {
+          cb.checked = !cb.checked;
+          window.alert("Could not save tally setting: " + (e.message || e));
+        })
+        .finally(function () {
+          cb.disabled = false;
+        });
+    });
+  });
+}
+
+window.__svRenderAdminBallots = function (teamId, round) {
+  var tid = parseInt(teamId, 10) || 1;
+  var rk = normalizeRoundLabel(round) || round || "Round 1";
+  updateAdminBallotsList(tid, rk).catch(function (e) {
+    console.warn("[admin-ballots]", e);
+  });
+};
 
 function ensureDuplicateBallotsBanner() {
   var card = document.getElementById("resultsSummaryCard");
@@ -1070,6 +1296,8 @@ function renderWhoVoteUnmatched(teamId, round, squad, matched) {
     box.innerHTML = "";
     return;
   }
+  var tallyNote =
+    " Unmatched ballots are saved but excluded from results until you approve them below or in Ballots.";
   if (!isSuperAdminUnlocked()) {
     box.innerHTML =
       "<div style='font-weight:700;color:var(--red-dark);margin-bottom:0.25rem'>Unmatched ballots (" +
@@ -1083,6 +1311,7 @@ function renderWhoVoteUnmatched(teamId, round, squad, matched) {
           })
           .join("; ")
       ) +
+      tallyNote +
       "</span>";
     return;
   }
@@ -1230,6 +1459,17 @@ var debouncedUpdateWhoHasntVoted = debounce(function () {
   updateWhoHasntVoted();
 }, 300);
 
+var debouncedUpdateAdminBallots = debounce(function () {
+  var teamSel = document.getElementById("resultsTeamSelect");
+  var roundSel = document.getElementById("resultsRoundSelect");
+  if (!teamSel || !roundSel) return;
+  var teamId = parseInt(teamSel.value, 10) || 1;
+  var round = normalizeRoundLabel(roundSel.value) || roundSel.value || "Round 1";
+  if (typeof window.__svRenderAdminBallots === "function") {
+    window.__svRenderAdminBallots(teamId, round);
+  }
+}, 300);
+
 var debouncedUpdateAlreadyVotedBanner = debounce(function () {
   updateAlreadyVotedBanner();
 }, 300);
@@ -1245,14 +1485,18 @@ function wireWhoHasntVoted() {
     whoHasntVotedWired = true;
     teamSel.addEventListener("change", debouncedUpdateWhoHasntVoted);
     roundSel.addEventListener("change", debouncedUpdateWhoHasntVoted);
+    teamSel.addEventListener("change", debouncedUpdateAdminBallots);
+    roundSel.addEventListener("change", debouncedUpdateAdminBallots);
     window.addEventListener("sv-votes-merged", function () {
       Object.keys(cloudVotesCache).forEach(function (k) {
         delete cloudVotesCache[k];
       });
       debouncedUpdateWhoHasntVoted();
+      debouncedUpdateAdminBallots();
     });
   }
   updateWhoHasntVoted();
+  debouncedUpdateAdminBallots();
 }
 
 function ensureLineupSharePackButton() {
@@ -2060,6 +2304,7 @@ function wireAdminSectionTabs() {
       try {
         ensureWhoHasntVotedBlock();
         updateWhoHasntVoted();
+        debouncedUpdateAdminBallots();
       } catch (e) {
         console.warn("[who-vote]", e);
       }

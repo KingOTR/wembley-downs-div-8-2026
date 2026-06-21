@@ -7,9 +7,9 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const nm = await import(pathToFileURL(join(here, "../public/dist/name-match.js")).href);
-const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad, resolveCoachSlotForVoterName, formatGoalScorerDisplayName, formatGoalScorerList } = nm;
+const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad, resolveCoachSlotForVoterName, classifyBallotNameMatch, isVoteExcludedFromTally, formatGoalScorerDisplayName, formatGoalScorerList, voterNameKey, findSquadMatch, displayPlayerName } = nm;
 
-const squad = ["Jay", "Uli", "Sarah", "Sarah Goalkeeper", "Anna", "Erin", "Lauren", "Olivia Freame"];
+const squad = ["Jay", "Uli", "Sarah (tall)", "Sarah Goalkeeper", "Anna", "Erin", "Lauren", "Olivia Freame"];
 const votes = [
   { id: "1", teamId: 1, round: "Round 9", voterName: "Ulrika Delarve" },
   { id: "2", teamId: 1, round: "Round 9", voterName: "Johanna Frolinghaus" },
@@ -95,14 +95,27 @@ var chrisSlot = resolveCoachSlotForVoterName("Chris", team);
 if (!willSlot || willSlot.slot !== 1) throw new Error("Will should be coach slot 1");
 if (!chrisSlot || chrisSlot.slot !== 2) throw new Error("Chris should be coach slot 2");
 
+var unmatched = classifyBallotNameMatch("Totally Unknown", squad);
+if (unmatched.nameMatchStatus !== "unmatched" || !unmatched.tallyExcluded) {
+  throw new Error("unknown name should be unmatched and tallyExcluded");
+}
+var matched = classifyBallotNameMatch("Anna", squad);
+if (matched.nameMatchStatus !== "matched" || matched.tallyExcluded) {
+  throw new Error("Anna should match squad and count in tally");
+}
+var excludedVote = { nameMatchStatus: "unmatched", tallyExcluded: true, adminApproved: false };
+if (!isVoteExcludedFromTally(excludedVote)) throw new Error("unmatched vote should be excluded");
+var approvedVote = { nameMatchStatus: "unmatched", tallyExcluded: true, adminApproved: true };
+if (isVoteExcludedFromTally(approvedVote)) throw new Error("admin-approved vote should count");
+
 if (formatGoalScorerDisplayName("Olivia Freame", squad) !== "Freame") {
   throw new Error("Olivia Freame should display as Freame");
 }
 if (formatGoalScorerDisplayName("Anna Smith", squad) !== "Anna") {
   throw new Error("Anna should display as first name");
 }
-if (formatGoalScorerDisplayName("Sarah Smith", squad) !== "Sarah") {
-  throw new Error("unique Sarah should use first name only");
+if (formatGoalScorerDisplayName("Sarah (tall)", squad) !== "Sarah (tall)") {
+  throw new Error("ambiguous Sarah (tall) should use full squad name");
 }
 var sarahGk = formatGoalScorerDisplayName("Sarah Goalkeeper", squad);
 if (sarahGk !== "Sarah Goalkeeper") {
@@ -111,6 +124,25 @@ if (sarahGk !== "Sarah Goalkeeper") {
 var formatted = formatGoalScorerList(["Olivia Freame", "Ulrika Delarve"], squad);
 if (formatted[0] !== "Freame" || formatted[1] !== "Uli") {
   throw new Error("formatGoalScorerList failed: " + formatted.join(", "));
+}
+
+var tallSarah = findSquadMatch("Sarah (tall)", squad);
+if (!tallSarah || displayPlayerName(tallSarah.match) !== "Sarah (tall)") {
+  throw new Error("Sarah (tall) should match field Sarah, not goalkeeper");
+}
+var gkSarah = findSquadMatch("Sarah Goalkeeper", squad);
+if (!gkSarah || displayPlayerName(gkSarah.match) !== "Sarah Goalkeeper") {
+  throw new Error("Sarah Goalkeeper should match goalkeeper");
+}
+if (voterNameKey("Sarah (tall)") === voterNameKey("Sarah Goalkeeper")) {
+  throw new Error("voterNameKey must distinguish tall Sarah from goalkeeper");
+}
+var tallVotes = [
+  { id: "t1", teamId: 1, round: "Round 9", voterName: "Sarah (tall)", picks: ["Jay", "Anna", "Uli"] },
+];
+var tallMatch = matchSquadToVoters(squad, tallVotes, 1, "Round 9", voteRoundLabel);
+if (tallMatch.votedSquad.indexOf("Sarah (tall)") === -1 || tallMatch.votedSquad.indexOf("Sarah Goalkeeper") !== -1) {
+  throw new Error("Sarah (tall) ballot should map to Sarah (tall) only");
 }
 
 console.log("name-match smoke test OK");

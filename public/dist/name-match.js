@@ -11,13 +11,44 @@ export function displayPlayerName(name) {
     .trim();
 }
 
-/** Strip (C), (tall), Goalkeeper suffixes etc. before fuzzy matching. */
+/** Role-only parentheticals stripped for matching; disambiguators like (tall) are kept. */
+var ROLE_PAREN_RE = /^\s*\((c|vc|gk|captain|capt)\)\s*$/i;
+
+function disambigTagsFromName(name) {
+  var tags = [];
+  displayPlayerName(name).replace(/\(([^)]+)\)/g, function (_, inner) {
+    var low = String(inner || "")
+      .trim()
+      .toLowerCase();
+    if (low && !ROLE_PAREN_RE.test("(" + low + ")")) tags.push(low);
+    return " ";
+  });
+  return tags;
+}
+
+/** Strip role badges/suffixes; keep disambiguation tags (e.g. two Sarahs). */
 export function stripNameQualifiers(name) {
-  return displayPlayerName(name)
-    .replace(/\s*\([^)]*\)\s*/g, " ")
+  var base = displayPlayerName(name)
+    .replace(/\s*\((c|vc|gk|captain|capt)\)\s*/gi, " ")
     .replace(/\s+(goalkeeper|gk|captain|capt|c)\s*$/i, "")
+    .replace(/\([^)]+\)/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+  var tags = disambigTagsFromName(name);
+  if (tags.length) base = (base + " " + tags.join(" ")).replace(/\s+/g, " ").trim();
+  return base;
+}
+
+/** Stable doc-key fragment for voterNameKey (preserves disambiguation). */
+export function voterNameKey(name) {
+  var base = stripNameQualifiers(displayPlayerName(name));
+  return (
+    base
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "x"
+  );
 }
 
 /**
@@ -242,6 +273,13 @@ export function formatGoalScorerList(scorers, squad) {
 
 export function findSquadMatch(voterName, players, threshold) {
   var th = threshold == null ? DEFAULT_SQUAD_THRESHOLD : threshold;
+  var rawVoter = displayPlayerName(voterName);
+  var exactDisplay = (players || []).find(function (p) {
+    return displayPlayerName(p).toLowerCase() === rawVoter.toLowerCase();
+  });
+  if (exactDisplay) {
+    return { match: exactDisplay, exact: true, similarity: 1, reason: "exact display match" };
+  }
   var exact = (players || []).find(function (p) {
     return normalizeName(p) === normalizeName(voterName);
   });
@@ -360,6 +398,54 @@ export function eligibleSquadPlayers(squad, excluded) {
   });
 }
 
+/** Whether a vote doc should be excluded from results tally. */
+export function isVoteExcludedFromTally(vote) {
+  if (!vote) return true;
+  if (vote.adminApproved === true) return false;
+  if (vote.tallyExcluded === true) return true;
+  if (vote.nameMatchStatus === "unmatched") return true;
+  return false;
+}
+
+/**
+ * Classify ballot name vs squad at submit time.
+ * Unmatched names: tallyExcluded by default; admin can set adminApproved later.
+ */
+export function classifyBallotNameMatch(voterName, squad, opts) {
+  var options = opts || {};
+  var aliases = options.aliases || {};
+  var th = options.threshold == null ? DEFAULT_SQUAD_THRESHOLD : options.threshold;
+  var raw = displayPlayerName(voterName);
+  if (!raw) {
+    return {
+      nameMatchStatus: "empty",
+      tallyExcluded: true,
+      adminApproved: false,
+      matchedPlayer: null,
+      reason: "empty name",
+    };
+  }
+  var alias = resolveBallotAlias(raw, aliases);
+  var match = findSquadMatch(alias.matchAs, squad, th);
+  if (!match && alias.matchAs !== raw) match = findSquadMatch(raw, squad, th);
+  if (!match) {
+    return {
+      nameMatchStatus: "unmatched",
+      tallyExcluded: true,
+      adminApproved: false,
+      matchedPlayer: null,
+      reason: explainSquadMismatch(raw, squad, th),
+    };
+  }
+  return {
+    nameMatchStatus: match.exact && !alias.aliased ? "matched" : "fuzzy",
+    tallyExcluded: false,
+    adminApproved: false,
+    matchedPlayer: displayPlayerName(match.match),
+    reason: match.reason,
+  };
+}
+
 /** Parse ballot submittedAt for sorting (latest first). */
 export function ballotSubmittedAt(vote) {
   if (!vote || !vote.submittedAt) return 0;
@@ -369,6 +455,11 @@ export function ballotSubmittedAt(vote) {
 
 function ballotDocKey(v, roundKey) {
   return v.id || "t" + v.teamId + "|" + normalizeName(v.voterName) + "|" + roundKey;
+}
+
+function ballotDedupeKey(v, roundKey) {
+  if (v.id) return v.id;
+  return "t" + v.teamId + "|" + normalizeName(v.voterName) + "|" + roundKey + "|" + (v.submittedAt || "");
 }
 
 function ballotMatchesPlayer(v, player, aliases, th) {
@@ -393,9 +484,10 @@ function ballotMatchesPlayer(v, player, aliases, th) {
 /**
  * Squad members with 2+ ballots matched to them. Latest submittedAt wins for tally.
  */
-export function findDuplicateBallotsPerSquad(squad, roundVotes, threshold, aliases) {
+export function findDuplicateBallotsPerSquad(squad, roundVotes, threshold, aliases, roundKey) {
   var th = threshold == null ? DEFAULT_SQUAD_THRESHOLD : threshold;
   var aliasMap = aliases || {};
+  var rk = roundKey || "";
   var duplicates = [];
 
   (squad || []).forEach(function (player) {
@@ -422,6 +514,7 @@ export function findDuplicateBallotsPerSquad(squad, roundVotes, threshold, alias
           ballot: x.ballot,
           submittedAt: x.submittedAt,
           id: x.id,
+          ballotKey: ballotDedupeKey(x._vote, rk),
           reason: "duplicate ballot for same squad member (latest wins)",
         };
       }),
@@ -453,18 +546,22 @@ export function dedupeVotesOnePerSquad(
     squad,
     roundVotes,
     threshold,
-    options.aliases || {}
+    options.aliases || {},
+    roundKey
   );
   var skipKeys = Object.create(null);
   duplicates.forEach(function (d) {
     d.excluded.forEach(function (x) {
       if (x.id) skipKeys[x.id] = true;
+      if (x.ballotKey) skipKeys[x.ballotKey] = true;
     });
   });
 
   var votesForTally = roundVotes.filter(function (v) {
     if (!v) return false;
     if (v.id && skipKeys[v.id]) return false;
+    if (skipKeys[ballotDedupeKey(v, roundKey)]) return false;
+    if (isVoteExcludedFromTally(v)) return false;
     return true;
   });
 

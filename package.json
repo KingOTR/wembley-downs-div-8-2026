@@ -7,6 +7,8 @@
     "validate": "node tools/ci-validate.js",
     "test": "node tools/ci-validate.js",
     "test:name-match": "node tools/test-name-match.mjs",
+    "test:tally": "node tools/test-tally.mjs",
+    "test:round-date": "node tools/test-round-date.mjs",
     "test:rules": "npx -y firebase-tools@latest emulators:exec --only firestore --project wembley-downs-rules-test \"node tools/test-firestore-rules.mjs\"",
     "test:browser": "node tools/browser-test.js",
     "test:visual": "node tools/visual-qa.js",

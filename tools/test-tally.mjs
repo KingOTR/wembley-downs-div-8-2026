@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const nm = await import(pathToFileURL(join(here, "../public/dist/name-match.js")).href);
-const { dedupeVotesOnePerSquad, displayPlayerName } = nm;
+const { dedupeVotesOnePerSquad, displayPlayerName, isVoteExcludedFromTally } = nm;
 
 function voteRoundLabel(v) {
   return String(v.round || "").trim();
@@ -84,9 +84,62 @@ if (dupPts.Carol !== 3 || dupPts.Dave !== 2) {
   throw new Error("duplicate Bob ballots should tally once, got " + JSON.stringify(dupPts));
 }
 
+var unmatchedBallot = [
+  {
+    id: "b-unmatched",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Wrong Name",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Bob", "Carol", "Dave"],
+    nameMatchStatus: "unmatched",
+    tallyExcluded: true,
+    adminApproved: false,
+  },
+];
+var unmatchedPts = simulateUo(unmatchedBallot, dedupeForTally);
+if (unmatchedPts.Bob || unmatchedPts.Carol || unmatchedPts.Dave) {
+  throw new Error("unmatched ballot should not tally, got " + JSON.stringify(unmatchedPts));
+}
+var approvedUnmatched = [
+  Object.assign({}, unmatchedBallot[0], { adminApproved: true, tallyExcluded: true }),
+];
+var approvedPts = simulateUo(approvedUnmatched, dedupeForTally);
+if (approvedPts.Bob !== 3) {
+  throw new Error("admin-approved unmatched ballot should tally, got " + JSON.stringify(approvedPts));
+}
+if (!isVoteExcludedFromTally(unmatchedBallot[0])) {
+  throw new Error("isVoteExcludedFromTally should exclude unmatched");
+}
+
 var oldFallbackPts = tallyPoints(dedupeForTally(1, "Round 9", dupSameName) || dupSameName);
 if (oldFallbackPts.Carol === 6) {
   throw new Error("dedupe returned empty and old || fallback would double-count");
+}
+
+var dupNoId = [
+  {
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Bob",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Carol", "Dave", "Alice"],
+  },
+  {
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Bob",
+    submittedAt: "2026-06-01T12:00:00.000Z",
+    picks: ["Carol", "Dave", "Alice"],
+  },
+];
+var noIdDeduped = dedupeForTally(1, "Round 9", dupNoId);
+if (noIdDeduped.length !== 1) {
+  throw new Error("id-less duplicate ballots should dedupe to 1, got " + noIdDeduped.length);
+}
+var noIdPts = simulateUo(dupNoId, dedupeForTally);
+if (noIdPts.Carol !== 3) {
+  throw new Error("id-less duplicate Bob should tally once, got " + JSON.stringify(noIdPts));
 }
 
 console.log("tally regression OK");
