@@ -11,8 +11,9 @@ import {
   findAmbiguousByFirstName,
   findSquadMatch,
   eligibleSquadPlayers,
+  dedupeVotesOnePerSquad,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v156";
+} from "./name-match.js?tag=v157";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -156,6 +157,35 @@ function syncVotesReceivedCount(ballotCount) {
   var el = document.getElementById("votesReceivedCount");
   if (el && ballotCount != null) el.textContent = String(ballotCount);
 }
+
+function resolveSquadSync(teamId, data) {
+  var team = getTeamFromData(data, teamId);
+  var squad = (team && Array.isArray(team.players) ? team.players : []).filter(Boolean);
+  return { team: team, squad: squad };
+}
+
+/** Hook for app.min.js results tally — one ballot per squad member (latest wins). */
+window.__svDedupeVotesForTally = function (teamId, round, votes) {
+  try {
+    var data = loadLocalData();
+    var resolved = resolveSquadSync(teamId, data);
+    if (!resolved.squad.length) return votes;
+    var meta = getVoteMeta(resolved.team, round);
+    var out = dedupeVotesOnePerSquad(
+      resolved.squad,
+      votes || [],
+      teamId,
+      round,
+      voteRoundLabel,
+      DEFAULT_SQUAD_THRESHOLD,
+      { aliases: meta.aliases }
+    );
+    return out.votesForTally;
+  } catch (e) {
+    console.warn("[dedupe-tally]", e);
+    return votes;
+  }
+};
 
 function getPublicPrefs() {
   try {
@@ -333,9 +363,16 @@ function wireDuplicateSubmitGuard() {
   var btn = document.getElementById("submitVote");
   if (!btn || btn._svDupGuard) return;
   btn._svDupGuard = true;
+  var submitting = false;
+
   btn.addEventListener(
     "click",
     function (ev) {
+      if (submitting) {
+        ev.stopImmediatePropagation();
+        ev.preventDefault();
+        return;
+      }
       var nameInput = document.getElementById("voterNameInput");
       var name = nameInput ? nameInput.value.trim() : "";
       if (!name) return;
@@ -351,18 +388,29 @@ function wireDuplicateSubmitGuard() {
       }
       var round = getCurrentRound(teamId);
       var existing = findExistingVote(teamId, name, round);
-      if (!existing) return;
-      var picks = (existing.picks || []).join(" · ");
-      var msg =
-        name +
-        " already has a ballot for " +
-        round +
-        (picks ? " (" + picks + ")." : ".") +
-        "\n\nSubmit again to replace it?";
-      if (!confirm(msg)) {
-        ev.stopImmediatePropagation();
-        ev.preventDefault();
+      if (existing) {
+        var picks = (existing.picks || []).join(" · ");
+        var msg =
+          name +
+          " already has a ballot for " +
+          round +
+          (picks ? " (" + picks + ")." : ".") +
+          "\n\nSubmit again to change your vote?";
+        if (!confirm(msg)) {
+          ev.stopImmediatePropagation();
+          ev.preventDefault();
+          return;
+        }
       }
+      submitting = true;
+      btn.disabled = true;
+      var prevText = btn.textContent;
+      btn.textContent = "Submitting…";
+      setTimeout(function () {
+        submitting = false;
+        btn.disabled = false;
+        btn.textContent = prevText;
+      }, 2800);
     },
     true
   );
@@ -660,6 +708,67 @@ function mergeVotesLists() {
   });
 }
 
+function formatBallotWhen(iso) {
+  if (!iso) return "unknown time";
+  try {
+    var d = new Date(iso);
+    if (!isFinite(d.getTime())) return String(iso);
+    return d.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return String(iso);
+  }
+}
+
+function ensureDuplicateBallotsBanner() {
+  var card = document.getElementById("resultsSummaryCard");
+  if (!card || document.getElementById("duplicateBallotsBanner")) return;
+  var el = document.createElement("div");
+  el.id = "duplicateBallotsBanner";
+  el.className = "duplicate-ballots-banner";
+  el.setAttribute("role", "alert");
+  el.hidden = true;
+  card.insertAdjacentElement("afterend", el);
+}
+
+function renderDuplicateBallotsWarning(duplicates) {
+  ensureDuplicateBallotsBanner();
+  var el = document.getElementById("duplicateBallotsBanner");
+  if (!el) return;
+  if (!duplicates || !duplicates.length) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  el.hidden = false;
+  var html =
+    "<strong>Duplicate ballots</strong> — someone may have accidentally submitted twice under different names. " +
+    "Only the <em>latest</em> ballot counts for results. Ask the voter to use <strong>Change vote</strong>, or remove extras in Firestore.";
+  html += "<ul class='duplicate-ballots-list'>";
+  duplicates.forEach(function (d) {
+    var names = d.ballotNames.join(", ");
+    html +=
+      "<li><strong>" +
+      escapeHtml(d.squadName) +
+      "</strong> received " +
+      d.ballotNames.length +
+      " ballots (" +
+      escapeHtml(names) +
+      "). Counting: <strong>" +
+      escapeHtml(d.kept.ballot) +
+      "</strong>" +
+      (d.kept.submittedAt ? " · " + escapeHtml(formatBallotWhen(d.kept.submittedAt)) : "") +
+      ". Ignored: " +
+      d.excluded
+        .map(function (x) {
+          return escapeHtml(x.ballot) + (x.submittedAt ? " (" + formatBallotWhen(x.submittedAt) + ")" : "");
+        })
+        .join("; ") +
+      ".</li>";
+  });
+  html += "</ul>";
+  el.innerHTML = html;
+}
+
 function ensureWhoHasntVotedBlock() {
   var results = document.getElementById("resultsSummaryCard");
   if (!results || document.getElementById("whoHasntVotedBlock")) return;
@@ -829,16 +938,25 @@ async function updateWhoHasntVoted() {
   var votes = mergeVotesLists(localVotes, cloudVotes);
   var matched = computeParticipation(squad, votes, teamId, round, meta);
   syncVotesReceivedCount(matched.ballotCount);
+  renderDuplicateBallotsWarning(matched.duplicates || []);
 
   if (votedEl) {
     if (matched.votedSquad.length) {
+      var dupNote =
+        matched.duplicates && matched.duplicates.length
+          ? " · " + matched.duplicates.length + " duplicate group(s) — latest counts"
+          : "";
       votedEl.innerHTML =
         "<div style='font-weight:700;color:#15803d;margin-bottom:0.25rem'>Voted (" +
         matched.votedSquad.length +
         " squad · " +
+        matched.countedBallots +
+        "/" +
         matched.ballotCount +
         " ballot" +
         (matched.ballotCount === 1 ? "" : "s") +
+        " counted" +
+        dupNote +
         ")</div>" +
         escapeHtml(matched.votedSquad.join(", "));
     } else {
@@ -1082,7 +1200,7 @@ function syncAdminLocationFromStore() {
     window.__svSyncLocationFromMatch(entry);
     return;
   }
-  import("./location-autocomplete.js?tag=v156")
+  import("./location-autocomplete.js?tag=v157")
     .then(function (mod) {
       if (mod.syncLocationFromMatch) mod.syncLocationFromMatch(entry);
       else mod.syncLocationFromInputs();
@@ -1120,7 +1238,7 @@ function wireLineupExportOverride() {
     function (ev) {
       ev.stopImmediatePropagation();
       ev.preventDefault();
-      import("./lineup-export.js?tag=v156")
+      import("./lineup-export.js?tag=v157")
         .then(function (mod) {
           var snap =
             typeof window.__svLineupExportSnapshot === "function"
@@ -1183,7 +1301,7 @@ async function updateMatchCardWeather() {
 
   mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
   try {
-    var mod = await import("./weather-forecast.js?tag=v156");
+    var mod = await import("./weather-forecast.js?tag=v157");
     var units = mod.getWeatherUnits();
     var data = await mod.fetchMatchWeather({
       suburb: entry.suburb,
@@ -1376,7 +1494,7 @@ function wireLineupPublicTabs() {
       advBtn.setAttribute("aria-pressed", advOn ? "true" : "false");
       advBtn.classList.toggle("lineup-tab-overlay-active", advOn);
     }
-    import("./lineup-fotmob.js?tag=v156")
+    import("./lineup-fotmob.js?tag=v157")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1431,7 +1549,7 @@ function wireLineupPublicTabs() {
   }
 
   window.addEventListener("sv-lineup-rendered", function () {
-    import("./lineup-fotmob.js?tag=v156")
+    import("./lineup-fotmob.js?tag=v157")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1703,7 +1821,7 @@ function wireAdminSectionTabs() {
       p.hidden = p.getAttribute("data-admin-panel") !== tab;
     });
     if (tab === "team") {
-      import("./location-autocomplete.js?tag=v156")
+      import("./location-autocomplete.js?tag=v157")
         .then(function (mod) {
           mod.initLocationAutocomplete();
           syncAdminLocationFromStore();
@@ -1725,7 +1843,7 @@ function wireLocationOnRoundChange() {
   roundSel._svLocWire = true;
   roundSel.addEventListener("change", function () {
     setTimeout(function () {
-      import("./location-autocomplete.js?tag=v156")
+      import("./location-autocomplete.js?tag=v157")
         .then(function (mod) {
           mod.initLocationAutocomplete();
           syncAdminLocationFromStore();

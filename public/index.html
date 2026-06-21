@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#EE2B33" />
   <meta name="color-scheme" content="light dark" />
-  <meta name="sv-app-version" content="156" />
+  <meta name="sv-app-version" content="157" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v156: auto-update SW + stale HTML self-heal -->
+  <!-- v157: auto-update SW + stale HTML self-heal -->
   <script>
     (function () {
       function appVer() {
@@ -94,7 +94,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v156" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v157" />
   <style>
     /* Iwanoff-inspired design system — warm concrete, terracotta, charcoal */
     :root {
@@ -3236,6 +3236,29 @@
       .banner--already-voted { color: #fecaca; }
     }
 
+    .duplicate-ballots-banner {
+      display: block;
+      margin: 0.5rem 0 0.75rem;
+      padding: 0.65rem 0.75rem;
+      border-radius: var(--radius-md, 0.5rem);
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+      color: #78350f;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+    .duplicate-ballots-banner[hidden] { display: none !important; }
+    .duplicate-ballots-list {
+      margin: 0.45rem 0 0;
+      padding-left: 1.15rem;
+    }
+    .duplicate-ballots-list li { margin: 0.25rem 0; }
+    html[data-theme="dark"] .duplicate-ballots-banner {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: #d97706;
+      color: #fde68a;
+    }
+
     .focus-ring:focus-visible,
     button:focus-visible,
     input:focus-visible,
@@ -4520,9 +4543,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v156"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v156"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v156"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v157"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v157"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v157"></script>
   <script>
     (function () {
       var loaded = false;
@@ -4536,7 +4559,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v156").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v157").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
@@ -4575,7 +4598,7 @@
       try {
         if (!("serviceWorker" in navigator)) return;
         var ver = window.__svAppVersion ? window.__svAppVersion() : "154";
-        var SW_URL = "/sw.js?v=156";
+        var SW_URL = "/sw.js?v=157";
         var reloaded = false;
         var lastUpdateCheck = 0;
 

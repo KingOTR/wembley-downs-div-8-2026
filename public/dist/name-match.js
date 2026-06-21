@@ -289,6 +289,127 @@ export function eligibleSquadPlayers(squad, excluded) {
   });
 }
 
+/** Parse ballot submittedAt for sorting (latest first). */
+export function ballotSubmittedAt(vote) {
+  if (!vote || !vote.submittedAt) return 0;
+  var t = Date.parse(String(vote.submittedAt));
+  return isFinite(t) ? t : 0;
+}
+
+function ballotDocKey(v, roundKey) {
+  return v.id || "t" + v.teamId + "|" + normalizeName(v.voterName) + "|" + roundKey;
+}
+
+function ballotMatchesPlayer(v, player, aliases, th) {
+  var raw = displayPlayerName(v.voterName || "");
+  if (!raw) return null;
+  var alias = resolveBallotAlias(raw, aliases);
+  var m = findSquadMatch(alias.matchAs, [player], th);
+  if (!m && alias.matchAs !== raw) m = findSquadMatch(raw, [player], th);
+  if (!m) return null;
+  return {
+    ballot: raw,
+    squadName: displayPlayerName(player),
+    voterNameKey: v.voterNameKey || "",
+    submittedAt: v.submittedAt || "",
+    id: v.id || "",
+    exact: m.exact && !alias.aliased,
+    similarity: m.similarity,
+    aliased: alias.aliased,
+  };
+}
+
+/**
+ * Squad members with 2+ ballots matched to them. Latest submittedAt wins for tally.
+ */
+export function findDuplicateBallotsPerSquad(squad, roundVotes, threshold, aliases) {
+  var th = threshold == null ? DEFAULT_SQUAD_THRESHOLD : threshold;
+  var aliasMap = aliases || {};
+  var duplicates = [];
+
+  (squad || []).forEach(function (player) {
+    var squadName = displayPlayerName(player);
+    var hits = [];
+    (roundVotes || []).forEach(function (v) {
+      var m = ballotMatchesPlayer(v, player, aliasMap, th);
+      if (m) {
+        hits.push(Object.assign({}, m, { _vote: v, _ts: ballotSubmittedAt(v) }));
+      }
+    });
+    if (hits.length < 2) return;
+
+    hits.sort(function (a, b) {
+      return b._ts - a._ts || String(b.ballot).localeCompare(String(a.ballot));
+    });
+    var kept = hits[0];
+    var excluded = hits.slice(1);
+    duplicates.push({
+      squadName: squadName,
+      kept: { ballot: kept.ballot, submittedAt: kept.submittedAt, id: kept.id },
+      excluded: excluded.map(function (x) {
+        return {
+          ballot: x.ballot,
+          submittedAt: x.submittedAt,
+          id: x.id,
+          reason: "duplicate ballot for same squad member (latest wins)",
+        };
+      }),
+      ballotNames: hits.map(function (x) {
+        return x.ballot;
+      }),
+    });
+  });
+
+  return duplicates;
+}
+
+/** One ballot per squad member for results tally. Latest submittedAt wins. */
+export function dedupeVotesOnePerSquad(
+  squad,
+  votes,
+  teamId,
+  roundLabel,
+  voteRoundLabelFn,
+  threshold,
+  opts
+) {
+  var options = opts || {};
+  var roundKey = voteRoundLabelFn({ round: roundLabel });
+  var roundVotes = (votes || []).filter(function (v) {
+    return v && String(v.teamId) === String(teamId) && voteRoundLabelFn(v) === roundKey;
+  });
+  var duplicates = findDuplicateBallotsPerSquad(
+    squad,
+    roundVotes,
+    threshold,
+    options.aliases || {}
+  );
+  var skipKeys = Object.create(null);
+  duplicates.forEach(function (d) {
+    d.excluded.forEach(function (x) {
+      if (x.id) skipKeys[x.id] = true;
+    });
+    roundVotes.forEach(function (v) {
+      d.excluded.forEach(function (x) {
+        if (x.ballot && displayPlayerName(v.voterName || "") === x.ballot) {
+          skipKeys[ballotDocKey(v, roundKey)] = true;
+        }
+      });
+    });
+  });
+
+  var votesForTally = roundVotes.filter(function (v) {
+    return !skipKeys[ballotDocKey(v, roundKey)];
+  });
+
+  return {
+    votesForTally: votesForTally,
+    duplicates: duplicates,
+    ballotCount: roundVotes.length,
+    countedBallots: votesForTally.length,
+  };
+}
+
 /** Map squad player → voter ballot for this round (exact, fuzzy, or admin alias). */
 export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLabelFn, threshold, opts) {
   var th = threshold == null ? DEFAULT_SQUAD_THRESHOLD : threshold;
@@ -296,13 +417,6 @@ export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLa
   var aliases = options.aliases || {};
   var excluded = options.excluded || [];
   var eligible = eligibleSquadPlayers(squad, excluded);
-  var voted = [];
-  var votedSquad = [];
-  var missing = [];
-  var possible = [];
-  var extraVoters = [];
-  var extraDetails = [];
-  var usedBallots = Object.create(null);
   var roundKey = voteRoundLabelFn({ round: roundLabel });
 
   var roundVotes = (votes || []).filter(function (v) {
@@ -310,36 +424,44 @@ export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLa
   });
   var ballotCount = roundVotes.length;
 
+  var deduped = dedupeVotesOnePerSquad(
+    squad,
+    votes,
+    teamId,
+    roundLabel,
+    voteRoundLabelFn,
+    th,
+    { aliases: aliases }
+  );
+  var tallyVotes = deduped.votesForTally;
+  var duplicates = deduped.duplicates;
+
+  var voted = [];
+  var votedSquad = [];
+  var missing = [];
+  var possible = [];
+  var extraVoters = [];
+  var extraDetails = [];
+  var usedBallots = Object.create(null);
+
   function ballotKey(v) {
-    return v.id || "t" + v.teamId + "|" + normalizeName(v.voterName) + "|" + roundKey;
+    return ballotDocKey(v, roundKey);
   }
 
   function tryMatchBallot(v, player) {
-    var raw = displayPlayerName(v.voterName || "");
-    if (!raw) return null;
-    var alias = resolveBallotAlias(raw, aliases);
-    var m = findSquadMatch(alias.matchAs, [player], th);
-    if (!m && alias.matchAs !== raw) m = findSquadMatch(raw, [player], th);
-    if (!m) return null;
-    return {
-      ballot: raw,
-      squadName: displayPlayerName(player),
-      exact: m.exact && !alias.aliased,
-      similarity: m.similarity,
-      aliased: alias.aliased,
-    };
+    return ballotMatchesPlayer(v, player, aliases, th);
   }
 
   eligible.forEach(function (player) {
     var hit = null;
-    roundVotes.forEach(function (v) {
+    tallyVotes.forEach(function (v) {
       var bk = ballotKey(v);
       if (usedBallots[bk]) return;
       var m = tryMatchBallot(v, player);
       if (m) hit = m;
     });
     if (hit) {
-      roundVotes.forEach(function (v) {
+      tallyVotes.forEach(function (v) {
         if (displayPlayerName(v.voterName || "") === hit.ballot) usedBallots[ballotKey(v)] = true;
       });
       votedSquad.push(hit.squadName);
@@ -386,6 +508,8 @@ export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLa
     extraVoters: extraVoters,
     extraDetails: extraDetails,
     ballotCount: ballotCount,
+    countedBallots: deduped.countedBallots,
+    duplicates: duplicates,
     eligibleCount: eligible.length,
     excluded: excluded.slice(),
     squadCount: (squad || []).length,

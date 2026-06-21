@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const nm = await import(pathToFileURL(join(here, "../public/dist/name-match.js")).href);
-const { matchSquadToVoters, normalizeName } = nm;
+const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad } = nm;
 
 const squad = ["Jay", "Uli", "Sarah", "Sarah Goalkeeper", "Anna", "Erin", "Lauren"];
 const votes = [
@@ -38,5 +38,32 @@ var withAlias = matchSquadToVoters(squad, votes, 1, "Round 9", voteRoundLabel, u
 if (withAlias.votedSquad.indexOf("Jay") === -1) throw new Error("alias should link Johanna to Jay");
 if (withAlias.eligibleCount !== squad.length - 2) throw new Error("eligible should exclude Erin+Lauren");
 if (withAlias.missing.indexOf("Erin") !== -1) throw new Error("Erin should not be in missing");
+
+var dupVotes = [
+  {
+    id: "t1_rround-9_vuli",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Uli",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Jay", "Anna", "Sarah"],
+  },
+  {
+    id: "t1_rround-9_vulrika-delarve",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Ulrika Delarve",
+    submittedAt: "2026-06-01T12:00:00.000Z",
+    picks: ["Jay", "Sarah", "Anna"],
+  },
+];
+var dups = findDuplicateBallotsPerSquad(["Uli", "Jay"], dupVotes);
+if (!dups.length || dups[0].squadName !== "Uli") throw new Error("expected Uli duplicate group");
+if (dups[0].kept.ballot !== "Ulrika Delarve") throw new Error("latest ballot should win");
+var deduped = dedupeVotesOnePerSquad(["Uli", "Jay"], dupVotes, 1, "Round 9", voteRoundLabel);
+if (deduped.votesForTally.length !== 1) throw new Error("dedupe should keep one ballot for Uli");
+var matchedDup = matchSquadToVoters(["Uli", "Jay"], dupVotes, 1, "Round 9", voteRoundLabel);
+if (!matchedDup.duplicates || matchedDup.duplicates.length !== 1) throw new Error("match should report duplicates");
+if (matchedDup.countedBallots !== 1) throw new Error("countedBallots should be 1");
 
 console.log("name-match smoke test OK");
