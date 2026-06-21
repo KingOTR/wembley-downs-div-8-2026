@@ -27,7 +27,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v175";
+} from "./name-match.js?tag=v176";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -41,7 +41,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v175";
+  return "v176";
 }
 
 function distImport(path) {
@@ -208,9 +208,20 @@ function resolveSquadSync(teamId, data) {
 /** Hook for app.min.js results tally — one ballot per squad member (latest wins). */
 window.__svDedupeVotesForTally = function (teamId, round, votes) {
   try {
+    var list = votes || [];
+    if (
+      list.length &&
+      list.every(function (v) {
+        return v && v.slot != null && !v.voterName;
+      })
+    ) {
+      return typeof window.__svDedupeCoachVotesForTally === "function"
+        ? window.__svDedupeCoachVotesForTally(teamId, round, list)
+        : list;
+    }
     var data = loadLocalData();
     var resolved = resolveSquadSync(teamId, data);
-    if (!resolved.squad.length) return votes || [];
+    if (!resolved.squad.length) return list;
     var meta = getVoteMeta(resolved.team, round);
     var merged = votes || [];
     var cached = cloudVotesCache[String(teamId)];
@@ -219,7 +230,7 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
     }
     merged = sanitizeVotesWithDuplicatePicks(merged);
     var voterDeduped = dedupeBallotDocsOnePerVoter(merged, teamId, round, voteRoundLabel);
-    merged = voterDeduped.votesForTally || merged;
+    merged = Array.isArray(voterDeduped.votesForTally) ? voterDeduped.votesForTally : merged;
     var out = dedupeVotesOnePerSquad(
       resolved.squad,
       merged,

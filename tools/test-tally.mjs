@@ -310,4 +310,103 @@ if (migrationPlan.removed !== 2) {
   throw new Error("migration plan should remove 2 docs, got " + migrationPlan.removed);
 }
 
+function simulateUoCoach(votes, dedupeFn) {
+  var round = "Round 9";
+  var h = votes;
+  var _h = h;
+  var _svTd = dedupeFn(1, round, h);
+  if (Array.isArray(_svTd)) _h = _svTd;
+  return tallyPoints(_h);
+}
+
+function dedupeCoachForTally(teamId, round, coachVotes) {
+  return dedupeCoachVotesOnePerSlot(coachVotes, teamId, round, voteRoundLabel).votesForTally || [];
+}
+
+var threeCoachSlots = [
+  {
+    id: "c1_rround-9_s1",
+    teamId: 1,
+    slot: 1,
+    round: "Round 9",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Alice", "Bob", "Carol"],
+  },
+  {
+    id: "c1_rround-9_s2",
+    teamId: 1,
+    slot: 2,
+    round: "Round 9",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Bob", "Carol", "Dave"],
+  },
+  {
+    id: "c1_rround-9_s3",
+    teamId: 1,
+    slot: 3,
+    round: "Round 9",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Carol", "Dave", "Alice"],
+  },
+];
+var coachPts = simulateUoCoach(threeCoachSlots, dedupeCoachForTally);
+if (coachPts.Alice !== 4 || coachPts.Bob !== 5 || coachPts.Carol !== 6 || coachPts.Dave !== 3) {
+  throw new Error("three coach slots should all tally, got " + JSON.stringify(coachPts));
+}
+
+function dedupePlayerHookOnCoach(teamId, round, coachVotes) {
+  var out = dedupeVotesOnePerSquad(["Alice", "Bob", "Carol", "Dave"], coachVotes, teamId, round, voteRoundLabel);
+  return out.votesForTally || [];
+}
+var wrongCoachPts = simulateUoCoach(threeCoachSlots, dedupePlayerHookOnCoach);
+if (Object.keys(wrongCoachPts).length <= 1) {
+  throw new Error("player dedupe on coach votes should not collapse to one ballot (regression guard)");
+}
+
+function normalizeRoundLikeApp(l) {
+  var s = String(l ?? "").trim();
+  if (!s) return "Round 1";
+  s = s.replace(/\s+/g, " ").trim();
+  var h = s.match(/^round\s*(\d+(?:\.\d+)?)$/i);
+  if (h) return "Round " + h[1];
+  var m = s.match(/^(\d+(?:\.\d+)?)$/);
+  if (m) return "Round " + m[1];
+  return s;
+}
+
+function simulateUoWithRound(roundLabel, votes, dedupeFn) {
+  var l = normalizeRoundLikeApp(roundLabel);
+  var h = votes;
+  var _h = h;
+  var _svT = dedupeFn(1, l, h);
+  if (Array.isArray(_svT)) _h = _svT;
+  var m = {};
+  _h.forEach(function (f) {
+    if (String(f.teamId) !== "1") return;
+    if (normalizeRoundLikeApp(f.round) !== l) return;
+    var picks = f.picks || [];
+    var weights = [3, 2, 1];
+    picks.forEach(function (b, i) {
+      if (!b) return;
+      m[b] = (m[b] || 0) + (weights[i] || 0);
+    });
+  });
+  return m;
+}
+
+var roundNineVotes = [
+  {
+    id: "r9",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Alice",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Bob", "Carol", "Dave"],
+  },
+];
+var rawRoundPts = simulateUoWithRound("9", roundNineVotes, dedupeForTally);
+if (rawRoundPts.Bob !== 3) {
+  throw new Error("round label '9' should tally after normalize, got " + JSON.stringify(rawRoundPts));
+}
+
 console.log("tally regression OK");

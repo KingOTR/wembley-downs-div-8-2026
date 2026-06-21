@@ -6,7 +6,7 @@ import {
   normalizeName,
   formatGoalScorerList,
   validateBallotPicks,
-} from "./name-match.js?tag=v175";
+} from "./name-match.js?tag=v176";
 
 window.__svCanonicalPlayerName = canonicalPlayerName;
 window.__svNormalizeName = normalizeName;

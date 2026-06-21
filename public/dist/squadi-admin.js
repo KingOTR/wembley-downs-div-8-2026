@@ -6,7 +6,7 @@ import {
   normalizeSquadiConfig,
   fetchWembleyFixtures,
   mergeFixturesIntoMatchesByRound,
-} from "./squadi-client.js?tag=v175";
+} from "./squadi-client.js?tag=v176";
 
 var STORAGE_KEY = "soccerVoteApp_v2";
 
