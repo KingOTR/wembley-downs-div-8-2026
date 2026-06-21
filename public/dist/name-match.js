@@ -267,60 +267,127 @@ export function explainSquadMismatch(voterName, players, threshold) {
   return "no similar names on squad";
 }
 
-/** Map squad player -> voter ballot name for this round (exact or fuzzy). */
-export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLabelFn, threshold) {
+/** Resolve admin-confirmed ballot alias (normalized ballot name → squad display name). */
+export function resolveBallotAlias(voterName, aliases) {
+  var vn = displayPlayerName(voterName);
+  if (!vn || !aliases) return { ballot: vn, matchAs: vn, aliased: false };
+  var key = normalizeName(vn);
+  var target = aliases[key];
+  if (target) return { ballot: vn, matchAs: displayPlayerName(target), aliased: true };
+  return { ballot: vn, matchAs: vn, aliased: false };
+}
+
+/** Filter squad to players expected to vote (exclude didn't play / didn't watch). */
+export function eligibleSquadPlayers(squad, excluded) {
+  var skip = Object.create(null);
+  (excluded || []).forEach(function (p) {
+    var k = normalizeName(p);
+    if (k) skip[k] = true;
+  });
+  return (squad || []).filter(function (p) {
+    return p && !skip[normalizeName(p)];
+  });
+}
+
+/** Map squad player → voter ballot for this round (exact, fuzzy, or admin alias). */
+export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLabelFn, threshold, opts) {
   var th = threshold == null ? DEFAULT_SQUAD_THRESHOLD : threshold;
+  var options = opts || {};
+  var aliases = options.aliases || {};
+  var excluded = options.excluded || [];
+  var eligible = eligibleSquadPlayers(squad, excluded);
   var voted = [];
+  var votedSquad = [];
   var missing = [];
   var possible = [];
   var extraVoters = [];
   var extraDetails = [];
-  var usedVoters = Object.create(null);
+  var usedBallots = Object.create(null);
+  var roundKey = voteRoundLabelFn({ round: roundLabel });
 
-  (squad || []).forEach(function (player) {
+  var roundVotes = (votes || []).filter(function (v) {
+    return v && String(v.teamId) === String(teamId) && voteRoundLabelFn(v) === roundKey;
+  });
+  var ballotCount = roundVotes.length;
+
+  function ballotKey(v) {
+    return v.id || "t" + v.teamId + "|" + normalizeName(v.voterName) + "|" + roundKey;
+  }
+
+  function tryMatchBallot(v, player) {
+    var raw = displayPlayerName(v.voterName || "");
+    if (!raw) return null;
+    var alias = resolveBallotAlias(raw, aliases);
+    var m = findSquadMatch(alias.matchAs, [player], th);
+    if (!m && alias.matchAs !== raw) m = findSquadMatch(raw, [player], th);
+    if (!m) return null;
+    return {
+      ballot: raw,
+      squadName: displayPlayerName(player),
+      exact: m.exact && !alias.aliased,
+      similarity: m.similarity,
+      aliased: alias.aliased,
+    };
+  }
+
+  eligible.forEach(function (player) {
     var hit = null;
-    (votes || []).forEach(function (v) {
-      if (!v || String(v.teamId) !== String(teamId)) return;
-      if (voteRoundLabelFn(v) !== voteRoundLabelFn({ round: roundLabel })) return;
-      var vn = displayPlayerName(v.voterName || "");
-      if (!vn || usedVoters[normalizeName(vn)]) return;
-      var m = findSquadMatch(vn, [player], th);
-      if (m) hit = { voterName: vn, squadName: player, exact: m.exact, similarity: m.similarity };
+    roundVotes.forEach(function (v) {
+      var bk = ballotKey(v);
+      if (usedBallots[bk]) return;
+      var m = tryMatchBallot(v, player);
+      if (m) hit = m;
     });
     if (hit) {
-      usedVoters[normalizeName(hit.voterName)] = true;
-      voted.push(hit.voterName);
-      if (!hit.exact) possible.push(hit.voterName + " ≈ " + hit.squadName);
+      roundVotes.forEach(function (v) {
+        if (displayPlayerName(v.voterName || "") === hit.ballot) usedBallots[ballotKey(v)] = true;
+      });
+      votedSquad.push(hit.squadName);
+      voted.push(hit.squadName);
+      if (!hit.exact || hit.aliased) {
+        possible.push(hit.ballot + " → " + hit.squadName);
+      }
     } else {
-      missing.push(player);
+      missing.push(displayPlayerName(player));
     }
   });
 
-  (votes || []).forEach(function (v) {
-    if (!v || String(v.teamId) !== String(teamId)) return;
-    if (voteRoundLabelFn(v) !== voteRoundLabelFn({ round: roundLabel })) return;
-    var vn = displayPlayerName(v.voterName || "");
-    if (!vn) return;
-    if (usedVoters[normalizeName(vn)]) return;
-    var onSquad = findSquadMatch(vn, squad, th);
+  roundVotes.forEach(function (v) {
+    var bk = ballotKey(v);
+    if (usedBallots[bk]) return;
+    var raw = displayPlayerName(v.voterName || "");
+    if (!raw) return;
+    var alias = resolveBallotAlias(raw, aliases);
+    var onSquad = findSquadMatch(alias.matchAs, eligible, th);
+    if (!onSquad && alias.matchAs !== raw) onSquad = findSquadMatch(raw, squad, th);
     if (onSquad) {
-      if (!onSquad.exact) possible.push(vn + " ≈ " + onSquad.match);
-      voted.push(vn);
-      usedVoters[normalizeName(vn)] = true;
+      usedBallots[bk] = true;
+      var squadName = displayPlayerName(onSquad.match);
+      if (votedSquad.indexOf(squadName) === -1) {
+        votedSquad.push(squadName);
+        voted.push(squadName);
+      }
+      if (!onSquad.exact || alias.aliased) possible.push(raw + " → " + squadName);
     } else {
-      extraVoters.push(vn);
+      extraVoters.push(raw);
       extraDetails.push({
-        voterName: vn,
-        reason: explainSquadMismatch(vn, squad, th),
+        voterName: raw,
+        reason: explainSquadMismatch(raw, squad, th),
+        suggestion: findSquadMatch(raw, squad, th * 0.85),
       });
     }
   });
 
   return {
     voted: voted,
+    votedSquad: votedSquad,
     missing: missing,
     possible: possible,
     extraVoters: extraVoters,
     extraDetails: extraDetails,
+    ballotCount: ballotCount,
+    eligibleCount: eligible.length,
+    excluded: excluded.slice(),
+    squadCount: (squad || []).length,
   };
 }

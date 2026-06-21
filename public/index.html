@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#EE2B33" />
   <meta name="color-scheme" content="light dark" />
-  <meta name="sv-app-version" content="155" />
+  <meta name="sv-app-version" content="156" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v155: auto-update SW + stale HTML self-heal -->
+  <!-- v156: auto-update SW + stale HTML self-heal -->
   <script>
     (function () {
       function appVer() {
@@ -94,7 +94,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v155" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v156" />
   <style>
     /* Iwanoff-inspired design system — warm concrete, terracotta, charcoal */
     :root {
@@ -4520,9 +4520,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v155"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v155"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v155"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v156"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v156"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v156"></script>
   <script>
     (function () {
       var loaded = false;
@@ -4536,7 +4536,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v155").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v156").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
@@ -4575,7 +4575,7 @@
       try {
         if (!("serviceWorker" in navigator)) return;
         var ver = window.__svAppVersion ? window.__svAppVersion() : "154";
-        var SW_URL = "/sw.js?v=155";
+        var SW_URL = "/sw.js?v=156";
         var reloaded = false;
         var lastUpdateCheck = 0;
 

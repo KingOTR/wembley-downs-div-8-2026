@@ -9,8 +9,10 @@ import {
   canonicalPlayerName,
   nameSimilarity,
   findAmbiguousByFirstName,
+  findSquadMatch,
+  eligibleSquadPlayers,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v155";
+} from "./name-match.js?tag=v156";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -95,6 +97,64 @@ function loadLocalData() {
   } catch {
     return { teams: [], votes: [], coachVotes: [] };
   }
+}
+
+function getTeamFromData(data, teamId) {
+  return (data.teams || []).find(function (t) {
+    return String(t.id) === String(teamId);
+  });
+}
+
+function getVoteMeta(team, round) {
+  if (!team || !team.voteMetaByRound) return { excluded: [], aliases: {} };
+  var rk = normalizeRoundLabel(round) || round;
+  var meta = team.voteMetaByRound[rk] || team.voteMetaByRound[round] || {};
+  return {
+    excluded: Array.isArray(meta.excluded) ? meta.excluded.slice() : [],
+    aliases: meta.aliases && typeof meta.aliases === "object" ? Object.assign({}, meta.aliases) : {},
+  };
+}
+
+function saveVoteMeta(teamId, round, patch) {
+  var rk = normalizeRoundLabel(round) || round;
+  if (typeof window.__svPatchVoteMeta === "function") {
+    window.__svPatchVoteMeta(teamId, rk, patch);
+  } else {
+    var data = loadLocalData();
+    var team = getTeamFromData(data, teamId);
+    if (!team) return;
+    team.voteMetaByRound = team.voteMetaByRound || {};
+    var cur = getVoteMeta(team, rk);
+    if (patch.excluded) cur.excluded = patch.excluded.slice();
+    if (patch.aliases) cur.aliases = Object.assign({}, cur.aliases, patch.aliases);
+    if (patch.addAlias && patch.addAlias.from && patch.addAlias.to) {
+      cur.aliases[normalizeName(patch.addAlias.from)] = displayPlayerName(patch.addAlias.to);
+    }
+    team.voteMetaByRound[rk] = cur;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn("[vote-meta]", e);
+    }
+  }
+  if (typeof window.__svSyncConfig === "function") {
+    window.__svSyncConfig().catch(function (e) {
+      console.warn("[vote-meta] cloud sync", e);
+    });
+  }
+}
+
+function computeParticipation(squad, votes, teamId, round, meta) {
+  var m = meta || { excluded: [], aliases: {} };
+  return matchSquadToVoters(squad, votes, teamId, round, voteRoundLabel, DEFAULT_SQUAD_THRESHOLD, {
+    excluded: m.excluded,
+    aliases: m.aliases,
+  });
+}
+
+function syncVotesReceivedCount(ballotCount) {
+  var el = document.getElementById("votesReceivedCount");
+  if (el && ballotCount != null) el.textContent = String(ballotCount);
 }
 
 function getPublicPrefs() {
@@ -605,15 +665,131 @@ function ensureWhoHasntVotedBlock() {
   if (!results || document.getElementById("whoHasntVotedBlock")) return;
   var details = document.createElement("details");
   details.id = "whoHasntVotedBlock";
-  details.className = "subcard";
+  details.className = "subcard who-vote-panel";
   details.style.cssText = "padding:0.65rem 0.75rem; margin:0.5rem 0 0";
   details.innerHTML =
     "<summary style='cursor:pointer;font-weight:800;color:var(--red-dark)'>Who has / hasn't voted?</summary>" +
-    "<p class='hint' style='margin:0.35rem 0 0'>Ballots this round vs squad list (local + cloud, fuzzy name match).</p>" +
+    "<p class='hint' style='margin:0.35rem 0 0'>Eligible squad vs ballots this round (local + cloud). Exclude players who didn't play/watch.</p>" +
     "<div id='whoVotedList' style='margin-top:0.45rem;font-size:0.9rem;line-height:1.5'></div>" +
     "<div id='whoHasntVotedList' style='margin-top:0.45rem;font-size:0.9rem;line-height:1.5'></div>" +
+    "<div id='whoVoteUnmatched' style='margin-top:0.45rem;font-size:0.88rem;line-height:1.45'></div>" +
+    "<div id='whoVoteExclusions' style='margin-top:0.55rem;font-size:0.88rem;line-height:1.45'></div>" +
     "<p id='whoVoteStatusHint' class='hint' style='margin:0.35rem 0 0'></p>";
   results.insertAdjacentElement("afterend", details);
+}
+
+function renderWhoVoteExclusions(teamId, round, squad, meta) {
+  var box = document.getElementById("whoVoteExclusions");
+  if (!box || !isSuperAdminUnlocked()) {
+    if (box) box.innerHTML = "";
+    return;
+  }
+  var excluded = meta.excluded || [];
+  var html =
+    "<div class='who-vote-excl-head' style='font-weight:800;color:var(--terracotta-deep);margin-bottom:0.35rem'>Excluded this round (didn't play / watch)</div>" +
+    "<div class='who-vote-excl-list' style='display:flex;flex-direction:column;gap:0.25rem'>";
+  squad.forEach(function (player) {
+    var name = displayPlayerName(player);
+    var checked = excluded.some(function (x) {
+      return normalizeName(x) === normalizeName(name);
+    });
+    html +=
+      "<label class='who-vote-excl-row' style='display:flex;align-items:center;gap:0.45rem;font-size:0.86rem'>" +
+      "<input type='checkbox' data-excl-player='" +
+      escapeHtml(name) +
+      "'" +
+      (checked ? " checked" : "") +
+      " />" +
+      "<span>" +
+      escapeHtml(name) +
+      "</span></label>";
+  });
+  html += "</div>";
+  html +=
+    "<button type='button' class='ghost' id='whoVoteExclSave' style='margin-top:0.45rem;padding:0.35rem 0.65rem;font-size:0.8rem'>Save exclusions</button>";
+  box.innerHTML = html;
+  var saveBtn = document.getElementById("whoVoteExclSave");
+  if (saveBtn && !saveBtn._svBound) {
+    saveBtn._svBound = true;
+    saveBtn.addEventListener("click", function () {
+      var next = [];
+      box.querySelectorAll("input[data-excl-player]:checked").forEach(function (cb) {
+        next.push(cb.getAttribute("data-excl-player"));
+      });
+      saveVoteMeta(teamId, round, { excluded: next });
+      updateWhoHasntVoted();
+    });
+  }
+}
+
+function renderWhoVoteUnmatched(teamId, round, squad, matched) {
+  var box = document.getElementById("whoVoteUnmatched");
+  if (!box) return;
+  if (!matched.extraDetails || !matched.extraDetails.length) {
+    box.innerHTML = "";
+    return;
+  }
+  if (!isSuperAdminUnlocked()) {
+    box.innerHTML =
+      "<div style='font-weight:700;color:var(--red-dark);margin-bottom:0.25rem'>Unmatched ballots (" +
+      matched.extraDetails.length +
+      ")</div>" +
+      "<span class='hint'>" +
+      escapeHtml(
+        matched.extraDetails
+          .map(function (d) {
+            return d.voterName + " (" + d.reason + ")";
+          })
+          .join("; ")
+      ) +
+      "</span>";
+    return;
+  }
+  var html =
+    "<div style='font-weight:700;color:var(--red-dark);margin-bottom:0.35rem'>Confirm ballot → squad</div>";
+  matched.extraDetails.forEach(function (d, idx) {
+    var suggested = d.suggestion && d.suggestion.match ? displayPlayerName(d.suggestion.match) : "";
+    html +=
+      "<div class='who-vote-alias-row' style='display:flex;flex-wrap:wrap;gap:0.35rem;align-items:center;margin:0.3rem 0'>" +
+      "<span style='font-weight:650'>" +
+      escapeHtml(d.voterName) +
+      "</span>" +
+      "<select data-alias-idx='" +
+      idx +
+      "' style='min-width:8rem;padding:0.25rem 0.4rem;font-size:0.82rem'>" +
+      "<option value=''>— link to squad —</option>";
+    squad.forEach(function (p) {
+      var pn = displayPlayerName(p);
+      html +=
+        "<option value='" +
+        escapeHtml(pn) +
+        "'" +
+        (suggested && normalizeName(suggested) === normalizeName(pn) ? " selected" : "") +
+        ">" +
+        escapeHtml(pn) +
+        "</option>";
+    });
+    html +=
+      "</select>" +
+      "<button type='button' class='ghost who-vote-alias-btn' data-ballot='" +
+      escapeHtml(d.voterName) +
+      "' style='padding:0.25rem 0.5rem;font-size:0.78rem'>Confirm</button>" +
+      "</div>";
+  });
+  box.innerHTML = html;
+  box.querySelectorAll(".who-vote-alias-btn").forEach(function (btn) {
+    if (btn._svBound) return;
+    btn._svBound = true;
+    btn.addEventListener("click", function () {
+      var ballot = btn.getAttribute("data-ballot");
+      var row = btn.closest(".who-vote-alias-row");
+      var sel = row && row.querySelector("select");
+      var target = sel && sel.value;
+      if (!ballot || !target) return;
+      saveVoteMeta(teamId, round, { addAlias: { from: ballot, to: target } });
+      updateWhoHasntVoted();
+    });
+  });
 }
 
 async function updateWhoHasntVoted() {
@@ -631,12 +807,14 @@ async function updateWhoHasntVoted() {
   if (votedEl) votedEl.innerHTML = "";
   if (statusEl) statusEl.textContent = "Fetching ballots from cloud…";
 
+  var team = getTeamFromData(data, teamId);
   var squad = await resolveTeamSquad(teamId, data.teams || []);
   if (!squad.length) {
     listEl.innerHTML = "<span class='hint'>No squad list saved (check config sync).</span>";
     return;
   }
 
+  var meta = getVoteMeta(team, round);
   var localVotes = (data.votes || []).filter(function (v) {
     return v && String(v.teamId) === String(teamId);
   });
@@ -649,21 +827,25 @@ async function updateWhoHasntVoted() {
     console.warn("[who-hasnt-voted]", e);
   }
   var votes = mergeVotesLists(localVotes, cloudVotes);
-  var roundVotes = votes.filter(function (v) {
-    return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === voteRoundLabel({ round: round });
-  });
-  var matched = matchSquadToVoters(squad, votes, teamId, round, voteRoundLabel, DEFAULT_SQUAD_THRESHOLD);
+  var matched = computeParticipation(squad, votes, teamId, round, meta);
+  syncVotesReceivedCount(matched.ballotCount);
 
   if (votedEl) {
-    if (matched.voted.length) {
+    if (matched.votedSquad.length) {
       votedEl.innerHTML =
         "<div style='font-weight:700;color:#15803d;margin-bottom:0.25rem'>Voted (" +
-        matched.voted.length +
+        matched.votedSquad.length +
+        " squad · " +
+        matched.ballotCount +
+        " ballot" +
+        (matched.ballotCount === 1 ? "" : "s") +
         ")</div>" +
-        escapeHtml(matched.voted.join(", "));
+        escapeHtml(matched.votedSquad.join(", "));
     } else {
       votedEl.innerHTML =
-        "<div style='font-weight:700;color:#52525b;margin-bottom:0.25rem'>Voted (0)</div><span class='hint'>No ballots yet this round.</span>";
+        "<div style='font-weight:700;color:#52525b;margin-bottom:0.25rem'>Voted (0)</div><span class='hint'>No squad matches yet for " +
+        matched.ballotCount +
+        " ballot(s).</span>";
     }
   }
 
@@ -672,36 +854,24 @@ async function updateWhoHasntVoted() {
       "<div style='font-weight:700;color:var(--red-dark);margin-bottom:0.25rem'>Hasn't voted (" +
       matched.missing.length +
       "/" +
-      squad.length +
-      ")</div>" +
+      matched.eligibleCount +
+      " eligible)</div>" +
       escapeHtml(matched.missing.join(", "));
   } else {
     listEl.innerHTML =
       "<div style='font-weight:700;color:#15803d;margin-bottom:0.25rem'>Hasn't voted (0)</div>" +
-      "<span style='color:#15803d'>Everyone on the squad has voted.</span>";
+      "<span style='color:#15803d'>Everyone eligible has voted.</span>";
   }
 
+  renderWhoVoteUnmatched(teamId, round, squad, matched);
+  renderWhoVoteExclusions(teamId, round, squad, meta);
+
   var hints = [];
-  hints.push(roundVotes.length + " ballot(s) this round");
-  hints.push(squad.length + " on squad");
+  hints.push(matched.ballotCount + " ballot(s)");
+  hints.push(matched.eligibleCount + " eligible of " + matched.squadCount + " squad");
+  if (matched.excluded.length) hints.push(matched.excluded.length + " excluded");
   hints.push(isSuperAdminUnlocked() ? "cloud refresh" : "local + public cloud read");
-  if (matched.possible.length) hints.push("fuzzy: " + matched.possible.join("; "));
-  if (matched.extraVoters.length) {
-    var extras = matched.extraVoters.filter(function (n) {
-      return displayPlayerName(n);
-    });
-    if (extras.length) hints.push("not on squad: " + extras.join(", "));
-  }
-  if (matched.extraDetails && matched.extraDetails.length) {
-    hints.push(
-      "mismatch detail: " +
-        matched.extraDetails
-          .map(function (d) {
-            return d.voterName + " (" + d.reason + ")";
-          })
-          .join("; ")
-    );
-  }
+  if (matched.possible.length) hints.push("linked: " + matched.possible.join("; "));
   if (cloudErr) hints.push("cloud error: " + cloudErr);
   if (statusEl) statusEl.textContent = hints.join(" · ");
 }
@@ -912,7 +1082,7 @@ function syncAdminLocationFromStore() {
     window.__svSyncLocationFromMatch(entry);
     return;
   }
-  import("./location-autocomplete.js?tag=v155")
+  import("./location-autocomplete.js?tag=v156")
     .then(function (mod) {
       if (mod.syncLocationFromMatch) mod.syncLocationFromMatch(entry);
       else mod.syncLocationFromInputs();
@@ -950,7 +1120,7 @@ function wireLineupExportOverride() {
     function (ev) {
       ev.stopImmediatePropagation();
       ev.preventDefault();
-      import("./lineup-export.js?tag=v155")
+      import("./lineup-export.js?tag=v156")
         .then(function (mod) {
           var snap =
             typeof window.__svLineupExportSnapshot === "function"
@@ -1013,7 +1183,7 @@ async function updateMatchCardWeather() {
 
   mount.innerHTML = "<p class='hint' style='margin:0.35rem 0 0'>Loading weather…</p>";
   try {
-    var mod = await import("./weather-forecast.js?tag=v155");
+    var mod = await import("./weather-forecast.js?tag=v156");
     var units = mod.getWeatherUnits();
     var data = await mod.fetchMatchWeather({
       suburb: entry.suburb,
@@ -1104,6 +1274,7 @@ async function updateParticipationCounter() {
   var teamId = getCurrentTeamId();
   var round = getCurrentRound(teamId);
   var data = loadLocalData();
+  var team = getTeamFromData(data, teamId);
   var squad = await resolveTeamSquad(teamId, data.teams || []);
   squad = squad.filter(function (player) {
     return !isCoachVoterName(player, teamId);
@@ -1113,6 +1284,7 @@ async function updateParticipationCounter() {
     return;
   }
 
+  var meta = getVoteMeta(team, round);
   textEl.textContent = "Loading participation…";
   el.classList.add("is-visible");
 
@@ -1126,14 +1298,18 @@ async function updateParticipationCounter() {
     console.warn("[participation]", e);
   }
   var votes = mergeVotesLists(localVotes, cloudVotes);
-  var matched = matchSquadToVoters(squad, votes, teamId, round, voteRoundLabel, DEFAULT_SQUAD_THRESHOLD);
-  var voted = matched.voted.length;
-  var total = squad.length;
+  var matched = computeParticipation(squad, votes, teamId, round, meta);
+  var voted = matched.votedSquad.length;
+  var total = matched.eligibleCount;
   var pct = total ? Math.round((voted / total) * 100) : 0;
 
-  textEl.textContent = voted + " of " + total + " squad members have voted (" + round + ")";
+  textEl.textContent =
+    voted + " of " + total + " eligible squad members have voted (" + round + ")";
   if (fillEl) fillEl.style.width = pct + "%";
-  el.setAttribute("aria-label", voted + " of " + total + " squad members have voted this round");
+  el.setAttribute(
+    "aria-label",
+    voted + " of " + total + " eligible squad members have voted this round"
+  );
 }
 
 function wireParticipationCounter() {
@@ -1200,7 +1376,7 @@ function wireLineupPublicTabs() {
       advBtn.setAttribute("aria-pressed", advOn ? "true" : "false");
       advBtn.classList.toggle("lineup-tab-overlay-active", advOn);
     }
-    import("./lineup-fotmob.js?tag=v155")
+    import("./lineup-fotmob.js?tag=v156")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1255,7 +1431,7 @@ function wireLineupPublicTabs() {
   }
 
   window.addEventListener("sv-lineup-rendered", function () {
-    import("./lineup-fotmob.js?tag=v155")
+    import("./lineup-fotmob.js?tag=v156")
       .then(function (mod) {
         mod.syncPitchOverlay(document.getElementById("lineupPublicWrap"));
       })
@@ -1527,7 +1703,7 @@ function wireAdminSectionTabs() {
       p.hidden = p.getAttribute("data-admin-panel") !== tab;
     });
     if (tab === "team") {
-      import("./location-autocomplete.js?tag=v155")
+      import("./location-autocomplete.js?tag=v156")
         .then(function (mod) {
           mod.initLocationAutocomplete();
           syncAdminLocationFromStore();
@@ -1549,7 +1725,7 @@ function wireLocationOnRoundChange() {
   roundSel._svLocWire = true;
   roundSel.addEventListener("change", function () {
     setTimeout(function () {
-      import("./location-autocomplete.js?tag=v155")
+      import("./location-autocomplete.js?tag=v156")
         .then(function (mod) {
           mod.initLocationAutocomplete();
           syncAdminLocationFromStore();
