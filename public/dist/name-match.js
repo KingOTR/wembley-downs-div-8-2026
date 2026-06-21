@@ -808,3 +808,199 @@ export function fixBallotsWithDuplicatePicks(votes, roundLabelFn) {
   });
   return { votes: out, fixed: fixed, byRound: byRound };
 }
+
+/** Stable group key: one ballot doc per voter per team+round. */
+export function ballotVoterGroupKey(vote, roundLabelFn) {
+  var rk =
+    typeof roundLabelFn === "function"
+      ? roundLabelFn(vote)
+      : String((vote && vote.round) || "").trim();
+  var vk = (vote && vote.voterNameKey) || voterNameKey((vote && vote.voterName) || "");
+  return String(vote && vote.teamId != null ? vote.teamId : "") + "|" + rk + "|" + vk;
+}
+
+/** Stable group key: one coach ballot per slot per team+round. */
+export function coachVoteSlotGroupKey(vote, roundLabelFn) {
+  var rk =
+    typeof roundLabelFn === "function"
+      ? roundLabelFn(vote)
+      : String((vote && vote.round) || "").trim();
+  var slot = parseInt(vote && vote.slot, 10);
+  if (!isFinite(slot)) slot = 0;
+  return String(vote && vote.teamId != null ? vote.teamId : "") + "|" + rk + "|s" + slot;
+}
+
+function ballotsHaveIdenticalPicks(a, b) {
+  if (!a || !b) return false;
+  var pa = (a.picks || [])
+    .map(function (p) {
+      return normalizeName(p);
+    })
+    .join("|");
+  var pb = (b.picks || [])
+    .map(function (p) {
+      return normalizeName(p);
+    })
+    .join("|");
+  return pa === pb;
+}
+
+/** Same voter+round with 2+ ballot documents. Latest submittedAt wins. */
+export function findDuplicateBallotDocsPerVoter(votes, roundLabelFn) {
+  var groups = Object.create(null);
+  (votes || []).forEach(function (v) {
+    if (!v) return;
+    var gk = ballotVoterGroupKey(v, roundLabelFn);
+    if (!groups[gk]) groups[gk] = [];
+    groups[gk].push(v);
+  });
+  var duplicates = [];
+  Object.keys(groups).forEach(function (gk) {
+    var list = groups[gk];
+    if (list.length < 2) return;
+    list.sort(function (a, b) {
+      return ballotSubmittedAt(b) - ballotSubmittedAt(a) || String(b.id || "").localeCompare(String(a.id || ""));
+    });
+    var kept = list[0];
+    duplicates.push({
+      groupKey: gk,
+      voterName: kept.voterName,
+      teamId: kept.teamId,
+      round: typeof roundLabelFn === "function" ? roundLabelFn(kept) : kept.round,
+      kept: { id: kept.id, submittedAt: kept.submittedAt },
+      excluded: list.slice(1).map(function (x) {
+        return {
+          id: x.id,
+          voterName: x.voterName,
+          submittedAt: x.submittedAt,
+          identical: ballotsHaveIdenticalPicks(kept, x),
+          reason: "duplicate ballot doc for same voter (latest wins)",
+        };
+      }),
+    });
+  });
+  return duplicates;
+}
+
+/** One ballot document per voter for tally. Latest submittedAt wins. */
+export function dedupeBallotDocsOnePerVoter(votes, teamId, roundLabel, roundLabelFn) {
+  var roundKey = roundLabelFn({ round: roundLabel });
+  var roundVotes = (votes || []).filter(function (v) {
+    return v && String(v.teamId) === String(teamId) && roundLabelFn(v) === roundKey;
+  });
+  var duplicates = findDuplicateBallotDocsPerVoter(roundVotes, roundLabelFn);
+  var skipIds = Object.create(null);
+  duplicates.forEach(function (d) {
+    d.excluded.forEach(function (x) {
+      if (x.id) skipIds[x.id] = true;
+    });
+  });
+  var votesForTally = roundVotes.filter(function (v) {
+    if (!v) return false;
+    if (v.id && skipIds[v.id]) return false;
+    return true;
+  });
+  return {
+    votesForTally: votesForTally,
+    duplicates: duplicates,
+    ballotCount: roundVotes.length,
+    countedBallots: votesForTally.length,
+  };
+}
+
+/** Same coach slot+round with 2+ documents. Latest submittedAt wins. */
+export function findDuplicateCoachVoteDocsPerSlot(votes, roundLabelFn) {
+  var groups = Object.create(null);
+  (votes || []).forEach(function (v) {
+    if (!v || v.slot == null) return;
+    var gk = coachVoteSlotGroupKey(v, roundLabelFn);
+    if (!groups[gk]) groups[gk] = [];
+    groups[gk].push(v);
+  });
+  var duplicates = [];
+  Object.keys(groups).forEach(function (gk) {
+    var list = groups[gk];
+    if (list.length < 2) return;
+    list.sort(function (a, b) {
+      return ballotSubmittedAt(b) - ballotSubmittedAt(a) || String(b.id || "").localeCompare(String(a.id || ""));
+    });
+    var kept = list[0];
+    duplicates.push({
+      groupKey: gk,
+      slot: kept.slot,
+      teamId: kept.teamId,
+      round: typeof roundLabelFn === "function" ? roundLabelFn(kept) : kept.round,
+      kept: { id: kept.id, submittedAt: kept.submittedAt },
+      excluded: list.slice(1).map(function (x) {
+        return {
+          id: x.id,
+          submittedAt: x.submittedAt,
+          identical: ballotsHaveIdenticalPicks(kept, x),
+          reason: "duplicate coach ballot for same slot (latest wins)",
+        };
+      }),
+    });
+  });
+  return duplicates;
+}
+
+/** One coach ballot per slot for tally. Latest submittedAt wins. */
+export function dedupeCoachVotesOnePerSlot(coachVotes, teamId, roundLabel, roundLabelFn) {
+  var roundKey = roundLabelFn({ round: roundLabel });
+  var roundVotes = (coachVotes || []).filter(function (v) {
+    return v && String(v.teamId) === String(teamId) && roundLabelFn(v) === roundKey;
+  });
+  var duplicates = findDuplicateCoachVoteDocsPerSlot(roundVotes, roundLabelFn);
+  var skipIds = Object.create(null);
+  duplicates.forEach(function (d) {
+    d.excluded.forEach(function (x) {
+      if (x.id) skipIds[x.id] = true;
+    });
+  });
+  var votesForTally = roundVotes.filter(function (v) {
+    if (!v) return false;
+    if (v.id && skipIds[v.id]) return false;
+    return true;
+  });
+  return {
+    votesForTally: votesForTally,
+    duplicates: duplicates,
+    ballotCount: roundVotes.length,
+    countedBallots: votesForTally.length,
+  };
+}
+
+/**
+ * Plan migration: remove duplicate ballot docs (player + coach). Latest wins; identical picks keep one.
+ */
+export function planBallotDocDedupeMigration(votes, coachVotes, roundLabelFn) {
+  var playerDups = findDuplicateBallotDocsPerVoter(votes || [], roundLabelFn);
+  var coachDups = findDuplicateCoachVoteDocsPerSlot(coachVotes || [], roundLabelFn);
+  var removeIds = Object.create(null);
+  var keptIds = Object.create(null);
+  var byRound = Object.create(null);
+
+  function markRemove(dups, prefix) {
+    dups.forEach(function (d) {
+      if (d.kept && d.kept.id) keptIds[d.kept.id] = true;
+      d.excluded.forEach(function (x) {
+        if (!x.id) return;
+        removeIds[x.id] = { id: x.id, kind: prefix, identical: x.identical };
+        var rk = String(d.teamId) + "|" + String(d.round || "");
+        byRound[rk] = (byRound[rk] || 0) + 1;
+      });
+    });
+  }
+
+  markRemove(playerDups, "vote");
+  markRemove(coachDups, "coach");
+
+  return {
+    playerDuplicates: playerDups,
+    coachDuplicates: coachDups,
+    removeIds: removeIds,
+    keptIds: keptIds,
+    removed: Object.keys(removeIds).length,
+    byRound: byRound,
+  };
+}

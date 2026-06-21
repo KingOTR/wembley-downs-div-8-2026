@@ -12,6 +12,9 @@ import {
   findSquadMatch,
   eligibleSquadPlayers,
   dedupeVotesOnePerSquad,
+  dedupeBallotDocsOnePerVoter,
+  dedupeCoachVotesOnePerSlot,
+  planBallotDocDedupeMigration,
   resolveCoachSlotForVoterName,
   voterNameKey,
   classifyBallotNameMatch,
@@ -24,7 +27,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v173";
+} from "./name-match.js?tag=v174";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -38,7 +41,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v173";
+  return "v174";
 }
 
 function distImport(path) {
@@ -215,6 +218,8 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
       merged = mergeVotesLists(merged, cached.votes);
     }
     merged = sanitizeVotesWithDuplicatePicks(merged);
+    var voterDeduped = dedupeBallotDocsOnePerVoter(merged, teamId, round, voteRoundLabel);
+    merged = voterDeduped.votesForTally || merged;
     var out = dedupeVotesOnePerSquad(
       resolved.squad,
       merged,
@@ -228,6 +233,17 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
   } catch (e) {
     console.warn("[dedupe-tally]", e);
     return votes || [];
+  }
+};
+
+/** Hook for app.min.js coach results tally — one ballot per coach slot (latest wins). */
+window.__svDedupeCoachVotesForTally = function (teamId, round, coachVotes) {
+  try {
+    var out = dedupeCoachVotesOnePerSlot(coachVotes || [], teamId, round, voteRoundLabel);
+    return out.votesForTally || [];
+  } catch (e) {
+    console.warn("[dedupe-coach-tally]", e);
+    return coachVotes || [];
   }
 };
 
@@ -507,6 +523,169 @@ function scheduleBallotPickMigration() {
   }, 1500);
 }
 
+var BALLOT_DOC_MIGRATION_KEY = STORAGE_KEY + "_ballot_doc_dedupe_v174";
+var BALLOT_DOC_MIGRATION_REPORT_KEY = STORAGE_KEY + "_ballot_doc_dedupe_report";
+
+function removeLocalBallotsByIds(removeMap) {
+  var ids = Object.keys(removeMap || {});
+  if (!ids.length) return false;
+  var data = loadLocalData();
+  var changed = false;
+  data.votes = (data.votes || []).filter(function (v) {
+    if (v && v.id && removeMap[v.id] && removeMap[v.id].kind === "vote") {
+      changed = true;
+      return false;
+    }
+    return true;
+  });
+  data.coachVotes = (data.coachVotes || []).filter(function (v) {
+    if (v && v.id && removeMap[v.id] && removeMap[v.id].kind === "coach") {
+      changed = true;
+      return false;
+    }
+    return true;
+  });
+  if (changed) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn("[ballot-doc-migration] local save", e);
+    }
+  }
+  return changed;
+}
+
+async function migrateAllDuplicateBallotDocs(opts) {
+  var force = !!(opts && opts.force);
+  if (!force) {
+    try {
+      if (localStorage.getItem(BALLOT_DOC_MIGRATION_KEY) === "1") {
+        var cached = localStorage.getItem(BALLOT_DOC_MIGRATION_REPORT_KEY);
+        if (cached) window.__svBallotDocDedupeReport = JSON.parse(cached);
+        return window.__svBallotDocDedupeReport;
+      }
+    } catch (e) {}
+  }
+
+  var data = loadLocalData();
+  var teamIds = collectMigrationTeamIds(data);
+  var allVotes = (data.votes || []).slice();
+  var allCoach = (data.coachVotes || []).slice();
+  var report = {
+    removed: 0,
+    playerRemoved: 0,
+    coachRemoved: 0,
+    byRound: {},
+    at: new Date().toISOString(),
+    version: assetTag(),
+    cloud: false,
+    cloudDeleted: 0,
+  };
+
+  var cloudReady = await waitForFirebaseReady(8000);
+  if (cloudReady) {
+    report.cloud = true;
+    try {
+      var configTeams = await fetchConfigTeams();
+      configTeams.forEach(function (t) {
+        if (t && t.id != null) teamIds.push(String(t.id));
+      });
+    } catch (e) {}
+    var seenTeam = Object.create(null);
+    teamIds = teamIds.filter(function (id) {
+      if (seenTeam[id]) return false;
+      seenTeam[id] = true;
+      return true;
+    });
+    for (var ti = 0; ti < teamIds.length; ti++) {
+      try {
+        var cv = await fetchCloudVotes(teamIds[ti], true);
+        allVotes = mergeVotesLists(allVotes, cv);
+      } catch (e) {
+        console.warn("[ballot-doc-migration] votes fetch", teamIds[ti], e);
+      }
+      try {
+        var cc = await fetchCloudCoachVotes(teamIds[ti], true);
+        allCoach = mergeCoachVotesLists(allCoach, cc);
+      } catch (e) {
+        console.warn("[ballot-doc-migration] coach fetch", teamIds[ti], e);
+      }
+    }
+  }
+
+  var plan = planBallotDocDedupeMigration(allVotes, allCoach, voteRoundLabel);
+  report.removed = plan.removed;
+  report.byRound = plan.byRound;
+  report.playerRemoved = (plan.playerDuplicates || []).reduce(function (n, d) {
+    return n + (d.excluded ? d.excluded.length : 0);
+  }, 0);
+  report.coachRemoved = (plan.coachDuplicates || []).reduce(function (n, d) {
+    return n + (d.excluded ? d.excluded.length : 0);
+  }, 0);
+
+  removeLocalBallotsByIds(plan.removeIds);
+
+  var canDeleteCloud = isSuperAdminUnlocked() && window.__svFirebaseApp && projectId();
+  if (canDeleteCloud) {
+    var deleteTasks = [];
+    Object.keys(plan.removeIds).forEach(function (id) {
+      var row = plan.removeIds[id];
+      var col = row.kind === "coach" ? "coachVotes" : "votes";
+      deleteTasks.push(
+        deleteFirestoreDoc(col, id).then(function () {
+          report.cloudDeleted++;
+        })
+      );
+    });
+    await Promise.all(
+      deleteTasks.map(function (p) {
+        return p.catch(function (e) {
+          console.warn("[ballot-doc-migration] cloud delete", e);
+        });
+      })
+    );
+  }
+
+  try {
+    localStorage.setItem(BALLOT_DOC_MIGRATION_KEY, "1");
+    localStorage.setItem(BALLOT_DOC_MIGRATION_REPORT_KEY, JSON.stringify(report));
+  } catch (e) {}
+  window.__svBallotDocDedupeReport = report;
+  if (report.removed) {
+    console.info(
+      "[ballot-doc-migration] removed " +
+        report.removed +
+        " duplicate doc(s) (player " +
+        report.playerRemoved +
+        ", coach " +
+        report.coachRemoved +
+        ")",
+      report.byRound
+    );
+  }
+  try {
+    window.dispatchEvent(new CustomEvent("sv-ballot-doc-migration-done", { detail: report }));
+  } catch (e) {}
+  return report;
+}
+
+window.__svMigrateDuplicateBallotDocs = migrateAllDuplicateBallotDocs;
+
+function scheduleBallotDocMigration() {
+  try {
+    if (localStorage.getItem(BALLOT_DOC_MIGRATION_KEY) === "1") {
+      var raw = localStorage.getItem(BALLOT_DOC_MIGRATION_REPORT_KEY);
+      if (raw) window.__svBallotDocDedupeReport = JSON.parse(raw);
+      return;
+    }
+  } catch (e) {}
+  setTimeout(function () {
+    migrateAllDuplicateBallotDocs().catch(function (e) {
+      console.warn("[ballot-doc-migration]", e);
+    });
+  }, 2200);
+}
+
 function ensureBallotPickMigrationHint() {
   if (!isSuperAdminUnlocked()) return;
   var rep = window.__svBallotPickDedupeReport;
@@ -536,6 +715,46 @@ function ensureBallotPickMigrationHint() {
     rep.fixed +
     " ballot(s)" +
     (rounds ? " — " + rounds : "") +
+    ".";
+}
+
+function ensureBallotDocMigrationHint() {
+  if (!isSuperAdminUnlocked()) return;
+  var rep = window.__svBallotDocDedupeReport;
+  if (!rep) return;
+  var mount = document.getElementById("resultsBallotsWrap");
+  if (!mount || !mount.parentNode) return;
+  var el = document.getElementById("ballotDocMigrationHint");
+  if (!el) {
+    el = document.createElement("p");
+    el.id = "ballotDocMigrationHint";
+    el.className = "hint";
+    var pickHint = document.getElementById("ballotPickMigrationHint");
+    if (pickHint && pickHint.parentNode) pickHint.parentNode.insertBefore(el, pickHint.nextSibling);
+    else mount.parentNode.insertBefore(el, mount);
+  }
+  if (!rep.removed) {
+    el.textContent =
+      "Ballot doc scan (" + (rep.version || assetTag()) + "): no duplicate voter/coach ballots found.";
+    return;
+  }
+  var rounds = Object.keys(rep.byRound)
+    .map(function (k) {
+      return k + ": " + rep.byRound[k];
+    })
+    .join("; ");
+  el.textContent =
+    "Ballot doc cleanup (" +
+    (rep.version || assetTag()) +
+    "): removed " +
+    rep.removed +
+    " duplicate doc(s) (player " +
+    (rep.playerRemoved || 0) +
+    ", coach " +
+    (rep.coachRemoved || 0) +
+    ")" +
+    (rounds ? " — " + rounds : "") +
+    (rep.cloudDeleted ? " · " + rep.cloudDeleted + " deleted from cloud" : "") +
     ".";
 }
 
@@ -649,12 +868,16 @@ function findExistingCoachVote(teamId, slot, roundLabel) {
   );
 }
 
-async function submitCoachVoteRest(payload) {
+function coachVoteDocId(teamId, roundLabel, slot) {
+  return "c" + teamId + "_r" + nameKey(roundLabel) + "_s" + parseInt(slot, 10);
+}
+
+async function submitCoachVoteRest(docId, payload) {
   if (!projectId()) throw new Error("Cloud not ready");
-  var url = firestoreUrl("coachVotes");
+  var url = firestoreUrl("coachVotes/" + encodeURIComponent(docId));
   if (!url) throw new Error("Cloud not ready");
   var res = await fetch(url, {
-    method: "POST",
+    method: "PATCH",
     headers: await restHeaders(),
     body: JSON.stringify({
       fields: {
@@ -672,10 +895,7 @@ async function submitCoachVoteRest(payload) {
     });
     throw new Error((body.error && body.error.message) || "Coach vote submit failed");
   }
-  var json = await res.json().catch(function () {
-    return {};
-  });
-  return json;
+  return { name: "projects/" + projectId() + "/databases/(default)/documents/coachVotes/" + docId };
 }
 
 function saveCoachVoteLocal(payload, cloudId) {
@@ -692,7 +912,7 @@ function saveCoachVoteLocal(payload, cloudId) {
   });
   var localId =
     cloudId ||
-    "coach_" + payload.teamId + "_s" + payload.slot + "_r" + nameKey(payload.round);
+    coachVoteDocId(payload.teamId, payload.round, payload.slot);
   data.coachVotes.push(
     Object.assign({}, payload, {
       id: localId,
@@ -734,11 +954,10 @@ window.__svSubmitCoachVoteFromPlayerUI = async function (opts) {
     picks: picks,
     submittedAt: new Date().toISOString(),
   };
-  var cloudId = null;
+  var cloudId = coachVoteDocId(teamId, round, slot);
   if (window.__svFirebaseApp && navigator.onLine) {
     try {
-      var json = await submitCoachVoteRest(payload);
-      cloudId = docPath(json.name) || null;
+      await submitCoachVoteRest(cloudId, payload);
     } catch (e) {
       console.warn("[coach-vote-cloud]", e);
       throw e;
@@ -1276,6 +1495,118 @@ async function fetchCloudVotes(teamId, force) {
   } finally {
     delete cloudVotesInflight[tid];
   }
+}
+
+var cloudCoachVotesCache = Object.create(null);
+var cloudCoachVotesInflight = Object.create(null);
+
+async function fetchCloudCoachVotes(teamId, force) {
+  var tid = String(teamId);
+  if (!force && cloudCoachVotesCache[tid] && Date.now() - cloudCoachVotesCache[tid].at < 15000) {
+    return cloudCoachVotesCache[tid].votes;
+  }
+  if (cloudCoachVotesInflight[tid]) return cloudCoachVotesInflight[tid];
+  if (!window.__svFirebaseApp || !projectId()) return [];
+
+  cloudCoachVotesInflight[tid] = (async function () {
+    var byId = Object.create(null);
+    var url = firestoreUrl(":runQuery");
+    if (!url) return [];
+    for (var i = 0; i < 2; i++) {
+      var teamVal = i === 0 ? parseInt(teamId, 10) || 1 : String(teamId);
+      var structuredQuery = {
+        from: [{ collectionId: "coachVotes" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "teamId" },
+            op: "EQUAL",
+            value: fsValue(teamVal),
+          },
+        },
+        orderBy: [{ field: { fieldPath: "__name__" }, direction: "ASCENDING" }],
+      };
+      var startAt = null;
+      for (var page = 0; page < 20; page++) {
+        var query = structuredQuery;
+        if (startAt) query = Object.assign({}, structuredQuery, { startAt: startAt });
+        var res = await fetch(url, {
+          method: "POST",
+          headers: await restHeaders(),
+          body: JSON.stringify({ structuredQuery: query }),
+        });
+        var rows = await res.json().catch(function () {
+          return [];
+        });
+        if (!res.ok) {
+          console.warn("[coach-votes] cloud query failed", rows.error || res.status);
+          break;
+        }
+        if (!Array.isArray(rows) || !rows.length) break;
+        var lastDoc = null;
+        var gotDoc = false;
+        rows.forEach(function (row) {
+          if (!row || !row.document) return;
+          lastDoc = row.document;
+          gotDoc = true;
+          var id = docPath(row.document.name);
+          if (!id || byId[id]) return;
+          var data = {};
+          var fields = row.document.fields || {};
+          Object.keys(fields).forEach(function (k) {
+            data[k] = parseFsValue(fields[k]);
+          });
+          byId[id] = Object.assign({ id: id }, data);
+        });
+        if (!gotDoc || !lastDoc) break;
+        startAt = { values: [{ referenceValue: lastDoc.name }], before: false };
+        if (rows.length < 300) break;
+      }
+    }
+    var votes = Object.keys(byId).map(function (id) {
+      return byId[id];
+    });
+    cloudCoachVotesCache[tid] = { at: Date.now(), votes: votes };
+    return votes;
+  })();
+
+  try {
+    return await cloudCoachVotesInflight[tid];
+  } finally {
+    delete cloudCoachVotesInflight[tid];
+  }
+}
+
+async function deleteFirestoreDoc(collection, docId) {
+  if (!projectId() || !docId) return false;
+  var url = firestoreUrl(collection + "/" + encodeURIComponent(docId));
+  if (!url) return false;
+  var res = await fetch(url, {
+    method: "DELETE",
+    headers: await restHeaders(),
+  });
+  if (!res.ok) {
+    var body = await res.json().catch(function () {
+      return {};
+    });
+    throw new Error((body.error && body.error.message) || "Delete failed");
+  }
+  return true;
+}
+
+function mergeCoachVotesLists() {
+  var byId = Object.create(null);
+  for (var i = 0; i < arguments.length; i++) {
+    (arguments[i] || []).forEach(function (v) {
+      if (!v) return;
+      var id =
+        v.id ||
+        coachVoteDocId(v.teamId, voteRoundLabel(v), v.slot);
+      byId[id] = Object.assign({}, v, { id: id });
+    });
+  }
+  return Object.keys(byId).map(function (k) {
+    return byId[k];
+  });
 }
 
 function mergeVotesLists() {
@@ -1834,10 +2165,12 @@ function wireWhoHasntVoted() {
       debouncedUpdateAdminBallots();
     });
     window.addEventListener("sv-ballot-pick-migration-done", ensureBallotPickMigrationHint);
+    window.addEventListener("sv-ballot-doc-migration-done", ensureBallotDocMigrationHint);
   }
   updateWhoHasntVoted();
   debouncedUpdateAdminBallots();
   ensureBallotPickMigrationHint();
+  ensureBallotDocMigrationHint();
 }
 
 function ensureLineupSharePackButton() {
@@ -2758,6 +3091,7 @@ function init() {
   wireSarahDisambiguation();
   wirePublishedRoundControls();
   scheduleBallotPickMigration();
+  scheduleBallotDocMigration();
 }
 
 function safeInit() {

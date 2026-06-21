@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#EE2B33" />
   <meta name="color-scheme" content="light dark" />
-  <meta name="sv-app-version" content="173" />
+  <meta name="sv-app-version" content="174" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v173: block duplicate 3/2/1 picks (canonical names); scan legacy ballots -->
+  <!-- v174: full-screen layout; ballot doc dedupe migration; coach slot dedupe -->
   <script>
     (function () {
       try {
@@ -108,7 +108,7 @@
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="dns-prefetch" href="//firestore.googleapis.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v173" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v174" />
   <style>
     /* Iwanoff-inspired design system — warm concrete, terracotta, charcoal */
     :root {
@@ -291,27 +291,35 @@
     .wrap { position: relative; z-index: 1; }
 
     .wrap {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: max(1.35rem, env(safe-area-inset-top, 0px)) max(1.15rem, env(safe-area-inset-right, 0px)) max(3.5rem, env(safe-area-inset-bottom, 0px)) max(1.15rem, env(safe-area-inset-left, 0px));
+      max-width: 100%;
+      width: 100%;
+      margin: 0;
+      box-sizing: border-box;
+      padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(3.5rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
     }
 
-    @media (min-width: 900px) {
+    @media (min-width: 768px) {
       .wrap {
-        max-width: 760px;
-        padding-left: 1.35rem;
-        padding-right: 1.35rem;
+        padding-left: max(1.35rem, env(safe-area-inset-left, 0px));
+        padding-right: max(1.35rem, env(safe-area-inset-right, 0px));
       }
     }
 
-    /* Make match result card a bit wider */
-    #matchCard {
-      max-width: 760px;
-      margin-left: auto;
-      margin-right: auto;
+    @media (min-width: 1200px) {
+      .wrap {
+        padding-left: max(1.75rem, env(safe-area-inset-left, 0px));
+        padding-right: max(1.75rem, env(safe-area-inset-right, 0px));
+      }
     }
 
-    /* When viewing lineup or voting, let the layout go full-width */
+    /* Match card + main content use full width (FotMob-style immersive) */
+    #matchCard {
+      max-width: none;
+      margin-left: 0;
+      margin-right: 0;
+    }
+
+    /* Lineup / vote tabs: edge-to-edge on all breakpoints */
     body.main-tab-lineup .wrap,
     body.main-tab-vote .wrap {
       max-width: 100%;
@@ -1524,6 +1532,44 @@
     @media (max-width: 520px) {
       #lineupCard .pitch--public {
         --pitch-max-h: 860px;
+      }
+    }
+
+    @media (min-width: 768px) {
+      #matchCard {
+        padding: 1.5rem 1.35rem 1.65rem;
+      }
+
+      #matchCard .match-hero-row {
+        gap: 1.25rem;
+      }
+
+      #matchCard #matchOpponentLine {
+        font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+      }
+
+      #matchCard .score-num {
+        font-size: clamp(2.25rem, 4.5vw, 3rem);
+      }
+
+      #matchCard .score-pill {
+        padding: 0.75rem 1.35rem;
+      }
+    }
+
+    @media (max-width: 520px) {
+      #matchCard {
+        margin-left: calc(-1 * max(1rem, env(safe-area-inset-left, 0px)));
+        margin-right: calc(-1 * max(1rem, env(safe-area-inset-right, 0px)));
+        border-left: none;
+        border-right: none;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 1.15rem max(1rem, env(safe-area-inset-right, 0px)) 1.35rem max(1rem, env(safe-area-inset-left, 0px));
+      }
+
+      #matchCard .score-num {
+        font-size: 2.15rem;
       }
     }
 
@@ -4771,10 +4817,10 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v173"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v173"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v173"></script>
-  <script type="module" defer src="dist/squadi-admin.js?tag=v173"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v174"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v174"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v174"></script>
+  <script type="module" defer src="dist/squadi-admin.js?tag=v174"></script>
   <script>
     (function () {
       var loaded = false;
@@ -4788,7 +4834,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v173").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v174").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           loaded = false;
           var errEl = document.getElementById("mergeRoundsErr");

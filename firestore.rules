@@ -35,6 +35,13 @@ service cloud.firestore {
         && request.resource.data.round is string;
     }
 
+    /** Doc id c{team}_r{roundKey}_s{slot} must match payload teamId + slot. */
+    function coachIdMatchesPayload(coachId, data) {
+      return coachId.matches('c[0-9]+_r.+_s[0-9]+')
+        && coachId.matches('c' + string(data.teamId) + '_r.+_s.+')
+        && coachId.matches('.*_s' + string(data.slot) + '$');
+    }
+
     match /config/{docId} {
       allow read: if true;
       allow write: if isSuperAdmin();
@@ -53,8 +60,13 @@ service cloud.firestore {
 
     match /coachVotes/{docId} {
       allow read: if true;
-      allow create: if isValidCoachVote() || isSuperAdmin();
-      allow update, delete: if isSuperAdmin();
+      allow create: if coachIdMatchesPayload(docId, request.resource.data)
+        && isValidCoachVote();
+      allow update: if isSuperAdmin()
+        || (coachIdMatchesPayload(docId, request.resource.data)
+          && isValidCoachVote()
+          && resource.data.slot == request.resource.data.slot);
+      allow delete: if isSuperAdmin();
     }
 
     match /adminLog/{docId} {

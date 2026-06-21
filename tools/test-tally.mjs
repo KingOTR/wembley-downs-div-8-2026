@@ -242,4 +242,72 @@ if (migrationResult.votes[0].picks[0] !== "Bob" || migrationResult.votes[0].pick
   throw new Error("migration should dedupe Bob triple to 3pt slot");
 }
 
+var {
+  dedupeBallotDocsOnePerVoter,
+  dedupeCoachVotesOnePerSlot,
+  planBallotDocDedupeMigration,
+} = nm;
+
+var dupVoterDocs = [
+  {
+    id: "t1_rround-9_vbob",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Bob",
+    voterNameKey: "bob",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Carol", "Dave", "Alice"],
+  },
+  {
+    id: "t1_rround-9_vbob-old",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Bob",
+    voterNameKey: "bob",
+    submittedAt: "2026-06-01T08:00:00.000Z",
+    picks: ["Carol", "Dave", "Alice"],
+  },
+];
+var voterDocDeduped = dedupeBallotDocsOnePerVoter(dupVoterDocs, 1, "Round 9", voteRoundLabel);
+if (voterDocDeduped.votesForTally.length !== 1) {
+  throw new Error("voter doc dedupe expected 1 ballot, got " + voterDocDeduped.votesForTally.length);
+}
+var voterDocPts = simulateUo(dupVoterDocs, function (teamId, round, votes) {
+  return dedupeBallotDocsOnePerVoter(votes, teamId, round, voteRoundLabel).votesForTally;
+});
+if (voterDocPts.Carol !== 3) {
+  throw new Error("duplicate voter docs should tally once, got " + JSON.stringify(voterDocPts));
+}
+
+var dupCoachDocs = [
+  {
+    id: "c1_rround-9_s1",
+    teamId: 1,
+    slot: 1,
+    round: "Round 9",
+    submittedAt: "2026-06-01T12:00:00.000Z",
+    picks: ["Alice", "Bob", "Carol"],
+  },
+  {
+    id: "coach-old-random-id",
+    teamId: 1,
+    slot: 1,
+    round: "Round 9",
+    submittedAt: "2026-06-01T09:00:00.000Z",
+    picks: ["Alice", "Bob", "Carol"],
+  },
+];
+var coachDeduped = dedupeCoachVotesOnePerSlot(dupCoachDocs, 1, "Round 9", voteRoundLabel);
+if (coachDeduped.votesForTally.length !== 1) {
+  throw new Error("coach slot dedupe expected 1 ballot, got " + coachDeduped.votesForTally.length);
+}
+if (coachDeduped.votesForTally[0].id !== "c1_rround-9_s1") {
+  throw new Error("coach dedupe should keep latest doc");
+}
+
+var migrationPlan = planBallotDocDedupeMigration(dupVoterDocs, dupCoachDocs, voteRoundLabel);
+if (migrationPlan.removed !== 2) {
+  throw new Error("migration plan should remove 2 docs, got " + migrationPlan.removed);
+}
+
 console.log("tally regression OK");
