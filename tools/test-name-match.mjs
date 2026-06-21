@@ -145,4 +145,17 @@ if (tallMatch.votedSquad.indexOf("Sarah (tall)") === -1 || tallMatch.votedSquad.
   throw new Error("Sarah (tall) ballot should map to Sarah (tall) only");
 }
 
+var { ballotPicksHaveDuplicates, validateBallotPicks, findDuplicateBallotPickNames } = nm;
+var roster = ["Robert Smith", "Jay", "Anna"];
+if (!ballotPicksHaveDuplicates(["Bob", "Robert Smith", "Jay"], roster)) {
+  throw new Error("nickname Bob vs Robert Smith should be duplicate on ballot");
+}
+if (!validateBallotPicks(["bob", "BOB", "Anna"], roster)) {
+  throw new Error("case-only duplicate should fail validation");
+}
+var guestDups = findDuplicateBallotPickNames(["Guest", "guest", "Anna"], roster);
+if (guestDups.length !== 1) {
+  throw new Error("guest case duplicate should list one dup, got " + JSON.stringify(guestDups));
+}
+
 console.log("name-match smoke test OK");

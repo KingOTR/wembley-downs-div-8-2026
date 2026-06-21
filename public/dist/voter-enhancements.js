@@ -22,6 +22,8 @@ import {
   dedupeBallotPicks,
   ballotPicksNeedDedupe,
   fixBallotsWithDuplicatePicks,
+  formatBallotDuplicatePickError,
+  validateBallotPicks,
 } from "./name-match.js?tag=v173";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
@@ -249,20 +251,28 @@ window.__svEnrichVotePayload = function (voterName, teamId, payload) {
   }
 };
 
-function formatDuplicatePickError(picks) {
-  var dups = findDuplicateBallotPickNames(picks);
-  if (!dups.length) return "";
-  return (
-    "Each player can only appear once on your ballot. You picked " +
-    dups.join(", ") +
-    " more than once — change your 3 / 2 / 1 picks and try again."
-  );
+function getBallotSquadSync(teamId) {
+  try {
+    var data = loadLocalData();
+    var tid = teamId != null ? teamId : getCurrentTeamId();
+    var team = getTeamFromData(data, tid);
+    return team && team.players ? team.players.filter(Boolean) : [];
+  } catch (e) {
+    return [];
+  }
 }
 
-window.__svValidateBallotPicks = function (picks) {
-  if (!ballotPicksHaveDuplicates(picks)) return "";
-  return formatDuplicatePickError(picks);
+window.__svGetBallotSquad = function () {
+  return getBallotSquadSync(getCurrentTeamId());
 };
+
+function formatDuplicatePickError(picks, teamId) {
+  return formatBallotDuplicatePickError(picks, getBallotSquadSync(teamId));
+}
+
+function validatePicksForSubmit(picks, teamId) {
+  return validateBallotPicks(picks, getBallotSquadSync(teamId));
+}
 
 function readPicksFromDom() {
   var picksRow = document.getElementById("picksRow");
@@ -317,11 +327,16 @@ async function persistCleanedBallotPicks(vote, cleanedPicks) {
 function sanitizeVotesWithDuplicatePicks(votes) {
   var out = [];
   (votes || []).forEach(function (v) {
-    if (!v || !ballotPicksNeedDedupe(v.picks)) {
+    if (!v) {
       out.push(v);
       return;
     }
-    var cleaned = dedupeBallotPicks(v.picks);
+    var squad = getBallotSquadSync(v.teamId);
+    if (!ballotPicksNeedDedupe(v.picks, squad)) {
+      out.push(v);
+      return;
+    }
+    var cleaned = dedupeBallotPicks(v.picks, squad);
     var next = Object.assign({}, v, { picks: cleaned });
     out.push(next);
     persistCleanedBallotPicks(v, cleaned).catch(function (e) {
@@ -432,13 +447,16 @@ async function migrateAllBallotDuplicatePicks(opts) {
 
   var toFix = [];
   allVotes.forEach(function (v) {
-    if (v && ballotPicksNeedDedupe(v.picks)) toFix.push(v);
+    if (!v) return;
+    var squad = getBallotSquadSync(v.teamId);
+    if (ballotPicksNeedDedupe(v.picks, squad)) toFix.push({ vote: v, squad: squad });
   });
 
   var persistTasks = [];
   var localPatch = Object.create(null);
-  toFix.forEach(function (v) {
-    var cleaned = dedupeBallotPicks(v.picks);
+  toFix.forEach(function (row) {
+    var v = row.vote;
+    var cleaned = dedupeBallotPicks(v.picks, row.squad);
     var rk = String(v.teamId) + "|" + voteRoundLabel(v);
     report.fixed++;
     report.byRound[rk] = (report.byRound[rk] || 0) + 1;
@@ -707,7 +725,7 @@ window.__svSubmitCoachVoteFromPlayerUI = async function (opts) {
     return canonicalPlayerName(p) || displayPlayerName(p);
   });
   if (picks.length !== 3) throw new Error("Pick 3 players before submitting.");
-  var dupErr = formatDuplicatePickError(picks);
+  var dupErr = formatDuplicatePickError(picks, teamId);
   if (dupErr) throw new Error(dupErr);
   var payload = {
     teamId: teamId,
@@ -834,7 +852,8 @@ function wireDuplicatePickGuard() {
     function (ev) {
       var picks = readPicksFromDom();
       if (picks.length !== 3) return;
-      var err = formatDuplicatePickError(picks);
+      var teamId = getCurrentTeamId();
+      var err = validatePicksForSubmit(picks, teamId);
       if (!err) {
         showVotePickError("");
         return;
@@ -845,6 +864,28 @@ function wireDuplicatePickGuard() {
     },
     true
   );
+}
+
+function updateBallotPickDuplicateHint() {
+  var picks = readPicksFromDom();
+  if (picks.length < 2) {
+    showVotePickError("");
+    return;
+  }
+  var err = validatePicksForSubmit(picks, getCurrentTeamId());
+  showVotePickError(err || "");
+}
+
+function wireBallotPickDuplicateHint() {
+  var picksRow = document.getElementById("picksRow");
+  if (!picksRow || picksRow._svDupHint) return;
+  picksRow._svDupHint = true;
+  var debounced = debounce(updateBallotPickDuplicateHint, 120);
+  var obs = new MutationObserver(function () {
+    debounced();
+  });
+  obs.observe(picksRow, { childList: true, subtree: true, characterData: true });
+  debounced();
 }
 
 function wireDuplicateSubmitGuard() {
@@ -1097,7 +1138,8 @@ function wireOfflineQueue() {
         });
       }
       if (picks.length !== 3) return;
-      var dupErr = formatDuplicatePickError(picks);
+      var teamId = getCurrentTeamId();
+      var dupErr = validatePicksForSubmit(picks, teamId);
       if (dupErr) {
         showVotePickError(dupErr);
         ev.stopImmediatePropagation();
@@ -2704,6 +2746,7 @@ function init() {
   wireNameSuggestDeferUntilFocus();
   wireVoterNameListeners();
   wireDuplicatePickGuard();
+  wireBallotPickDuplicateHint();
   wireDuplicateSubmitGuard();
   wireOfflineQueue();
   wireThemeToggle();

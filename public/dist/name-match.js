@@ -751,19 +751,19 @@ export function validateBallotPicks(picks, squad) {
  * Slots are 3 / 2 / 1 points (indices 0 / 1 / 2).
  * Example: ["Bob","Bob","Bob"] → ["Bob","",""]
  */
-export function dedupeBallotPicks(picks) {
+export function dedupeBallotPicks(picks, squad) {
   var src = Array.isArray(picks) ? picks.slice(0, 3) : [];
   while (src.length < 3) src.push("");
   var best = Object.create(null);
   src.forEach(function (name, idx) {
     var display = displayPlayerName(name);
     if (!display) return;
-    var key = ballotPickKey(display);
+    var key = ballotPickKey(display, squad);
     if (!key) return;
     if (!best[key] || BALLOT_SLOT_POINTS[idx] > BALLOT_SLOT_POINTS[best[key].idx]) {
       best[key] = {
         idx: idx,
-        name: canonicalPlayerName(display) || display,
+        name: resolveBallotPickCanonical(display, squad),
       };
     }
   });
@@ -776,5 +776,35 @@ export function dedupeBallotPicks(picks) {
 }
 
 /** True when dedupeBallotPicks would change the ballot. */
-export function ballotPicksNeedDedupe(picks) {
-  if (!ballotPicksHaveDuplicates(picks))
+export function ballotPicksNeedDedupe(picks, squad) {
+  if (!ballotPicksHaveDuplicates(picks, squad)) return false;
+  var cleaned = dedupeBallotPicks(picks, squad);
+  var src = (picks || []).slice(0, 3);
+  while (src.length < 3) src.push("");
+  for (var i = 0; i < 3; i++) {
+    if (ballotPickKey(src[i], squad) !== ballotPickKey(cleaned[i], squad)) return true;
+    if (displayPlayerName(src[i]) !== displayPlayerName(cleaned[i])) return true;
+  }
+  return false;
+}
+
+/**
+ * Fix duplicate picks on every ballot in a list; report counts by teamId|round.
+ */
+export function fixBallotsWithDuplicatePicks(votes, roundLabelFn) {
+  var labelFn =
+    roundLabelFn ||
+    function (v) {
+      return String(v && v.round != null ? v.round : "Round 1");
+    };
+  var fixed = 0;
+  var byRound = Object.create(null);
+  var out = (votes || []).map(function (v) {
+    if (!v || !ballotPicksNeedDedupe(v.picks)) return v;
+    fixed++;
+    var rk = String(v.teamId != null ? v.teamId : "") + "|" + labelFn(v);
+    byRound[rk] = (byRound[rk] || 0) + 1;
+    return Object.assign({}, v, { picks: dedupeBallotPicks(v.picks) });
+  });
+  return { votes: out, fixed: fixed, byRound: byRound };
+}

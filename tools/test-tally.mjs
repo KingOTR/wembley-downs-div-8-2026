@@ -146,6 +146,7 @@ var {
   dedupeBallotPicks,
   ballotPicksHaveDuplicates,
   findDuplicateBallotPickNames,
+  validateBallotPicks,
 } = nm;
 
 var bobTriple = dedupeBallotPicks(["Bob", "Bob", "Bob"]);
@@ -188,6 +189,20 @@ if (ballotPicksHaveDuplicates(["Bob", "Bob", "Carol"]) !== true) {
 }
 if (!findDuplicateBallotPickNames(["Bob", "Bob", "Carol"]).includes("Bob")) {
   throw new Error("findDuplicateBallotPickNames should list Bob");
+}
+
+var squadRobert = ["Robert Smith", "Carol", "Dave"];
+if (!ballotPicksHaveDuplicates(["Bob", "Robert Smith", "Carol"], squadRobert)) {
+  throw new Error("Bob + Robert Smith on squad should count as duplicate");
+}
+if (!ballotPicksHaveDuplicates(["bob", "BOB", "Carol"], squadRobert)) {
+  throw new Error("case variants should count as duplicate");
+}
+if (ballotPicksHaveDuplicates(["Guest One", "Guest Two", "Carol"], squadRobert)) {
+  throw new Error("distinct guests should not count as duplicate");
+}
+if (!validateBallotPicks(["Bob", "Robert", "Dave"], squadRobert)) {
+  throw new Error("validateBallotPicks should return error for nickname duplicate");
 }
 
 var { fixBallotsWithDuplicatePicks } = nm;
