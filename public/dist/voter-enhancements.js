@@ -170,7 +170,7 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
   try {
     var data = loadLocalData();
     var resolved = resolveSquadSync(teamId, data);
-    if (!resolved.squad.length) return votes;
+    if (!resolved.squad.length) return votes || [];
     var meta = getVoteMeta(resolved.team, round);
     var out = dedupeVotesOnePerSquad(
       resolved.squad,
@@ -181,10 +181,10 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
       DEFAULT_SQUAD_THRESHOLD,
       { aliases: meta.aliases }
     );
-    return out.votesForTally;
+    return out.votesForTally || [];
   } catch (e) {
     console.warn("[dedupe-tally]", e);
-    return votes;
+    return votes || [];
   }
 };
 

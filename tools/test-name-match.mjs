@@ -66,6 +66,29 @@ var matchedDup = matchSquadToVoters(["Uli", "Jay"], dupVotes, 1, "Round 9", vote
 if (!matchedDup.duplicates || matchedDup.duplicates.length !== 1) throw new Error("match should report duplicates");
 if (matchedDup.countedBallots !== 1) throw new Error("countedBallots should be 1");
 
+var sameNameDup = [
+  {
+    id: "b1",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Jay",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Anna", "Sarah", "Uli"],
+  },
+  {
+    id: "b2",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Jay",
+    submittedAt: "2026-06-01T12:00:00.000Z",
+    picks: ["Anna", "Sarah", "Uli"],
+  },
+];
+var sameNameDeduped = dedupeVotesOnePerSquad(["Jay", "Anna"], sameNameDup, 1, "Round 9", voteRoundLabel);
+if (sameNameDeduped.votesForTally.length !== 1) {
+  throw new Error("voter matching squad name: expected 1 ballot for tally, got " + sameNameDeduped.votesForTally.length);
+}
+
 var team = { coach1Name: "Will", coach2Name: "Chris" };
 var willSlot = resolveCoachSlotForVoterName("Will", team);
 var chrisSlot = resolveCoachSlotForVoterName("Chris", team);

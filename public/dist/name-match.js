@@ -408,17 +408,12 @@ export function dedupeVotesOnePerSquad(
     d.excluded.forEach(function (x) {
       if (x.id) skipKeys[x.id] = true;
     });
-    roundVotes.forEach(function (v) {
-      d.excluded.forEach(function (x) {
-        if (x.ballot && displayPlayerName(v.voterName || "") === x.ballot) {
-          skipKeys[ballotDocKey(v, roundKey)] = true;
-        }
-      });
-    });
   });
 
   var votesForTally = roundVotes.filter(function (v) {
-    return !skipKeys[ballotDocKey(v, roundKey)];
+    if (!v) return false;
+    if (v.id && skipKeys[v.id]) return false;
+    return true;
   });
 
   return {
