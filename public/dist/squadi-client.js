@@ -1,4 +1,8 @@
-/**\n * Browser copy of tools/squadi-lib.mjs — keep in sync.\n */\n\nexport const SQUADI_LIVE_BASE = "https://api.squadi.com/livescores";
+/**
+ * Browser copy of tools/squadi-lib.mjs — keep in sync.
+ */
+
+export const SQUADI_LIVE_BASE = "https://api.squadi.com/livescores";
 
 /** Football West default organisation key */
 export const FOOTBALL_WEST_ORG = "27a1f3ab-90c1-4412-853f-d85c9b27967c";

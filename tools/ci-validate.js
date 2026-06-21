@@ -105,13 +105,16 @@ try {
 }
 
 try {
-  const appPath = path.join(publicDir, "dist", "app.min.js");
-  const tmp = path.join(root, ".tmp-ci-app.mjs");
-  fs.writeFileSync(tmp, fs.readFileSync(appPath, "utf8"));
-  execFileSync(process.execPath, ["--check", tmp], { stdio: "pipe" });
-  fs.unlinkSync(tmp);
+  const syntaxFiles = [
+    path.join(publicDir, "dist", "app.min.js"),
+    path.join(publicDir, "dist", "squadi-client.js"),
+    path.join(publicDir, "dist", "voter-enhancements.js"),
+  ];
+  syntaxFiles.forEach(function (appPath) {
+    execFileSync(process.execPath, ["--check", appPath], { stdio: "pipe" });
+  });
 } catch (e) {
-  console.error("app.min.js syntax check failed");
+  console.error("dist JS syntax check failed:", e.message || e);
   failed = true;
 }
 

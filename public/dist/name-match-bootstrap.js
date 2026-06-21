@@ -1,7 +1,7 @@
 /**
  * Load before app.min.js so vote tally / doc keys can canonicalize aliases.
  */
-import { canonicalPlayerName, normalizeName } from "./name-match.js?tag=v166";
+import { canonicalPlayerName, normalizeName } from "./name-match.js?tag=v167";
 
 window.__svCanonicalPlayerName = canonicalPlayerName;
 window.__svNormalizeName = normalizeName;
