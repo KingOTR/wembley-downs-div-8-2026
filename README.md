@@ -2,7 +2,7 @@
 
 Static single-page app for team player-of-the-match voting, hosted on [Firebase Hosting](https://wembley-downs-div-8-2026.web.app/).
 
-**Current version:** v144
+**Current version:** v154
 
 ## Architecture
 
@@ -134,9 +134,9 @@ npx playwright install chromium
 
 Run against local emulator: `node tools/admin-check.js http://localhost:5000`
 
-## Release checklist (bump v138 → v139 together)
+## Release checklist (bump v154 → v155 together)
 
-When shipping a new cache-breaking version, update **all** of these to the same version (e.g. `v139`):
+When shipping a new cache-breaking version, update **all** of these to the same version (e.g. `v155`):
 
 1. `public/index.html` — HTML comment + every `?tag=vNNN` on dist scripts (`app.min.js`, `voter-enhancements.js`, `admin-merge-rounds.js`, etc.)
 2. `public/sw.js` — `CACHE_VERSION = "vNNN"`

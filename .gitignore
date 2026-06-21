@@ -16,3 +16,9 @@ Thumbs.db
 # Env / secrets
 .env
 .env.*
+
+# Debug / temp artifacts
+.tmp-*
+.tmp-attachments/
+public/_review-screens/
+public/dist/app.min.v*.js
