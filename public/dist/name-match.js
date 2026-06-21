@@ -678,3 +678,84 @@ export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLa
     squadCount: (squad || []).length,
   };
 }
+
+var BALLOT_SLOT_POINTS = [3, 2, 1];
+
+/** Canonical key for duplicate-pick detection on one ballot. */
+export function ballotPickKey(name) {
+  var display = displayPlayerName(name);
+  if (!display) return "";
+  return normalizeName(canonicalPlayerName(display));
+}
+
+/** True when the same player appears in more than one pick slot. */
+export function ballotPicksHaveDuplicates(picks) {
+  var seen = Object.create(null);
+  var list = picks || [];
+  for (var i = 0; i < list.length; i++) {
+    var key = ballotPickKey(list[i]);
+    if (!key) continue;
+    if (seen[key]) return true;
+    seen[key] = true;
+  }
+  return false;
+}
+
+/** Display names of players picked more than once (for validation messages). */
+export function findDuplicateBallotPickNames(picks) {
+  var seen = Object.create(null);
+  var dups = [];
+  (picks || []).forEach(function (name) {
+    var key = ballotPickKey(name);
+    if (!key) return;
+    var label = canonicalPlayerName(name) || displayPlayerName(name);
+    if (seen[key]) {
+      if (dups.indexOf(label) === -1) dups.push(label);
+    } else {
+      seen[key] = label;
+    }
+  });
+  return dups;
+}
+
+/**
+ * Remove duplicate picks on one ballot; keep the highest-value slot per player.
+ * Slots are 3 / 2 / 1 points (indices 0 / 1 / 2).
+ * Example: ["Bob","Bob","Bob"] → ["Bob","",""]
+ */
+export function dedupeBallotPicks(picks) {
+  var src = Array.isArray(picks) ? picks.slice(0, 3) : [];
+  while (src.length < 3) src.push("");
+  var best = Object.create(null);
+  src.forEach(function (name, idx) {
+    var display = displayPlayerName(name);
+    if (!display) return;
+    var key = ballotPickKey(display);
+    if (!key) return;
+    if (!best[key] || BALLOT_SLOT_POINTS[idx] > BALLOT_SLOT_POINTS[best[key].idx]) {
+      best[key] = {
+        idx: idx,
+        name: canonicalPlayerName(display) || display,
+      };
+    }
+  });
+  var out = ["", "", ""];
+  Object.keys(best).forEach(function (k) {
+    var e = best[k];
+    out[e.idx] = e.name;
+  });
+  return out;
+}
+
+/** True when dedupeBallotPicks would change the ballot. */
+export function ballotPicksNeedDedupe(picks) {
+  if (!ballotPicksHaveDuplicates(picks)) return false;
+  var cleaned = dedupeBallotPicks(picks);
+  var src = (picks || []).slice(0, 3);
+  while (src.length < 3) src.push("");
+  for (var i = 0; i < 3; i++) {
+    if (ballotPickKey(src[i]) !== ballotPickKey(cleaned[i])) return true;
+    if (displayPlayerName(src[i]) !== displayPlayerName(cleaned[i])) return true;
+  }
+  return false;
+}

@@ -11,7 +11,7 @@ import {
   nameSimilarity,
   DEFAULT_SQUAD_THRESHOLD,
   STRICT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v170";
+} from "./name-match.js?tag=v171";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const CHRIS_COACH_SLOT = 2;
@@ -1460,9 +1460,6 @@ function renderCoachSlotRepairPreview(el, plan) {
         " ballot(s) to reassign</div>"
     );
     plan.moves.forEach(function (move) {
-      var picks = (move.doc.picks || []).map(function (p) {
-        return displayPlayerName(p);
-      }).join(" · ");
       lines.push(
         "<div style='margin-top:0.35rem;padding:0.45rem 0.55rem;border:1px solid var(--border);border-radius:10px;font-size:0.88rem'>" +
           "<strong>" +
@@ -1473,9 +1470,7 @@ function renderCoachSlotRepairPreview(el, plan) {
           move.toSlot +
           "<br><span class='hint'>" +
           escapeHtml(move.reason) +
-          "</span><br><span style='font-size:0.82rem'>" +
-          escapeHtml(picks) +
-          "</span></div>"
+          "</span><br><span style='font-size:0.82rem;color:#71717a;font-style:italic'>Vote picks hidden.</span></div>"
       );
     });
   }

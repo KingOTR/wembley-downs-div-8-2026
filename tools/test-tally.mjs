@@ -142,4 +142,52 @@ if (noIdPts.Carol !== 3) {
   throw new Error("id-less duplicate Bob should tally once, got " + JSON.stringify(noIdPts));
 }
 
+var {
+  dedupeBallotPicks,
+  ballotPicksHaveDuplicates,
+  findDuplicateBallotPickNames,
+} = nm;
+
+var bobTriple = dedupeBallotPicks(["Bob", "Bob", "Bob"]);
+if (bobTriple[0] !== "Bob" || bobTriple[1] || bobTriple[2]) {
+  throw new Error("Bob,Bob,Bob should dedupe to Bob only in 3pt slot, got " + JSON.stringify(bobTriple));
+}
+
+var bobMixed = dedupeBallotPicks(["Alice", "Bob", "Bob"]);
+if (bobMixed[0] !== "Alice" || bobMixed[1] !== "Bob" || bobMixed[2]) {
+  throw new Error("Alice,Bob,Bob should keep Alice@3 Bob@2, got " + JSON.stringify(bobMixed));
+}
+
+var dupPickBallot = [
+  {
+    id: "b-dup-picks",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Alice",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Bob", "Bob", "Bob"],
+  },
+];
+function dedupeForTallySanitized(teamId, round, votes) {
+  var sanitized = votes.map(function (v) {
+    if (!ballotPicksHaveDuplicates(v.picks)) return v;
+    return Object.assign({}, v, { picks: dedupeBallotPicks(v.picks) });
+  });
+  return dedupeForTally(teamId, round, sanitized);
+}
+var dupPickPts = simulateUo(dupPickBallot, dedupeForTallySanitized);
+if (dupPickPts.Bob !== 3 || dupPickPts.Alice) {
+  throw new Error("Bob,Bob,Bob ballot should tally Bob:3 only, got " + JSON.stringify(dupPickPts));
+}
+
+if (ballotPicksHaveDuplicates(["Bob", "Carol", "Dave"])) {
+  throw new Error("expected no duplicate picks on valid ballot");
+}
+if (ballotPicksHaveDuplicates(["Bob", "Bob", "Carol"]) !== true) {
+  throw new Error("expected duplicate picks detected on Bob,Bob,Carol");
+}
+if (!findDuplicateBallotPickNames(["Bob", "Bob", "Carol"]).includes("Bob")) {
+  throw new Error("findDuplicateBallotPickNames should list Bob");
+}
+
 console.log("tally regression OK");

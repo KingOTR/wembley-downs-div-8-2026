@@ -17,7 +17,11 @@ import {
   classifyBallotNameMatch,
   isVoteExcludedFromTally,
   DEFAULT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v170";
+  ballotPicksHaveDuplicates,
+  findDuplicateBallotPickNames,
+  dedupeBallotPicks,
+  ballotPicksNeedDedupe,
+} from "./name-match.js?tag=v171";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -31,7 +35,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v170";
+  return "v171";
 }
 
 function distImport(path) {
@@ -207,6 +211,7 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
     if (cached && cached.votes && cached.votes.length) {
       merged = mergeVotesLists(merged, cached.votes);
     }
+    merged = sanitizeVotesWithDuplicatePicks(merged);
     var out = dedupeVotesOnePerSquad(
       resolved.squad,
       merged,
@@ -242,6 +247,88 @@ window.__svEnrichVotePayload = function (voterName, teamId, payload) {
     return {};
   }
 };
+
+function formatDuplicatePickError(picks) {
+  var dups = findDuplicateBallotPickNames(picks);
+  if (!dups.length) return "";
+  return (
+    "Each player can only appear once on your ballot. You picked " +
+    dups.join(", ") +
+    " more than once — change your 3 / 2 / 1 picks and try again."
+  );
+}
+
+window.__svValidateBallotPicks = function (picks) {
+  if (!ballotPicksHaveDuplicates(picks)) return "";
+  return formatDuplicatePickError(picks);
+};
+
+function readPicksFromDom() {
+  var picksRow = document.getElementById("picksRow");
+  var picks = [];
+  if (picksRow) {
+    picksRow.querySelectorAll(".pick-chip").forEach(function (chip) {
+      var spans = chip.querySelectorAll("span");
+      if (spans.length >= 2) picks.push(spans[1].textContent.trim());
+    });
+  }
+  return picks;
+}
+
+function showVotePickError(msg) {
+  var el = document.getElementById("voteMsg");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.style.color = msg ? "#b91c1c" : "";
+}
+
+var ballotSanitizeQueued = Object.create(null);
+
+async function persistCleanedBallotPicks(vote, cleanedPicks) {
+  if (!vote || !vote.id || !cleanedPicks) return;
+  var key = String(vote.id);
+  if (ballotSanitizeQueued[key]) return ballotSanitizeQueued[key];
+  ballotSanitizeQueued[key] = (async function () {
+    patchLocalVote(vote.id, { picks: cleanedPicks });
+    if (cloudVotesCache[String(vote.teamId)]) {
+      cloudVotesCache[String(vote.teamId)].votes = (cloudVotesCache[String(vote.teamId)].votes || []).map(
+        function (v) {
+          if (v && v.id === vote.id) return Object.assign({}, v, { picks: cleanedPicks });
+          return v;
+        }
+      );
+    }
+    if (window.__svFirebaseApp && projectId()) {
+      try {
+        await submitVoteRest(vote.id, Object.assign({}, vote, { picks: cleanedPicks }));
+      } catch (e) {
+        console.warn("[ballot-pick-dedupe]", e);
+      }
+    }
+  })();
+  try {
+    await ballotSanitizeQueued[key];
+  } finally {
+    delete ballotSanitizeQueued[key];
+  }
+}
+
+function sanitizeVotesWithDuplicatePicks(votes) {
+  var out = [];
+  (votes || []).forEach(function (v) {
+    if (!v || !ballotPicksNeedDedupe(v.picks)) {
+      out.push(v);
+      return;
+    }
+    var cleaned = dedupeBallotPicks(v.picks);
+    var next = Object.assign({}, v, { picks: cleaned });
+    out.push(next);
+    persistCleanedBallotPicks(v, cleaned).catch(function (e) {
+      console.warn("[ballot-pick-dedupe]", e);
+    });
+  });
+  return out;
+}
 
 function getPublicPrefs() {
   try {
@@ -429,6 +516,8 @@ window.__svSubmitCoachVoteFromPlayerUI = async function (opts) {
     return canonicalPlayerName(p) || displayPlayerName(p);
   });
   if (picks.length !== 3) throw new Error("Pick 3 players before submitting.");
+  var dupErr = formatDuplicatePickError(picks);
+  if (dupErr) throw new Error(dupErr);
   var payload = {
     teamId: teamId,
     slot: slot,
@@ -516,13 +605,11 @@ function updateAlreadyVotedBanner() {
         ").";
       return;
     }
-    var cpicks = (coachVote.picks || []).join(" · ");
     setBannerVisible(banner, true);
     banner.innerHTML =
       "<strong>You already voted</strong> as coach <em>" +
       escapeHtml(coachSlot.label) +
-      "</em> this round" +
-      (cpicks ? " — " + escapeHtml(cpicks) + "." : ".") +
+      "</em> this round." +
       " Submitting again will replace your coach ballot.";
     return;
   }
@@ -531,13 +618,11 @@ function updateAlreadyVotedBanner() {
     setBannerVisible(banner, false);
     return;
   }
-  var picks = (existing.picks || []).join(" · ");
   setBannerVisible(banner, true);
   banner.innerHTML =
     "<strong>You already voted</strong> this round as <em>" +
     escapeHtml(name) +
-    "</em>" +
-    (picks ? " — " + escapeHtml(picks) + "." : ".") +
+    "</em>." +
     " Submitting again will replace your ballot.";
 }
 
@@ -547,6 +632,28 @@ function escapeHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function wireDuplicatePickGuard() {
+  var btn = document.getElementById("submitVote");
+  if (!btn || btn._svDupPickGuard) return;
+  btn._svDupPickGuard = true;
+  btn.addEventListener(
+    "click",
+    function (ev) {
+      var picks = readPicksFromDom();
+      if (picks.length !== 3) return;
+      var err = formatDuplicatePickError(picks);
+      if (!err) {
+        showVotePickError("");
+        return;
+      }
+      showVotePickError(err);
+      ev.stopImmediatePropagation();
+      ev.preventDefault();
+    },
+    true
+  );
 }
 
 function wireDuplicateSubmitGuard() {
@@ -572,13 +679,11 @@ function wireDuplicateSubmitGuard() {
       if (coachSlot) {
         var existingCoach = findExistingCoachVote(teamId, coachSlot.slot, round);
         if (existingCoach) {
-          var cpicks = (existingCoach.picks || []).join(" · ");
           var cmsg =
             coachSlot.label +
             " already has a coach ballot for " +
             round +
-            (cpicks ? " (" + cpicks + ")." : ".") +
-            "\n\nSubmit again to change your coach vote?";
+            ".\n\nSubmit again to change your coach vote?";
           if (!confirm(cmsg)) {
             ev.stopImmediatePropagation();
             ev.preventDefault();
@@ -588,13 +693,11 @@ function wireDuplicateSubmitGuard() {
       } else {
         var existing = findExistingVote(teamId, name, round);
         if (existing) {
-          var picks = (existing.picks || []).join(" · ");
           var msg =
             name +
             " already has a ballot for " +
             round +
-            (picks ? " (" + picks + ")." : ".") +
-            "\n\nSubmit again to change your vote?";
+            ".\n\nSubmit again to change your vote?";
           if (!confirm(msg)) {
             ev.stopImmediatePropagation();
             ev.preventDefault();
@@ -803,6 +906,14 @@ function wireOfflineQueue() {
         });
       }
       if (picks.length !== 3) return;
+      var dupErr = formatDuplicatePickError(picks);
+      if (dupErr) {
+        showVotePickError(dupErr);
+        ev.stopImmediatePropagation();
+        ev.preventDefault();
+        return;
+      }
+      showVotePickError("");
       var teamId = getCurrentTeamId();
       var round = getCurrentRound(teamId);
       var voterKey = nameKey(name);
@@ -1067,9 +1178,6 @@ async function updateAdminBallotsList(teamId, round) {
     "<div style='display:flex;flex-direction:column;gap:0.45rem'>";
   votes.forEach(function (v, idx) {
     var when = formatBallotWhen(v.submittedAt);
-    var picks = (v.picks || []).map(function (p) {
-      return escapeHtml(displayPlayerName(p));
-    }).join(" · ");
     var badge = voteTallyBadge(v);
     var counts = voteCountsInTally(v);
     var statusColor = counts ? "#15803d" : "#b91c1c";
@@ -1093,9 +1201,7 @@ async function updateAdminBallotsList(teamId, round) {
       escapeHtml(when) +
       matchLine +
       "</div>" +
-      "<div style='margin-top:0.3rem;font-size:0.9rem'>" +
-      picks +
-      "</div>";
+      "<div style='margin-top:0.3rem;font-size:0.82rem;color:#71717a;font-style:italic'>Vote picks are private.</div>";
     if (isSuperAdminUnlocked()) {
       html +=
         "<label style='display:flex;align-items:center;gap:0.4rem;margin-top:0.4rem;font-size:0.82rem;cursor:pointer'>" +
@@ -2395,6 +2501,7 @@ function wirePublishedRoundControls() {
 function init() {
   wireNameSuggestDeferUntilFocus();
   wireVoterNameListeners();
+  wireDuplicatePickGuard();
   wireDuplicateSubmitGuard();
   wireOfflineQueue();
   wireThemeToggle();
