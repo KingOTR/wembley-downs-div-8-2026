@@ -7,9 +7,9 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const nm = await import(pathToFileURL(join(here, "../public/dist/name-match.js")).href);
-const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad, resolveCoachSlotForVoterName } = nm;
+const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad, resolveCoachSlotForVoterName, formatGoalScorerDisplayName, formatGoalScorerList } = nm;
 
-const squad = ["Jay", "Uli", "Sarah", "Sarah Goalkeeper", "Anna", "Erin", "Lauren"];
+const squad = ["Jay", "Uli", "Sarah", "Sarah Goalkeeper", "Anna", "Erin", "Lauren", "Olivia Freame"];
 const votes = [
   { id: "1", teamId: 1, round: "Round 9", voterName: "Ulrika Delarve" },
   { id: "2", teamId: 1, round: "Round 9", voterName: "Johanna Frolinghaus" },
@@ -94,5 +94,23 @@ var willSlot = resolveCoachSlotForVoterName("Will", team);
 var chrisSlot = resolveCoachSlotForVoterName("Chris", team);
 if (!willSlot || willSlot.slot !== 1) throw new Error("Will should be coach slot 1");
 if (!chrisSlot || chrisSlot.slot !== 2) throw new Error("Chris should be coach slot 2");
+
+if (formatGoalScorerDisplayName("Olivia Freame", squad) !== "Freame") {
+  throw new Error("Olivia Freame should display as Freame");
+}
+if (formatGoalScorerDisplayName("Anna Smith", squad) !== "Anna") {
+  throw new Error("Anna should display as first name");
+}
+if (formatGoalScorerDisplayName("Sarah Smith", squad) !== "Sarah") {
+  throw new Error("unique Sarah should use first name only");
+}
+var sarahGk = formatGoalScorerDisplayName("Sarah Goalkeeper", squad);
+if (sarahGk !== "Sarah Goalkeeper") {
+  throw new Error("ambiguous Sarah should use full squad name, got " + sarahGk);
+}
+var formatted = formatGoalScorerList(["Olivia Freame", "Ulrika Delarve"], squad);
+if (formatted[0] !== "Freame" || formatted[1] !== "Uli") {
+  throw new Error("formatGoalScorerList failed: " + formatted.join(", "));
+}
 
 console.log("name-match smoke test OK");

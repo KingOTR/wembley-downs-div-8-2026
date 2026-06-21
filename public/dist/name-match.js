@@ -188,6 +188,58 @@ export function findAmbiguousByFirstName(inputName, squad) {
   return unique.length > 1 ? unique : null;
 }
 
+/** Capitalise first letter of a name fragment. */
+function titleCaseWord(w) {
+  w = String(w || "").trim();
+  if (!w) return "";
+  return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
+/**
+ * Public match-card label for a goalscorer.
+ * First names by default; "Freame" for Olivia Freame; full squad names when first name is ambiguous (e.g. two Sarahs).
+ */
+export function formatGoalScorerDisplayName(fullName, squad) {
+  var raw = displayPlayerName(fullName);
+  if (!raw) return "";
+
+  var stripped = stripNameQualifiers(raw);
+  if (/\bfreame\b/i.test(stripped)) return "Freame";
+
+  var exact = (squad || []).find(function (p) {
+    return displayPlayerName(p).toLowerCase() === raw.toLowerCase();
+  });
+  var hit = exact ? { match: exact } : findSquadMatch(raw, squad, 0.82);
+  var rosterName = hit ? displayPlayerName(hit.match) : raw;
+  var parts = nameParts(stripNameQualifiers(rosterName));
+
+  if (parts.first && squad && squad.length) {
+    var ambig = findAmbiguousByFirstName(parts.first, squad);
+    if (ambig) {
+      var canon = canonicalPlayerName(rosterName);
+      var inAmbig = ambig.some(function (n) {
+        return n.toLowerCase() === canon.toLowerCase();
+      });
+      if (inAmbig) return rosterName;
+      for (var j = 0; j < ambig.length; j++) {
+        if (namesMatch(raw, ambig[j], 0.82)) return ambig[j];
+      }
+    }
+  }
+
+  if (parts.first) return titleCaseWord(parts.first);
+  return raw;
+}
+
+/** Format a list of goalscorer names for display or Squadi import. */
+export function formatGoalScorerList(scorers, squad) {
+  return (scorers || [])
+    .map(function (s) {
+      return formatGoalScorerDisplayName(s, squad);
+    })
+    .filter(Boolean);
+}
+
 export function findSquadMatch(voterName, players, threshold) {
   var th = threshold == null ? DEFAULT_SQUAD_THRESHOLD : threshold;
   var exact = (players || []).find(function (p) {

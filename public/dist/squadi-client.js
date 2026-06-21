@@ -2,6 +2,8 @@
  * Browser copy of tools/squadi-lib.mjs — keep in sync.
  */
 
+import { formatGoalScorerList } from "./name-match.js?tag=v167";
+
 export const SQUADI_LIVE_BASE = "https://api.squadi.com/livescores";
 
 /** Football West default organisation key */
@@ -270,6 +272,8 @@ export async function fetchWembleyFixtures(cfg, opts) {
         try {
           var events = await fetchMatchEvents(m.id, fetchImpl);
           scorers = extractGoalScorers(events, wembleyTeamId);
+          var squad = (opts && opts.squad) || [];
+          if (scorers.length && squad.length) scorers = formatGoalScorerList(scorers, squad);
         } catch (e) {
           /* non-fatal */
         }
@@ -300,7 +304,11 @@ export function mergeFixturesIntoMatchesByRound(existing, fixtures) {
       kickoff: fx.kickoff || prev.kickoff,
       ourScore: fx.ourScore != null ? fx.ourScore : prev.ourScore,
       oppScore: fx.oppScore != null ? fx.oppScore : prev.oppScore,
-      scorers: fx.scorers && fx.scorers.length ? fx.scorers : prev.scorers,
+      scorers: prev.goalscorersManual
+        ? prev.scorers
+        : fx.scorers && fx.scorers.length
+          ? fx.scorers
+          : prev.scorers,
       squadiMatchId: fx.squadiMatchId,
       squadiSyncedAt: fx.squadiSyncedAt,
     });

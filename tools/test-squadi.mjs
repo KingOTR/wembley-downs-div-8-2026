@@ -55,6 +55,34 @@ if (merged["Round 9"].kickoff !== "2026-06-21T11:00") {
   throw new Error("Squadi merge should update kickoff");
 }
 
+var manualMerge = mergeFixturesIntoMatchesByRound(
+  {
+    "Round 9": {
+      scorers: ["Jay", "Sarah Goalkeeper"],
+      goalscorersManual: true,
+      ourScore: 2,
+      oppScore: 1,
+    },
+  },
+  [
+    {
+      round: "Round 9",
+      opponent: "Test FC",
+      ourScore: 3,
+      oppScore: 0,
+      scorers: ["Johanna", "Ulrika"],
+      squadiMatchId: 2,
+      squadiSyncedAt: new Date().toISOString(),
+    },
+  ]
+);
+if (manualMerge["Round 9"].scorers.join() !== "Jay,Sarah Goalkeeper") {
+  throw new Error("Squadi merge must not overwrite manual goalscorers");
+}
+if (!manualMerge["Round 9"].goalscorersManual) {
+  throw new Error("goalscorersManual flag must be preserved");
+}
+
 var cfgMin1 = normalizeSquadiConfig({
   fixtureUrl:
     "https://registration.squadi.com/competitions?yearId=8&organisationKey=062d9386-ac59-4dd3-8692-7ff894465aa0&competitionUniqueKey=018c199d-a0b6-4e0a-be23-a7be9b68c0b0&divisionId=11766&teamId=107247",

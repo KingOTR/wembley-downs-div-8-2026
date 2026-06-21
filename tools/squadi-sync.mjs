@@ -67,7 +67,6 @@ async function writeFirestore(teamId, squadi) {
     }
   }
 
-  var fixtures = (await fetchWembleyFixtures(squadi)).fixtures;
   var db = admin.firestore();
   var ref = db.doc("config/main");
   var snap = await ref.get();
@@ -81,6 +80,7 @@ async function writeFirestore(teamId, squadi) {
   if (idx < 0) throw new Error("team id " + teamId + " not in config/main");
 
   var team = data.teams[idx];
+  var fixtures = (await fetchWembleyFixtures(squadi, { squad: team.players || [] })).fixtures;
   team.squadi = squadi;
   team.matchesByRound = mergeFixturesIntoMatchesByRound(team.matchesByRound, fixtures);
   data.teams[idx] = team;

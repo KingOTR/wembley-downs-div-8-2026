@@ -6,7 +6,7 @@ import {
   normalizeSquadiConfig,
   fetchWembleyFixtures,
   mergeFixturesIntoMatchesByRound,
-} from "./squadi-client.js?tag=v167";
+} from "./squadi-client.js?tag=v168";
 
 var STORAGE_KEY = "soccerVoteApp_v2";
 
@@ -113,7 +113,7 @@ async function importFromSquadi() {
       setSquadiStatus("Paste a Squadi fixture page URL or fill competition + year.", false);
       return;
     }
-    var syncOut = await fetchWembleyFixtures(squadi);
+    var syncOut = await fetchWembleyFixtures(squadi, { squad: team.players || [] });
     var fixtures = syncOut.fixtures;
     if (!fixtures.length) {
       setSquadiStatus("No matches found for “" + squadi.teamNameFilter + "”. Check competition URL.", false);
