@@ -1,6 +1,8 @@
-const { readFileSync } = require("node:fs");
+﻿const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const { pathToFileURL } = require("node:url");
+const { ensureFirestoreAdc } = require("./ensure-firestore-adc.cjs");
+ensureFirestoreAdc();
 const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
 
@@ -83,5 +85,10 @@ function voteRoundLabel(v) {
   );
 })().catch((e) => {
   console.error(e.message || e);
+  if (/NO_ADC_FOUND|Could not load the default credentials/i.test(String(e.message || e))) {
+    console.error(
+      "Auth: run `gcloud auth application-default login` (Google Cloud SDK), or `npx firebase login` then re-run npm run sync:firestore-votes"
+    );
+  }
   process.exit(1);
 });
