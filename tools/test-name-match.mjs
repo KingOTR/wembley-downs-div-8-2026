@@ -306,5 +306,8 @@ if (canonicalForTally("Rainey", div8Squad) !== "Rainy") {
 if (canonicalForTally("Johanna Frolinghaus", div8Squad) !== "Johanna") {
   throw new Error("canonicalForTally Johanna Frolinghaus should stay Johanna, not alias to Jay");
 }
+if (canonicalForTally("Jay", div8Squad) !== "Johanna") {
+  throw new Error("canonicalForTally Jay should resolve to Johanna when Jay is not on squad");
+}
 
 console.log("name-match smoke test OK");

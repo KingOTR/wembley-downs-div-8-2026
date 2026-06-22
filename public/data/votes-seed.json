@@ -1,8 +1,8 @@
 {
   "exportVersion": 1,
-  "exportedAt": "2026-06-22T06:41:06.436Z",
+  "exportedAt": "2026-06-22T10:40:59.739Z",
   "source": "tools/import-votes-csv.mjs",
-  "recoveryNote": "Reconstructed player ballots from season CSV tally export (C:/Users/sydne/OneDrive/Desktop/Div_8_all_rounds.csv). Picks per voter are inferred; totals per round match the CSV.",
+  "recoveryNote": "Reconstructed player ballots from season CSV tally export (C:/Users/sydne/OneDrive/Desktop/Div_8_all_rounds.csv). Picks per voter are inferred; totals per round match the CSV. v194: restored Johanna voter ballots for Round 1 and Round 5 from git commit 9eb02bb (v181) where pick sets matched exactly without changing CSV totals.",
   "csvMeta": {
     "exportedAt": "2026-06-21T17:49:30.426Z",
     "teamName": "Div 8"
@@ -134,8 +134,8 @@
     {
       "teamId": 1,
       "round": "Round 1",
-      "voterName": "Erin",
-      "voterNameKey": "erin",
+      "voterName": "Johanna",
+      "voterNameKey": "johanna",
       "picks": [
         "Sophie",
         "Emma",
@@ -144,8 +144,8 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-1_verin"
+      "recoveredFrom": "git:9eb02bb-v181-voter-restore",
+      "id": "t1_rround-1_vjohanna"
     },
     {
       "teamId": 1,
@@ -582,8 +582,8 @@
     {
       "teamId": 1,
       "round": "Round 5",
-      "voterName": "Sarah Goalkeeper",
-      "voterNameKey": "sarah-gk",
+      "voterName": "Johanna",
+      "voterNameKey": "johanna",
       "picks": [
         "Erika",
         "Elke",
@@ -592,8 +592,8 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-5_vsarah-gk"
+      "recoveredFrom": "git:9eb02bb-v181-voter-restore",
+      "id": "t1_rround-5_vjohanna"
     },
     {
       "teamId": 1,

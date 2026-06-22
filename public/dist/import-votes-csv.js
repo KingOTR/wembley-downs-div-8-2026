@@ -232,6 +232,9 @@ function pickVoters(ballots, squad, totals, assignmentCount) {
         const ca = counts[a] || 0;
         const cb = counts[b] || 0;
         if (ca !== cb) return ca - cb;
+        // Prefer Johanna for synthetic voter slots — CSV export drops her received points.
+        if (a === "Johanna" && b !== "Johanna") return -1;
+        if (b === "Johanna" && a !== "Johanna") return 1;
         return a.localeCompare(b);
       });
   }

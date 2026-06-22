@@ -90,6 +90,7 @@ export function voterNameKey(name) {
 export const NAME_ALIASES = {
   rainey: "Rainy",
   ulrika: "Uli",
+  jay: "Johanna",
 };
 
 function normalizeNameNoAliases(c) {

@@ -8,7 +8,12 @@ import { readFileSync } from "node:fs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const nm = await import(pathToFileURL(join(here, "../public/dist/name-match.js")).href);
-const { dedupeVotesOnePerSquad, displayPlayerName, isVoteExcludedFromTally } = nm;
+const { dedupeVotesOnePerSquad, displayPlayerName, isVoteExcludedFromTally, canonicalPlayerName } = nm;
+
+function canonicalForTally(name, squad) {
+  var base = canonicalPlayerName(name, squad && squad.length ? squad : undefined);
+  return base;
+}
 
 function voteRoundLabel(v) {
   return String(v.round || "").trim();
@@ -695,6 +700,33 @@ if (zeroRows[zeroRows.length - 1].name !== "Johanna") {
 var appMin = readFileSync(join(here, "../public/dist/app.min.js"), "utf8");
 if (appMin.includes("return _h.forEach")) {
   throw new Error("v193 Uo() still has return _h.forEach — tally returns undefined");
+}
+
+// v194: restored Johanna voter ballots + Jay pick alias for tally.
+var restored = JSON.parse(readFileSync(join(here, "../data/restored-votes.json"), "utf8"));
+var johannaVoters = (restored.votes || []).filter(function (v) {
+  return v && /johanna/i.test(v.voterName || "");
+});
+if (johannaVoters.length < 7) {
+  throw new Error("v194 expected >=7 Johanna voter ballots in restored-votes.json, got " + johannaVoters.length);
+}
+var jayPickVotes = [
+  {
+    id: "jay1",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Alice",
+    picks: ["Jay", "Bob", "Carol"],
+  },
+];
+var jayRows = tallyRowsWithZeroSquad(["Bob", "Carol", "Dave", "Johanna"], jayPickVotes, function (n) {
+  return canonicalForTally(n, ["Bob", "Carol", "Dave", "Johanna"]);
+});
+var jayJohanna = jayRows.find(function (r) {
+  return r.name === "Johanna";
+});
+if (!jayJohanna || jayJohanna.pts !== 3) {
+  throw new Error("v194 Jay 3pt pick should tally to Johanna, got " + (jayJohanna && jayJohanna.pts));
 }
 
 console.log("tally regression OK");
