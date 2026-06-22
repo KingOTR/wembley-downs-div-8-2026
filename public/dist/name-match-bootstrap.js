@@ -6,9 +6,25 @@ import {
   normalizeName,
   formatGoalScorerList,
   validateBallotPicks,
-} from "./name-match.js?tag=v187";
+  findSquadMatch,
+  displayPlayerName,
+  STRICT_SQUAD_THRESHOLD,
+} from "./name-match.js?tag=v188";
 
-window.__svCanonicalPlayerName = canonicalPlayerName;
+/** Map pick/voter name to squad roster label for tally (not off-roster nicknames). */
+function canonicalForTally(name) {
+  var base = canonicalPlayerName(name);
+  var squad =
+    typeof window.__svGetBallotSquad === "function" ? window.__svGetBallotSquad() : [];
+  if (squad && squad.length) {
+    var hit = findSquadMatch(base, squad, STRICT_SQUAD_THRESHOLD);
+    if (!hit) hit = findSquadMatch(name, squad, STRICT_SQUAD_THRESHOLD);
+    if (hit && hit.match) return displayPlayerName(hit.match);
+  }
+  return base;
+}
+
+window.__svCanonicalPlayerName = canonicalForTally;
 window.__svNormalizeName = normalizeName;
 window.__svFormatGoalScorerList = formatGoalScorerList;
 

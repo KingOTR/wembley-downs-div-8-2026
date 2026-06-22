@@ -272,7 +272,7 @@ Do **not** add new `patch-app-vNNN.js` files — edit `src/` instead.
 
 ## Name aliases
 
-**Built-in** (`NAME_ALIASES` in `public/dist/name-match.js`): lowercase stripped key → canonical display name (e.g. `ulrika: "Uli"`, `johanna: "Jay"`).
+**Built-in** (`NAME_ALIASES` in `public/dist/name-match.js`): lowercase stripped key → canonical display name (e.g. `rainey: "Rainy"`, `ulrika: "Uli"`). Per-team ballot aliases (e.g. full name → squad name) live in admin vote meta.
 
 **Per-round admin aliases** (v156+): super admin confirms ballot → squad in **Results → Who has / hasn't voted?** Stored in `team.voteMetaByRound[round].aliases` on `config/main`.
 

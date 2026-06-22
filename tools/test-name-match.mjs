@@ -240,4 +240,23 @@ if (sarahMatch.voterDocDuplicates.some(function (d) { return /goalkeeper/i.test(
   throw new Error("voter doc duplicate groups must not merge Sarah (tall) and Sarah Goalkeeper");
 }
 
+var div8Squad = [
+  "Erin", "Lauren", "Sophie", "Sarah (tall)", "Anna", "Ann", "Jane", "Uli",
+  "Johanna", "Elke", "Freame", "Abi", "Emma", "Erika", "Taryn (C)", "Rainy",
+  "Jess", "Sarah Goalkeeper", "Kat",
+];
+var jfClass = classifyBallotNameMatch("Johanna Frolinghaus", div8Squad);
+if (jfClass.nameMatchStatus === "unmatched" || jfClass.tallyExcluded) {
+  throw new Error("Johanna Frolinghaus must match squad Johanna (not Jay alias)");
+}
+if (jfClass.matchedPlayer !== "Johanna") {
+  throw new Error("Johanna Frolinghaus should match Johanna, got " + jfClass.matchedPlayer);
+}
+var jfWho = matchSquadToVoters(div8Squad, [
+  { id: "jf1", teamId: 1, round: "Round 9", voterName: "Johanna Frolinghaus" },
+], 1, "Round 9", voteRoundLabel);
+if (jfWho.votedSquad.indexOf("Johanna") === -1) {
+  throw new Error("Johanna Frolinghaus ballot should count in who-voted for Johanna");
+}
+
 console.log("name-match smoke test OK");

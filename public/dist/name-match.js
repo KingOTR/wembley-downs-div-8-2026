@@ -90,7 +90,6 @@ export function voterNameKey(name) {
 export const NAME_ALIASES = {
   rainey: "Rainy",
   ulrika: "Uli",
-  johanna: "Jay",
 };
 
 /** Resolve alias → canonical display name (unchanged if no alias). */
