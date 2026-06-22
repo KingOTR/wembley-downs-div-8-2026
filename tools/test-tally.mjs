@@ -4,6 +4,7 @@
 import { pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const nm = await import(pathToFileURL(join(here, "../public/dist/name-match.js")).href);
@@ -688,6 +689,12 @@ if (!johannaRow || johannaRow.pts !== 0) {
 }
 if (zeroRows[zeroRows.length - 1].name !== "Johanna") {
   throw new Error("v192 zero-pt players should sort after scorers");
+}
+
+// v193: Uo() must not return early from forEach (v192 regression).
+var appMin = readFileSync(join(here, "../public/dist/app.min.js"), "utf8");
+if (appMin.includes("return _h.forEach")) {
+  throw new Error("v193 Uo() still has return _h.forEach — tally returns undefined");
 }
 
 console.log("tally regression OK");
