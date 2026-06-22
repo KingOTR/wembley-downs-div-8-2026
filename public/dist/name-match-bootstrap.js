@@ -9,7 +9,7 @@ import {
   findSquadMatch,
   displayPlayerName,
   STRICT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v194";
+} from "./name-match.js?tag=v195";
 
 /** Map pick/voter name to squad roster label for tally (not off-roster nicknames). */
 function canonicalForTally(name) {

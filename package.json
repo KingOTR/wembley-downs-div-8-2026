@@ -20,6 +20,7 @@
     "import:votes-csv": "node tools/import-votes-csv.mjs",
     "sync:firestore-votes": "node tools/sync-firestore-votes.cjs",
     "audit:votes": "node tools/audit-votes.mjs",
+    "audit:tally-breakdown": "node tools/audit-tally-breakdown.mjs",
     "build": "node tools/build-app.mjs",
     "bump": "node tools/bump-version.js"
   },

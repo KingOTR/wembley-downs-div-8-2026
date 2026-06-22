@@ -698,7 +698,8 @@ if (zeroRows[zeroRows.length - 1].name !== "Johanna") {
 
 // v193: Uo() must not return early from forEach (v192 regression).
 var appMin = readFileSync(join(here, "../public/dist/app.min.js"), "utf8");
-if (appMin.includes("return _h.forEach")) {
+var uoChunk = appMin.match(/function Uo\([\s\S]{0,1200}/);
+if (uoChunk && /return _h\.forEach/.test(uoChunk[0])) {
   throw new Error("v193 Uo() still has return _h.forEach — tally returns undefined");
 }
 

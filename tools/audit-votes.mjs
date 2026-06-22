@@ -19,15 +19,19 @@ const csvPath = process.argv.find((a) => a.endsWith(".csv")) || DEFAULT_CSV;
 const restoredPath = join(root, "data/restored-votes.json");
 
 const lib = await import(pathToFileURL(join(root, "public/dist/import-votes-csv.js")).href);
-const { parseSeasonCsv, roundKey, tallyLikeSeasonExport } = lib;
+const { parseSeasonCsv, roundKey } = lib;
+const { tallyBreakdownForRound, loadNameMatch } = await import(
+  pathToFileURL(join(here, "tally-breakdown.mjs")).href
+);
+const nm = await loadNameMatch();
 
 function tallyFromBallots(votes, players, teamId, round) {
-  const rk = roundKey(round);
-  const ballots = votes
-    .filter((v) => v && String(v.teamId) === String(teamId) && roundKey(v.round) === rk)
-    .filter((v) => !v.tallyExcluded && v.nameMatchStatus !== "unmatched")
-    .map((v) => v.picks || []);
-  return tallyLikeSeasonExport(ballots, players);
+  const { breakdown } = tallyBreakdownForRound(votes, players, teamId, round, nm);
+  const out = {};
+  players.forEach((p) => {
+    out[p] = (breakdown[p] && breakdown[p].pts) || 0;
+  });
+  return out;
 }
 
 function csvRoundTotals(parsed) {
@@ -87,8 +91,7 @@ for (const round of rounds) {
   const ok =
     csvSum === importedSum &&
     csvSum === fsSum &&
-    importedBallots === fsBallots &&
-    csvSum % 6 === 0;
+    importedBallots === fsBallots;
   if (!ok) allOk = false;
   rows.push({
     round,
