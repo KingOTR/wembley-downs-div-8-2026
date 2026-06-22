@@ -14,16 +14,35 @@ export function displayPlayerName(name) {
 /** Role-only parentheticals stripped for matching; disambiguators like (tall) are kept. */
 var ROLE_PAREN_RE = /^\s*\((c|vc|gk|captain|capt)\)\s*$/i;
 
+function canonicalDisambigTag(tag) {
+  var t = String(tag || "")
+    .trim()
+    .toLowerCase();
+  if (t === "gk" || t === "goalkeeper") return "gk";
+  return t;
+}
+
 function disambigTagsFromName(name) {
   var tags = [];
-  displayPlayerName(name).replace(/\(([^)]+)\)/g, function (_, inner) {
+  var raw = displayPlayerName(name);
+  raw.replace(/\(([^)]+)\)/g, function (_, inner) {
     var low = String(inner || "")
       .trim()
       .toLowerCase();
-    if (low && !ROLE_PAREN_RE.test("(" + low + ")")) tags.push(low);
+    if (low && !ROLE_PAREN_RE.test("(" + low + ")")) tags.push(canonicalDisambigTag(low));
     return " ";
   });
+  var gkSuffix = raw.match(/\s+(goalkeeper|gk)\s*$/i);
+  if (gkSuffix) tags.push(canonicalDisambigTag(gkSuffix[1]));
   return tags;
+}
+
+/** True when the voter typed a disambiguator (paren tag or GK suffix), not a bare shared first name. */
+function inputHasDisambiguator(name) {
+  var raw = displayPlayerName(name);
+  if (!raw) return false;
+  if (disambigTagsFromName(raw).length) return true;
+  return false;
 }
 
 /** Strip role badges/suffixes; keep disambiguation tags (e.g. two Sarahs). */
@@ -115,6 +134,16 @@ var NICKNAME_ALIASES = {
   jane: ["janet"],
 };
 
+/** Distinct first names where one is a strict prefix of the other (e.g. Ann/Anna, Tom/Thomas). */
+function isPrefixFirstNameCollision(a, b) {
+  var pa = nameParts(a).first;
+  var pb = nameParts(b).first;
+  if (!pa || !pb || pa === pb) return false;
+  var shorter = pa.length <= pb.length ? pa : pb;
+  var longer = pa.length > pb.length ? pa : pb;
+  return longer.startsWith(shorter) && shorter.length >= 2;
+}
+
 function nicknameMatch(a, b) {
   var pa = nameParts(a);
   var pb = nameParts(b);
@@ -123,8 +152,9 @@ function nicknameMatch(a, b) {
   var aliasesA = NICKNAME_ALIASES[pa.first] || [];
   var aliasesB = NICKNAME_ALIASES[pb.first] || [];
   if (aliasesA.indexOf(pb.first) !== -1 || aliasesB.indexOf(pa.first) !== -1) return 0.9;
-  if (pa.first.length >= 3 && pb.first.startsWith(pa.first)) return 0.86;
-  if (pb.first.length >= 3 && pa.first.startsWith(pb.first)) return 0.86;
+  if (isPrefixFirstNameCollision(a, b)) return 0;
+  if (pa.first.length >= 4 && pb.first.startsWith(pa.first)) return 0.86;
+  if (pb.first.length >= 4 && pa.first.startsWith(pb.first)) return 0.86;
   return 0;
 }
 
@@ -151,6 +181,7 @@ export function nameSimilarity(a, b) {
   var nb = normalizeName(b);
   if (!na || !nb) return 0;
   if (na === nb) return 1;
+  if (isPrefixFirstNameCollision(a, b)) return 0;
 
   var pa = nameParts(a);
   var pb = nameParts(b);
@@ -280,46 +311,73 @@ export function findSquadMatch(voterName, players, threshold) {
   if (exactDisplay) {
     return { match: exactDisplay, exact: true, similarity: 1, reason: "exact display match" };
   }
+
+  var ambig = findAmbiguousByFirstName(voterName, players);
+  if (ambig && !inputHasDisambiguator(voterName)) {
+    return null;
+  }
+
   var exact = (players || []).find(function (p) {
     return normalizeName(p) === normalizeName(voterName);
   });
   if (exact) return { match: exact, exact: true, similarity: 1, reason: "exact match" };
 
-  var best = null;
-  var bestSim = 0;
+  var candidates = [];
   (players || []).forEach(function (p) {
     var sim = nameSimilarity(voterName, p);
-    if (sim >= th && sim > bestSim) {
-      bestSim = sim;
-      best = p;
-    }
+    if (sim >= th) candidates.push({ match: p, similarity: sim });
+  });
+  candidates.sort(function (a, b) {
+    return b.similarity - a.similarity || String(a.match).localeCompare(String(b.match));
   });
 
-  if (!best) {
+  if (candidates.length === 1) {
+    var lone = candidates[0];
+    return {
+      match: lone.match,
+      exact: false,
+      similarity: lone.similarity,
+      reason:
+        lone.similarity >= 0.95
+          ? "near-exact"
+          : "fuzzy (" + Math.round(lone.similarity * 100) + "%)",
+    };
+  }
+
+  if (candidates.length > 1) {
     var pa = nameParts(voterName);
-    if (pa.first && pa.first.length >= 2) {
-      var firstHits = (players || []).filter(function (p) {
-        return nameParts(p).first === pa.first;
+    if (pa.first) {
+      var firstExact = candidates.filter(function (c) {
+        return nameParts(c.match).first === pa.first;
       });
-      if (firstHits.length === 1) {
+      if (firstExact.length === 1) {
+        var hit = firstExact[0];
         return {
-          match: firstHits[0],
+          match: hit.match,
           exact: false,
-          similarity: 0.85,
-          reason: "unique first name on squad",
+          similarity: hit.similarity,
+          reason: "unique first name among fuzzy matches",
         };
       }
     }
+    return null;
   }
 
-  if (best) {
-    return {
-      match: best,
-      exact: false,
-      similarity: bestSim,
-      reason: bestSim >= 0.95 ? "near-exact" : "fuzzy (" + Math.round(bestSim * 100) + "%)",
-    };
+  var pa = nameParts(voterName);
+  if (pa.first && pa.first.length >= 2) {
+    var firstHits = (players || []).filter(function (p) {
+      return nameParts(p).first === pa.first;
+    });
+    if (firstHits.length === 1) {
+      return {
+        match: firstHits[0],
+        exact: false,
+        similarity: 0.85,
+        reason: "unique first name on squad",
+      };
+    }
   }
+
   return null;
 }
 

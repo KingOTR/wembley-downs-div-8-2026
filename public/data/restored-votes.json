@@ -1,6 +1,6 @@
 {
   "exportVersion": 1,
-  "exportedAt": "2026-06-22T05:39:17.164Z",
+  "exportedAt": "2026-06-22T06:23:33.892Z",
   "source": "tools/import-votes-csv.mjs",
   "recoveryNote": "Reconstructed player ballots from season CSV tally export (C:/Users/sydne/OneDrive/Desktop/Div_8_all_rounds.csv). Picks per voter are inferred; totals per round match the CSV.",
   "csvMeta": {
@@ -261,7 +261,7 @@
       "teamId": 1,
       "round": "Round 2",
       "voterName": "Sarah Goalkeeper",
-      "voterNameKey": "sarah",
+      "voterNameKey": "sarah-gk",
       "picks": [
         "Uli",
         "Ann",
@@ -271,7 +271,7 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-2_vsarah"
+      "id": "t1_rround-2_vsarah-gk"
     },
     {
       "teamId": 1,

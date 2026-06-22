@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const nm = await import(pathToFileURL(join(here, "../public/dist/name-match.js")).href);
-const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad, resolveCoachSlotForVoterName, classifyBallotNameMatch, isVoteExcludedFromTally, formatGoalScorerDisplayName, formatGoalScorerList, voterNameKey, findSquadMatch, displayPlayerName } = nm;
+const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad, resolveCoachSlotForVoterName, classifyBallotNameMatch, isVoteExcludedFromTally, formatGoalScorerDisplayName, formatGoalScorerList, voterNameKey, findSquadMatch, displayPlayerName, ballotPickKey } = nm;
 
 const squad = ["Jay", "Uli", "Sarah (tall)", "Sarah Goalkeeper", "Anna", "Erin", "Lauren", "Olivia Freame"];
 const votes = [
@@ -137,6 +137,28 @@ if (!gkSarah || displayPlayerName(gkSarah.match) !== "Sarah Goalkeeper") {
 if (voterNameKey("Sarah (tall)") === voterNameKey("Sarah Goalkeeper")) {
   throw new Error("voterNameKey must distinguish tall Sarah from goalkeeper");
 }
+if (voterNameKey("Sarah Goalkeeper") !== "sarah-gk") {
+  throw new Error("Sarah Goalkeeper voterNameKey should be sarah-gk, got " + voterNameKey("Sarah Goalkeeper"));
+}
+if (voterNameKey("Sarah") === voterNameKey("Sarah Goalkeeper")) {
+  throw new Error("bare Sarah voterNameKey must not equal Sarah Goalkeeper");
+}
+
+var bareSarah = findSquadMatch("Sarah", squad);
+if (bareSarah) {
+  throw new Error("bare Sarah must not auto-match a squad player, got " + displayPlayerName(bareSarah.match));
+}
+var bareClass = classifyBallotNameMatch("Sarah", squad);
+if (bareClass.nameMatchStatus !== "unmatched" || !bareClass.tallyExcluded) {
+  throw new Error("bare Sarah should be unmatched and tallyExcluded");
+}
+if (ballotPickKey("Sarah (tall)", squad) === ballotPickKey("Sarah Goalkeeper", squad)) {
+  throw new Error("ballot pick keys must distinguish Sarah (tall) from Sarah Goalkeeper");
+}
+var gkPick = findSquadMatch("Sarah GK", squad);
+if (!gkPick || displayPlayerName(gkPick.match) !== "Sarah Goalkeeper") {
+  throw new Error("Sarah GK should match Sarah Goalkeeper");
+}
 var tallVotes = [
   { id: "t1", teamId: 1, round: "Round 9", voterName: "Sarah (tall)", picks: ["Jay", "Anna", "Uli"] },
 ];
@@ -156,6 +178,39 @@ if (!validateBallotPicks(["bob", "BOB", "Anna"], roster)) {
 var guestDups = findDuplicateBallotPickNames(["Guest", "guest", "Anna"], roster);
 if (guestDups.length !== 1) {
   throw new Error("guest case duplicate should list one dup, got " + JSON.stringify(guestDups));
+}
+
+var annAnnaSquad = ["Jay", "Ann", "Anna", "Uli"];
+var annHit = findSquadMatch("Ann", annAnnaSquad);
+if (!annHit || displayPlayerName(annHit.match) !== "Ann") {
+  throw new Error("Ann ballot must match Ann only, got " + (annHit && annHit.match));
+}
+var annaHit = findSquadMatch("Anna", annAnnaSquad);
+if (!annaHit || displayPlayerName(annaHit.match) !== "Anna") {
+  throw new Error("Anna ballot must match Anna only, got " + (annaHit && annaHit.match));
+}
+if (findSquadMatch("Ann", ["Anna"])) {
+  throw new Error("Ann must not fuzzy-match lone squad Anna");
+}
+if (findSquadMatch("Anna", ["Ann"])) {
+  throw new Error("Anna must not fuzzy-match lone squad Ann");
+}
+if (voterNameKey("Ann") === voterNameKey("Anna")) {
+  throw new Error("voterNameKey must distinguish Ann from Anna");
+}
+if (ballotPickKey("Ann", annAnnaSquad) === ballotPickKey("Anna", annAnnaSquad)) {
+  throw new Error("ballotPickKey must distinguish Ann from Anna");
+}
+var annAnnaVotes = [
+  { id: "a1", teamId: 1, round: "Round 9", voterName: "Ann" },
+  { id: "a2", teamId: 1, round: "Round 9", voterName: "Anna" },
+];
+var annAnnaMatch = matchSquadToVoters(annAnnaSquad, annAnnaVotes, 1, "Round 9", voteRoundLabel);
+if (annAnnaMatch.votedSquad.indexOf("Ann") === -1 || annAnnaMatch.votedSquad.indexOf("Anna") === -1) {
+  throw new Error("both Ann and Anna must appear in votedSquad: " + annAnnaMatch.votedSquad.join(", "));
+}
+if (annAnnaMatch.possible.some(function (p) { return p.indexOf("Anna → Ann") !== -1 || p.indexOf("Ann → Anna") !== -1; })) {
+  throw new Error("Ann/Anna must not cross-map in who-voted: " + annAnnaMatch.possible.join("; "));
 }
 
 console.log("name-match smoke test OK");
