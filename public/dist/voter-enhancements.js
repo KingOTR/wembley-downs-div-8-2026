@@ -27,13 +27,16 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v177";
+} from "./name-match.js?tag=v178";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
 const PUBLIC_PREFS = STORAGE_KEY + "_public_prefs";
 const OFFLINE_QUEUE_KEY = STORAGE_KEY + "_offline_vote_queue";
 const THEME_KEY = STORAGE_KEY + "_theme";
+const VOTES_BACKUP_KEY = STORAGE_KEY + "_votes_backup";
+const VOTE_RESTORE_SESSION_KEY = "sv_vote_restore_v178";
+const LEGACY_STORAGE_KEYS = ["soccerVoteApp", "soccerVoteApp_v1"];
 
 function assetTag() {
   try {
@@ -41,7 +44,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v177";
+  return "v178";
 }
 
 function distImport(path) {
@@ -131,6 +134,370 @@ function loadLocalData() {
   } catch {
     return { teams: [], votes: [], coachVotes: [] };
   }
+}
+
+function backupLocalVotes(reason) {
+  try {
+    var data = loadLocalData();
+    var votes = data.votes || [];
+    var coachVotes = data.coachVotes || [];
+    if (!votes.length && !coachVotes.length) return false;
+    var payload = {
+      at: new Date().toISOString(),
+      reason: reason || "backup",
+      version: assetTag(),
+      votes: votes,
+      coachVotes: coachVotes,
+    };
+    localStorage.setItem(VOTES_BACKUP_KEY, JSON.stringify(payload));
+    return true;
+  } catch (e) {
+    console.warn("[vote-backup]", e);
+    return false;
+  }
+}
+
+function loadVotesBackup() {
+  try {
+    var raw = localStorage.getItem(VOTES_BACKUP_KEY);
+    if (!raw) return null;
+    var parsed = JSON.parse(raw);
+    if (!parsed || (!parsed.votes && !parsed.coachVotes)) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function collectRecoverableVotes() {
+  var data = loadLocalData();
+  var votes = mergeVotesLists(data.votes || []);
+  var coachVotes = mergeCoachVotesLists(data.coachVotes || []);
+  var backup = loadVotesBackup();
+  if (backup) {
+    votes = mergeVotesLists(votes, backup.votes || []);
+    coachVotes = mergeCoachVotesLists(coachVotes, backup.coachVotes || []);
+  }
+  LEGACY_STORAGE_KEYS.forEach(function (key) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return;
+      var legacy = JSON.parse(raw);
+      votes = mergeVotesLists(votes, legacy.votes || []);
+      coachVotes = mergeCoachVotesLists(coachVotes, legacy.coachVotes || []);
+    } catch (e) {}
+  });
+  try {
+    var queue = loadOfflineQueue();
+    queue.forEach(function (item) {
+      if (!item || !item.payload) return;
+      var p = item.payload;
+      var id =
+        item.docId ||
+        voteDocIdForBallot({
+          id: item.docId,
+          teamId: p.teamId,
+          round: p.round,
+          voterName: p.voterName,
+          voterNameKey: p.voterNameKey,
+        });
+      votes = mergeVotesLists(votes, [
+        Object.assign({}, p, {
+          id: id,
+          submittedAt: p.submittedAt || new Date().toISOString(),
+        }),
+      ]);
+    });
+  } catch (e) {}
+  return { votes: votes, coachVotes: coachVotes };
+}
+
+function voteDocIdForBallot(v) {
+  if (v && v.id && /^t\d+_r.+_v[a-z0-9-]+$/i.test(String(v.id))) return String(v.id);
+  var teamId = v && v.teamId != null ? v.teamId : 1;
+  var rk = nameKey(voteRoundLabel(v));
+  var vk = (v && v.voterNameKey) || nameKey((v && v.voterName) || "");
+  return "t" + teamId + "_r" + rk + "_v" + vk;
+}
+
+function mergeRecoverableIntoLocal() {
+  var recovered = collectRecoverableVotes();
+  var data = loadLocalData();
+  var nextVotes = mergeVotesLists(data.votes || [], recovered.votes);
+  var nextCoach = mergeCoachVotesLists(data.coachVotes || [], recovered.coachVotes);
+  var changed =
+    nextVotes.length !== (data.votes || []).length ||
+    nextCoach.length !== (data.coachVotes || []).length;
+  if (!changed) return { changed: false, votes: nextVotes.length, coachVotes: nextCoach.length };
+  data.votes = nextVotes;
+  data.coachVotes = nextCoach;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn("[vote-recover-local]", e);
+  }
+  return { changed: true, votes: nextVotes.length, coachVotes: nextCoach.length };
+}
+
+function rehydrateAppVotesFromLocal() {
+  try {
+    if (typeof window.__svHydrateVotesFromLocal === "function") {
+      return window.__svHydrateVotesFromLocal();
+    }
+  } catch (e) {
+    console.warn("[vote-hydrate]", e);
+  }
+  return { player: 0, coach: 0 };
+}
+
+async function countCloudPlayerVotes() {
+  var data = loadLocalData();
+  var teamIds = collectMigrationTeamIds(data);
+  var total = 0;
+  for (var i = 0; i < teamIds.length; i++) {
+    try {
+      var rows = await fetchCloudVotes(teamIds[i], true);
+      total += rows.length;
+    } catch (e) {}
+  }
+  return total;
+}
+
+async function restoreVotesFromLocal(opts) {
+  var dryRun = !!(opts && opts.dryRun);
+  if (!isSuperAdminUnlocked()) {
+    throw new Error("Super admin unlock required to restore votes to Firestore.");
+  }
+  var ready = await waitForFirebaseReady(15000);
+  if (!ready) throw new Error("Firebase not ready — sign in as super admin and retry.");
+
+  mergeRecoverableIntoLocal();
+  rehydrateAppVotesFromLocal();
+
+  var recovered = collectRecoverableVotes();
+  var report = {
+    dryRun: dryRun,
+    localPlayer: recovered.votes.length,
+    localCoach: recovered.coachVotes.length,
+    playerUploaded: 0,
+    coachUploaded: 0,
+    playerSkipped: 0,
+    coachSkipped: 0,
+    errors: [],
+    at: new Date().toISOString(),
+    version: assetTag(),
+  };
+
+  var cloudPlayerIds = Object.create(null);
+  var data = loadLocalData();
+  var teamIds = collectMigrationTeamIds(data);
+  for (var ti = 0; ti < teamIds.length; ti++) {
+    try {
+      (await fetchCloudVotes(teamIds[ti], true)).forEach(function (v) {
+        if (v && v.id) cloudPlayerIds[v.id] = true;
+      });
+    } catch (e) {
+      report.errors.push("fetch votes team " + teamIds[ti] + ": " + (e.message || e));
+    }
+  }
+
+  for (var vi = 0; vi < recovered.votes.length; vi++) {
+    var vote = recovered.votes[vi];
+    if (!vote || !vote.picks || vote.picks.length !== 3) {
+      report.playerSkipped++;
+      continue;
+    }
+    var docId = voteDocIdForBallot(vote);
+    if (cloudPlayerIds[docId]) {
+      report.playerSkipped++;
+      continue;
+    }
+    var payload = Object.assign({}, vote, {
+      id: docId,
+      teamId: vote.teamId != null ? vote.teamId : 1,
+      voterName: vote.voterName || "Unknown",
+      voterNameKey: vote.voterNameKey || nameKey(vote.voterName || "unknown"),
+      round: voteRoundLabel(vote),
+      submittedAt: vote.submittedAt || new Date().toISOString(),
+    });
+    if (dryRun) {
+      report.playerUploaded++;
+      continue;
+    }
+    try {
+      await submitVoteRest(docId, payload);
+      cloudPlayerIds[docId] = true;
+      report.playerUploaded++;
+    } catch (e) {
+      report.errors.push("vote " + docId + ": " + (e.message || e));
+    }
+  }
+
+  var cloudCoachIds = Object.create(null);
+  for (var ci = 0; ci < teamIds.length; ci++) {
+    try {
+      (await fetchCloudCoachVotes(teamIds[ci], true)).forEach(function (v) {
+        if (v && v.id) cloudCoachIds[v.id] = true;
+      });
+    } catch (e) {
+      report.errors.push("fetch coach team " + teamIds[ci] + ": " + (e.message || e));
+    }
+  }
+
+  for (var cvi = 0; cvi < recovered.coachVotes.length; cvi++) {
+    var cv = recovered.coachVotes[cvi];
+    if (!cv || cv.slot == null || !cv.picks || cv.picks.length !== 3) {
+      report.coachSkipped++;
+      continue;
+    }
+    var cDocId = cv.id || coachVoteDocId(cv.teamId, voteRoundLabel(cv), cv.slot);
+    if (cloudCoachIds[cDocId]) {
+      report.coachSkipped++;
+      continue;
+    }
+    var cPayload = {
+      teamId: cv.teamId != null ? cv.teamId : 1,
+      slot: parseInt(cv.slot, 10) || 1,
+      round: voteRoundLabel(cv),
+      picks: cv.picks,
+      submittedAt: cv.submittedAt || new Date().toISOString(),
+    };
+    if (dryRun) {
+      report.coachUploaded++;
+      continue;
+    }
+    try {
+      await submitCoachVoteRest(cDocId, cPayload);
+      cloudCoachIds[cDocId] = true;
+      report.coachUploaded++;
+    } catch (e) {
+      report.errors.push("coach " + cDocId + ": " + (e.message || e));
+    }
+  }
+
+  if (!dryRun && (report.playerUploaded || report.coachUploaded)) {
+    try {
+      window.dispatchEvent(new CustomEvent("sv-votes-restored", { detail: report }));
+      window.dispatchEvent(new CustomEvent("sv-votes-merged", { detail: report }));
+    } catch (e) {}
+    rehydrateAppVotesFromLocal();
+    triggerResultsRefresh();
+  }
+  window.__svVoteRestoreReport = report;
+  return report;
+}
+
+window.__svRestoreVotesFromLocal = restoreVotesFromLocal;
+window.__svCollectRecoverableVotes = collectRecoverableVotes;
+window.__svBackupLocalVotes = backupLocalVotes;
+
+function ensureVotesBackupOnBoot() {
+  try {
+    var data = loadLocalData();
+    if (!(data.votes || []).length && !(data.coachVotes || []).length) return;
+    if (localStorage.getItem(VOTES_BACKUP_KEY)) return;
+    backupLocalVotes("boot-snapshot");
+  } catch (e) {}
+}
+
+function ensureVoteRestoreHint(report) {
+  if (!isSuperAdminUnlocked()) return;
+  var mount = document.getElementById("resultsBallotsWrap");
+  if (!mount || !mount.parentNode) return;
+  var el = document.getElementById("voteRestoreHint");
+  if (!el) {
+    el = document.createElement("p");
+    el.id = "voteRestoreHint";
+    el.className = "hint";
+    mount.parentNode.insertBefore(el, mount);
+  }
+  if (!report) {
+    el.textContent = "";
+    return;
+  }
+  if (report.dryRun) {
+    el.textContent =
+      "Restore preview: would upload " +
+      report.playerUploaded +
+      " player + " +
+      report.coachUploaded +
+      " coach ballot(s) from local backup.";
+    return;
+  }
+  if (report.playerUploaded || report.coachUploaded) {
+    el.style.color = "#15803d";
+    el.textContent =
+      "Restored " +
+      report.playerUploaded +
+      " player + " +
+      report.coachUploaded +
+      " coach ballot(s) to Firestore from local backup.";
+    return;
+  }
+  if (report.localPlayer || report.localCoach) {
+    el.textContent =
+      "Local backup has " +
+      report.localPlayer +
+      " player + " +
+      report.localCoach +
+      " coach ballot(s). Cloud already has them or restore failed.";
+  } else {
+    el.textContent = "No local vote backup found on this device.";
+  }
+}
+
+async function maybeAutoRestoreVotes() {
+  if (!isSuperAdminUnlocked()) return null;
+  try {
+    if (sessionStorage.getItem(VOTE_RESTORE_SESSION_KEY) === "1") return null;
+  } catch (e) {
+    return null;
+  }
+  var recovered = collectRecoverableVotes();
+  if (!recovered.votes.length) return null;
+  var cloudCount = 0;
+  try {
+    cloudCount = await countCloudPlayerVotes();
+  } catch (e) {
+    return null;
+  }
+  if (cloudCount > 0) return null;
+  try {
+    sessionStorage.setItem(VOTE_RESTORE_SESSION_KEY, "1");
+  } catch (e) {}
+  console.info("[vote-restore] Cloud player votes empty — restoring from local backup…");
+  var report = await restoreVotesFromLocal({ dryRun: false });
+  ensureVoteRestoreHint(report);
+  return report;
+}
+
+function scheduleVoteRecovery() {
+  ensureVotesBackupOnBoot();
+  setTimeout(function () {
+    mergeRecoverableIntoLocal();
+    rehydrateAppVotesFromLocal();
+  }, 800);
+  setTimeout(function () {
+    maybeAutoRestoreVotes().catch(function (e) {
+      console.warn("[vote-restore]", e);
+    });
+  }, 3500);
+  var tries = 0;
+  var iv = setInterval(function () {
+    if (!isSuperAdminUnlocked()) {
+      if (++tries > 120) clearInterval(iv);
+      return;
+    }
+    clearInterval(iv);
+    maybeAutoRestoreVotes()
+      .catch(function (e) {
+        console.warn("[vote-restore]", e);
+      })
+      .finally(function () {
+        var rep = window.__svVoteRestoreReport;
+        if (rep) ensureVoteRestoreHint(rep);
+      });
+  }, 1000);
 }
 
 function getTeamFromData(data, teamId) {
@@ -638,9 +1005,15 @@ async function migrateAllDuplicateBallotDocs(opts) {
     return n + (d.excluded ? d.excluded.length : 0);
   }, 0);
 
+  if (plan.removed) backupLocalVotes("pre-ballot-doc-dedupe");
+
   removeLocalBallotsByIds(plan.removeIds);
 
-  var canDeleteCloud = isSuperAdminUnlocked() && window.__svFirebaseApp && projectId();
+  var canDeleteCloud =
+    !!(opts && opts.cloudDelete) &&
+    isSuperAdminUnlocked() &&
+    window.__svFirebaseApp &&
+    projectId();
   if (canDeleteCloud) {
     var deleteTasks = [];
     Object.keys(plan.removeIds).forEach(function (id) {
@@ -3125,6 +3498,7 @@ function init() {
   wirePublishedRoundControls();
   scheduleBallotPickMigration();
   scheduleBallotDocMigration();
+  scheduleVoteRecovery();
 }
 
 function safeInit() {
