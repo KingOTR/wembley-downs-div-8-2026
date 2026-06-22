@@ -28,7 +28,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v189";
+} from "./name-match.js?tag=v190";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -46,7 +46,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v189";
+  return "v190";
 }
 
 function distImport(path) {
@@ -4176,6 +4176,72 @@ function wireLineupPublicTabs() {
 
 var sarahPickPromise = null;
 
+function showCoachVoteSavedModal(coachLabel) {
+  var existing = document.getElementById("svCoachSaveModal");
+  if (existing) existing.remove();
+
+  var modal = document.createElement("div");
+  modal.id = "svCoachSaveModal";
+  modal.className = "sv-coach-save-modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-labelledby", "svCoachSaveTitle");
+
+  var card = document.createElement("div");
+  card.className = "sv-coach-save-card";
+  var labelNote = coachLabel
+    ? " as <strong>" + escapeHtml(coachLabel) + "</strong>"
+    : "";
+  card.innerHTML =
+    '<h3 id="svCoachSaveTitle">Coach vote saved</h3>' +
+    "<p>Your vote has been saved to the <strong>Coaches</strong> section" +
+    labelNote +
+    ".</p>" +
+    '<button type="button" class="sv-coach-save-ok">OK</button>';
+
+  function close() {
+    modal.remove();
+    document.body.classList.remove("sv-coach-save-open");
+  }
+
+  card.querySelector(".sv-coach-save-ok").addEventListener("click", close);
+  modal.addEventListener("click", function (ev) {
+    if (ev.target === modal) close();
+  });
+
+  modal.appendChild(card);
+  document.body.classList.add("sv-coach-save-open");
+  document.body.appendChild(modal);
+  try {
+    card.querySelector(".sv-coach-save-ok").focus();
+  } catch (e) {}
+}
+
+function wireCoachVoteSaveModal() {
+  if (window._svCoachSaveModalWire) return;
+  window._svCoachSaveModalWire = true;
+  window.addEventListener("sv-coach-vote-saved", function (ev) {
+    var detail = ev && ev.detail ? ev.detail : {};
+    var teamId = detail.teamId;
+    var slot = detail.slot;
+    var nameInput = document.getElementById("voterNameInput");
+    var name = nameInput ? nameInput.value.trim() : "";
+    if (!name || teamId == null) return;
+    var slotInfo = null;
+    try {
+      slotInfo =
+        typeof window.__svResolveCoachSlot === "function"
+          ? window.__svResolveCoachSlot(name, teamId)
+          : null;
+    } catch (e) {
+      return;
+    }
+    if (!slotInfo || !slotInfo.slot) return;
+    if (slot != null && slotInfo.slot !== slot) return;
+    showCoachVoteSavedModal(slotInfo.label);
+  });
+}
+
 function showNamePickModal(title, message, options) {
   return new Promise(function (resolve) {
     var existing = document.getElementById("svNamePickModal");
@@ -4828,6 +4894,7 @@ function init() {
   wireMatchWeather();
   wireLineupPublicTabs();
   wireSarahDisambiguation();
+  wireCoachVoteSaveModal();
   wirePublishedRoundControls();
   wireCoachVotesRescheduleMapping();
   scheduleBallotPickMigration();

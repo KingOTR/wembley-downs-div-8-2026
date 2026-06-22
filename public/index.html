@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#EE2B33" />
   <meta name="color-scheme" content="light dark" />
-  <meta name="sv-app-version" content="189" />
+  <meta name="sv-app-version" content="190" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v189: fix Johanna name match + tally roster keys; remove johanna→Jay alias -->
+  <!-- v190: centered content column; coach ballot saved modal on player UI -->
   <script>
     (function () {
       try {
@@ -106,7 +106,7 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" /></noscript>
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v189" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v190" />
   <style>
     /* Iwanoff-inspired design system — warm concrete, terracotta, charcoal */
     :root {
@@ -166,6 +166,7 @@
       --radius-soft: 4px;
       --grid-line: rgba(44, 42, 40, 0.06);
       --touch-min: 2.75rem;
+      --content-max: 880px;
       --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
       --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
       --dur-fast: 180ms;
@@ -290,9 +291,9 @@
     .wrap { position: relative; z-index: 1; }
 
     .wrap {
-      max-width: 100%;
+      max-width: var(--content-max);
       width: 100%;
-      margin: 0;
+      margin: 0 auto;
       box-sizing: border-box;
       padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(3.5rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
     }
@@ -311,23 +312,11 @@
       }
     }
 
-    /* Match card + main content use full width (FotMob-style immersive) */
-    #matchCard {
-      max-width: none;
-      margin-left: 0;
-      margin-right: 0;
-    }
-
-    /* Lineup / vote tabs: edge-to-edge on all breakpoints */
-    body.main-tab-lineup .wrap,
-    body.main-tab-vote .wrap {
-      max-width: 100%;
-    }
-
-    body.main-tab-lineup #lineupCard,
-    body.main-tab-vote #voteSection {
-      margin-left: 0;
-      margin-right: 0;
+    /* Desktop: centered content column; mobile stays near full-bleed below */
+    @media (max-width: 520px) {
+      .wrap {
+        max-width: 100%;
+      }
     }
 
     /* Make lineup grid use the space better on wide screens */
@@ -2010,6 +1999,56 @@
     .sv-name-pick-options button:hover {
       border-color: var(--club-red-35);
       background: var(--club-red-08);
+    }
+
+    /* Coach ballot saved (player UI → coachVotes) */
+    .sv-coach-save-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10060;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(15, 23, 42, 0.45);
+    }
+
+    body.sv-coach-save-open {
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    .sv-coach-save-card {
+      width: min(100%, 400px);
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem 1.05rem;
+      box-shadow: var(--shadow);
+    }
+
+    .sv-coach-save-card h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1rem;
+      color: var(--red-dark);
+    }
+
+    .sv-coach-save-card p {
+      margin: 0 0 0.85rem;
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .sv-coach-save-card .sv-coach-save-ok {
+      width: 100%;
+      padding: 0.6rem 0.85rem;
+      border-radius: 10px;
+      border: 2px solid var(--charcoal);
+      background: var(--terracotta);
+      color: var(--surface-raised);
+      font-weight: 800;
+      font-size: 0.92rem;
+      cursor: pointer;
     }
 
     .lineup-weather-mount {
@@ -4819,9 +4858,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v189"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v189"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v189"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v190"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v190"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v190"></script>
   <script>
     (function () {
       var mergeLoaded = false;
@@ -4831,7 +4870,7 @@
       function loadSquadiAdmin() {
         if (squadiLoaded) return;
         squadiLoaded = true;
-        import("./dist/squadi-admin.js?tag=v189").catch(function (e) {
+        import("./dist/squadi-admin.js?tag=v190").catch(function (e) {
           console.warn("squadi-admin module failed to load", e);
           squadiLoaded = false;
         });
@@ -4846,7 +4885,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v189").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v190").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           mergeLoaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
