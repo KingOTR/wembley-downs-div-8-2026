@@ -14,7 +14,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { firebaseConfigFromApp, fetchFirestoreVotes } from "./firestore-rest.mjs";
+import {
+  firebaseConfigFromApp,
+  fetchFirestoreCoachVotes,
+  fetchFirestoreVotes,
+} from "./firestore-rest.mjs";
 import { tallyBreakdownForRound, loadNameMatch } from "./tally-breakdown.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -75,6 +79,49 @@ function simulateOldDollarP(votes, roundsList) {
     });
   });
   return f;
+}
+
+/** v198 Over-rounds cumulative trend (same pipeline as $p → Uo per round). */
+function simulateTrendCumulative(votes, roundsList) {
+  const out = Object.create(null);
+  squad.forEach((p) => {
+    out[p] = roundsList.map(() => 0);
+  });
+  roundsList.forEach((round, idx) => {
+    const { breakdown } = tallyBreakdownForRound(votes, squad, teamId, round, nm);
+    squad.forEach((p) => {
+      out[p][idx] = (breakdown[p] && breakdown[p].pts) || 0;
+    });
+  });
+  squad.forEach((p) => {
+    let cum = 0;
+    out[p] = out[p].map((pts) => {
+      cum += pts;
+      return cum;
+    });
+  });
+  return out;
+}
+
+/** Cumulative ballots submitted per squad member (who-voted; not pts received). */
+function simulateVoterParticipationTrend(votes, roundsList) {
+  const out = Object.create(null);
+  squad.forEach((p) => {
+    out[p] = roundsList.map(() => 0);
+  });
+  roundsList.forEach((round, idx) => {
+    squad.forEach((player) => {
+      const voted = (votes || []).some(
+        (v) =>
+          String(v.teamId) === String(teamId) &&
+          v.round === round &&
+          nm.classifyBallotNameMatch(v.voterName, squad).matchedPlayer === player
+      );
+      const prev = idx > 0 ? out[player][idx - 1] : 0;
+      out[player][idx] = prev + (voted ? 1 : 0);
+    });
+  });
+  return out;
 }
 
 /** Current pipeline: dedupe + canonicalForTally per round. */
@@ -255,17 +302,41 @@ const restoredVotes = existsSync(restoredPath)
   : [];
 
 let firestoreVotes = [];
+let firestoreCoachVotes = [];
 let firestoreErr = null;
 try {
   const cfg = firebaseConfigFromApp();
   firestoreVotes = await fetchFirestoreVotes(cfg.projectId, cfg.apiKey);
+  firestoreCoachVotes = await fetchFirestoreCoachVotes(cfg.projectId, cfg.apiKey);
 } catch (e) {
   firestoreErr = e.message || String(e);
+}
+
+function ballotIdentityDiff(a, b) {
+  const aMap = new Map((a || []).map((v) => [v.id, v]));
+  const onlyA = (b || []).filter((v) => !aMap.has(v.id)).map((v) => v.id);
+  const onlyB = (a || []).filter((v) => !(b || []).some((x) => x.id === v.id)).map((v) => v.id);
+  const pickDiffs = [];
+  (b || []).forEach((v) => {
+    const r = aMap.get(v.id);
+    if (!r) return;
+    if (
+      JSON.stringify(r.picks) !== JSON.stringify(v.picks) ||
+      r.voterName !== v.voterName
+    ) {
+      pickDiffs.push(v.id);
+    }
+  });
+  return { onlyRestored: onlyB, onlyFirestore: onlyA, pickDiffs };
 }
 
 const csvTruth = csvSeasonTotals();
 const oldGraph = simulateOldDollarP(restoredVotes, rounds);
 const currentUo = simulateCurrentUoSeason(restoredVotes);
+const trendGraph = simulateTrendCumulative(restoredVotes, rounds);
+const voterParticipationTrend = simulateVoterParticipationTrend(restoredVotes, rounds);
+const coachTrend = simulateTrendCumulative(firestoreCoachVotes, rounds);
+const firestoreVsRestored = ballotIdentityDiff(restoredVotes, firestoreVotes);
 
 // --- 1. Old graph vs current vs CSV ---
 const oldGraphReport = squad.map((player) => {
@@ -287,6 +358,33 @@ const oldGraphReport = squad.map((player) => {
 const oldInflated = oldGraphReport.filter((r) => r.oldHigherThanCsv > 0);
 const oldDeflated = oldGraphReport.filter((r) => r.oldHigherThanCsv < 0);
 const oldVsCurrentDiffs = oldGraphReport.filter((r) => r.oldVsCurrent !== 0);
+
+const perPlayerDisplayed = squad.map((player) => {
+  const series = trendGraph[player] || [];
+  const displayedSeason = series.length ? series[series.length - 1] : 0;
+  const csv = csvTruth[player] || 0;
+  return {
+    player,
+    csvTruth: csv,
+    displayedOverRounds: displayedSeason,
+    currentUoSeason: currentUo[player] || 0,
+    oldGraphSeason: (oldGraph[player] || [])[(oldGraph[player] || []).length - 1] || 0,
+    deltaDisplayedVsCsv: displayedSeason - csv,
+    lostVotesRecoverable: false,
+  };
+});
+const displayedMismatches = perPlayerDisplayed.filter((r) => r.deltaDisplayedVsCsv !== 0);
+
+const johannaPointsSeries = trendGraph.Johanna || [];
+const johannaVoterSeries = voterParticipationTrend.Johanna || [];
+const johannaCoachSeries = coachTrend.Johanna || [];
+const johannaFirstPointRound = rounds.find((_, i) => (johannaPointsSeries[i] || 0) > 0) || null;
+const johannaZeroToOneConclusion =
+  johannaPointsSeries.some((v) => v > 0)
+    ? "DATA: Johanna has non-zero Over-rounds points in ballots — investigate picks/alias."
+    : johannaVoterSeries[0] === 1 && johannaPointsSeries[0] === 0
+      ? "UI MISREAD: Round 1 voter-participation cumulative goes 0→1 (Johanna submitted a ballot) but points received stay 0. Over rounds plots pts only; coach votes are separate and also 0 for Johanna."
+      : "CORRECT: Johanna flat 0 on Over rounds; matches CSV. No Jay/Johanna picks in ballots.";
 
 // Duplicate-ballot mechanism demo (Round 2 doubled)
 const dupDemo = restoredVotes.concat(
@@ -423,7 +521,26 @@ const report = {
   ballotCounts: {
     restored: restoredVotes.length,
     firestore: firestoreVotes.length,
+    coachFirestore: firestoreCoachVotes.length,
     firestoreErr,
+    firestoreMatchesRestored:
+      !firestoreVsRestored.onlyRestored.length &&
+      !firestoreVsRestored.onlyFirestore.length &&
+      !firestoreVsRestored.pickDiffs.length,
+  },
+  firestoreVsRestored,
+  perPlayerDisplayed,
+  displayedVsCsvMismatches: displayedMismatches,
+  johannaOverRounds: {
+    pointsCumulativeByRound: Object.fromEntries(rounds.map((r, i) => [r, johannaPointsSeries[i] || 0])),
+    voterBallotsCumulativeByRound: Object.fromEntries(
+      rounds.map((r, i) => [r, johannaVoterSeries[i] || 0])
+    ),
+    coachPointsCumulativeByRound: Object.fromEntries(
+      rounds.map((r, i) => [r, johannaCoachSeries[i] || 0])
+    ),
+    firstNonZeroPointsRound: johannaFirstPointRound,
+    conclusion: johannaZeroToOneConclusion,
   },
   summary: {
     currentBallotsMatchCsv:
@@ -440,6 +557,8 @@ const report = {
           : "Old $p differs from Uo on current ballots — see oldGraph.players.",
     },
     johannaAliasImpact: johannaAliasReport.conclusion,
+    johannaZeroToOne: johannaZeroToOneConclusion,
+    displayedVsCsvMismatches: displayedMismatches.length,
   },
   oldOverRoundsGraph: {
     description:
@@ -496,8 +615,23 @@ console.log(
   "| Jay picks in ballots:",
   johannaAliasReport.picksInCurrentBallots.jay.length
 );
+console.log("   Johanna 0→1 report:", johannaZeroToOneConclusion);
+console.log(
+  "   Points cumulative:",
+  johannaPointsSeries.join(","),
+  "| voter ballots cumulative:",
+  johannaVoterSeries.join(",")
+);
 console.log("");
-console.log("3. Max-ever git vs CSV (delta > 0)");
+console.log("3. Displayed Over-rounds vs CSV (delta != 0)");
+if (!displayedMismatches.length) console.log("   none — all 19 players match CSV on current ballots");
+else {
+  for (const r of displayedMismatches) {
+    console.log("  ", r.player, "displayed", r.displayedOverRounds, "csv", r.csvTruth);
+  }
+}
+console.log("");
+console.log("4. Max-ever git vs CSV (delta > 0)");
 const lost = perPlayerLost.filter((r) => r.delta > 0);
 if (!lost.length) console.log("   none — all players match CSV in current data");
 else {
