@@ -1,0 +1,3406 @@
+{
+  "generatedAt": "2026-06-22T16:14:44.555Z",
+  "squad": [
+    "Erin",
+    "Lauren",
+    "Sophie",
+    "Sarah (tall)",
+    "Anna",
+    "Ann",
+    "Jane",
+    "Uli",
+    "Johanna",
+    "Elke",
+    "Freame",
+    "Abi",
+    "Emma",
+    "Erika",
+    "Taryn (C)",
+    "Rainy",
+    "Jess",
+    "Sarah Goalkeeper",
+    "Kat"
+  ],
+  "squadSize": 19,
+  "rules": {
+    "globalAliases": {
+      "rainey": "Rainy",
+      "ulrika": "Uli",
+      "jay": "Johanna"
+    },
+    "defaultThreshold": 0.72,
+    "strictThreshold": 0.82,
+    "prefixCollisionPairs": [
+      {
+        "type": "prefix-collision",
+        "players": [
+          "Anna",
+          "Ann"
+        ],
+        "note": "First names are strict prefixes (Ann/Anna rule); fuzzy match blocked at 0%"
+      }
+    ],
+    "sarahDisambiguation": "Bare 'Sarah' is ambiguous; use 'Sarah (tall)' or 'Sarah Goalkeeper' / 'Sarah GK'",
+    "johannaNote": "jay→Johanna only when Jay not on roster; Johanna Frolinghaus matches Johanna directly",
+    "annAnnaNote": "Ann and Anna are prefix-collision blocked from cross-matching"
+  },
+  "sources": {
+    "restoredVotes": 70,
+    "firestoreVotes": 70,
+    "firestoreOnlyVotes": 0,
+    "coachSnapshot": 7,
+    "firestoreCoach": 7,
+    "firestoreErr": null
+  },
+  "ballotCounts": {
+    "restored": 70,
+    "firestore": 70,
+    "coach": 14,
+    "uniqueNameStrings": 21
+  },
+  "perPlayer": [
+    {
+      "canonicalName": "Erin",
+      "tallyKey": "Erin",
+      "voterNameKey": "erin",
+      "ballotPickKey": "erin",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 4,
+      "uniqueVoterNames": [
+        "Erin"
+      ],
+      "pickReferences": 2,
+      "pickSamples": [
+        {
+          "pick": "Erin",
+          "slot": "1",
+          "round": "Round 2",
+          "voterName": "Erika",
+          "id": "t1_rround-2_verika",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Erin",
+          "slot": "2",
+          "round": "Round 7",
+          "voterName": "Taryn (C)",
+          "id": "t1_rround-7_vtaryn",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Lauren",
+      "tallyKey": "Lauren",
+      "voterNameKey": "lauren",
+      "ballotPickKey": "lauren",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 2,
+      "uniqueVoterNames": [
+        "Lauren"
+      ],
+      "pickReferences": 19,
+      "pickSamples": [
+        {
+          "pick": "Lauren",
+          "slot": "2",
+          "round": "Round 1",
+          "voterName": "Abi",
+          "id": "t1_rround-1_vabi",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Lauren",
+          "slot": "3",
+          "round": "Round 1",
+          "voterName": "Erin",
+          "id": "t1_rround-1_verin",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Lauren",
+          "slot": "1",
+          "round": "Round 2",
+          "voterName": "Jess",
+          "id": "t1_rround-2_vjess",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Lauren",
+          "slot": "1",
+          "round": "Round 5",
+          "voterName": "Rainy",
+          "id": "t1_rround-5_vrainy",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Lauren",
+          "slot": "3",
+          "round": "Round 5",
+          "voterName": "Sarah Goalkeeper",
+          "id": "t1_rround-5_vsarah-gk",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Lauren",
+          "slot": "3",
+          "round": "Round 6",
+          "voterName": "Freame",
+          "id": "t1_rround-6_vfreame",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Lauren",
+          "slot": "1",
+          "round": "Round 6",
+          "voterName": "Anna",
+          "id": "t1_rround-6_vanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Lauren",
+          "slot": "3",
+          "round": "Round 7",
+          "voterName": "Taryn (C)",
+          "id": "t1_rround-7_vtaryn",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Sophie",
+      "tallyKey": "Sophie",
+      "voterNameKey": "sophie",
+      "ballotPickKey": "sophie",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 1,
+      "uniqueVoterNames": [
+        "Sophie"
+      ],
+      "pickReferences": 27,
+      "pickSamples": [
+        {
+          "pick": "Sophie",
+          "slot": "1",
+          "round": "Round 1",
+          "voterName": "Abi",
+          "id": "t1_rround-1_vabi",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sophie",
+          "slot": "3",
+          "round": "Round 1",
+          "voterName": "Johanna",
+          "id": "t1_rround-1_vjohanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sophie",
+          "slot": "1",
+          "round": "Round 1",
+          "voterName": "Freame",
+          "id": "t1_rround-1_vfreame",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sophie",
+          "slot": "3",
+          "round": "Round 2",
+          "voterName": "Erika",
+          "id": "t1_rround-2_verika",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sophie",
+          "slot": "3",
+          "round": "Round 2",
+          "voterName": "Jess",
+          "id": "t1_rround-2_vjess",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sophie",
+          "slot": "1",
+          "round": "Round 4",
+          "voterName": "Kat",
+          "id": "t1_rround-4_vkat",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sophie",
+          "slot": "1",
+          "round": "Round 5",
+          "voterName": "Taryn (C)",
+          "id": "t1_rround-5_vtaryn",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sophie",
+          "slot": "3",
+          "round": "Round 5",
+          "voterName": "Sarah (tall)",
+          "id": "t1_rround-5_vsarah-tall",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Sarah (tall)",
+      "tallyKey": "Sarah (tall)",
+      "voterNameKey": "sarah-tall",
+      "ballotPickKey": "sarah tall",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 3,
+      "uniqueVoterNames": [
+        "Sarah (tall)"
+      ],
+      "pickReferences": 15,
+      "pickSamples": [
+        {
+          "pick": "Sarah (tall)",
+          "slot": "1",
+          "round": "Round 6",
+          "voterName": "Freame",
+          "id": "t1_rround-6_vfreame",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah (tall)",
+          "slot": "2",
+          "round": "Round 6",
+          "voterName": "Anna",
+          "id": "t1_rround-6_vanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah (tall)",
+          "slot": "1",
+          "round": "Round 7",
+          "voterName": "Ann",
+          "id": "t1_rround-7_vann",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah (tall)",
+          "slot": "1",
+          "round": "Round 7",
+          "voterName": "Rainy",
+          "id": "t1_rround-7_vrainy",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah (tall)",
+          "slot": "3",
+          "round": "Round 7",
+          "voterName": "Anna",
+          "id": "t1_rround-7_vanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah (tall)",
+          "slot": "1",
+          "round": "Round 8",
+          "voterName": "Uli",
+          "id": "t1_rround-8_vuli",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah (tall)",
+          "slot": "1",
+          "round": "Round 8",
+          "voterName": "Emma",
+          "id": "t1_rround-8_vemma",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah (tall)",
+          "slot": "2",
+          "round": "Round 8",
+          "voterName": "Jane",
+          "id": "t1_rround-8_vjane",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [
+        {
+          "pick": "Sarah",
+          "slot": "3",
+          "round": "Round 4",
+          "coachSlot": 1,
+          "id": "c1_rround-4_s1",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "1",
+          "round": "Round 5",
+          "coachSlot": 1,
+          "id": "c1_rround-5_s1",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "3",
+          "round": "Round 3",
+          "coachSlot": 1,
+          "id": "c1_rround-3_s1",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "3",
+          "round": "Round 4",
+          "coachSlot": 1,
+          "id": "EjHFHeBTf8PeCtvdig45",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "1",
+          "round": "Round 5",
+          "coachSlot": 1,
+          "id": "o8X7GPkel7P0wxNnQSVu",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "3",
+          "round": "Round 3",
+          "coachSlot": 1,
+          "id": "ytKVgnpPNs6aAk1yZY1L",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        }
+      ],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Anna",
+      "tallyKey": "Anna",
+      "voterNameKey": "anna",
+      "ballotPickKey": "anna",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 4,
+      "uniqueVoterNames": [
+        "Anna"
+      ],
+      "pickReferences": 10,
+      "pickSamples": [
+        {
+          "pick": "Anna",
+          "slot": "1",
+          "round": "Round 1",
+          "voterName": "Elke",
+          "id": "t1_rround-1_velke",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Anna",
+          "slot": "2",
+          "round": "Round 1",
+          "voterName": "Ann",
+          "id": "t1_rround-1_vann",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Anna",
+          "slot": "2",
+          "round": "Round 1",
+          "voterName": "Erin",
+          "id": "t1_rround-1_verin",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Anna",
+          "slot": "2",
+          "round": "Round 2",
+          "voterName": "Erika",
+          "id": "t1_rround-2_verika",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Anna",
+          "slot": "1",
+          "round": "Round 4",
+          "voterName": "Erin",
+          "id": "t1_rround-4_verin",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Anna",
+          "slot": "3",
+          "round": "Round 4",
+          "voterName": "Kat",
+          "id": "t1_rround-4_vkat",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Anna",
+          "slot": "1",
+          "round": "Round 5",
+          "voterName": "Jane",
+          "id": "t1_rround-5_vjane",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Anna",
+          "slot": "2",
+          "round": "Round 5",
+          "voterName": "Sarah (tall)",
+          "id": "t1_rround-5_vsarah-tall",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Ann",
+      "tallyKey": "Ann",
+      "voterNameKey": "ann",
+      "ballotPickKey": "ann",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 4,
+      "uniqueVoterNames": [
+        "Ann"
+      ],
+      "pickReferences": 3,
+      "pickSamples": [
+        {
+          "pick": "Ann",
+          "slot": "2",
+          "round": "Round 2",
+          "voterName": "Jess",
+          "id": "t1_rround-2_vjess",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Ann",
+          "slot": "2",
+          "round": "Round 6",
+          "voterName": "Elke",
+          "id": "t1_rround-6_velke",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Ann",
+          "slot": "1",
+          "round": "Round 6",
+          "voterName": "Erika",
+          "id": "t1_rround-6_verika",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Jane",
+      "tallyKey": "Jane",
+      "voterNameKey": "jane",
+      "ballotPickKey": "jane",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 4,
+      "uniqueVoterNames": [
+        "Jane"
+      ],
+      "pickReferences": 18,
+      "pickSamples": [
+        {
+          "pick": "Jane",
+          "slot": "3",
+          "round": "Round 1",
+          "voterName": "Elke",
+          "id": "t1_rround-1_velke",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jane",
+          "slot": "3",
+          "round": "Round 1",
+          "voterName": "Abi",
+          "id": "t1_rround-1_vabi",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jane",
+          "slot": "3",
+          "round": "Round 1",
+          "voterName": "Ann",
+          "id": "t1_rround-1_vann",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jane",
+          "slot": "2",
+          "round": "Round 1",
+          "voterName": "Freame",
+          "id": "t1_rround-1_vfreame",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jane",
+          "slot": "3",
+          "round": "Round 2",
+          "voterName": "Kat",
+          "id": "t1_rround-2_vkat",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jane",
+          "slot": "3",
+          "round": "Round 2",
+          "voterName": "Rainy",
+          "id": "t1_rround-2_vrainy",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jane",
+          "slot": "3",
+          "round": "Round 2",
+          "voterName": "Sarah (tall)",
+          "id": "t1_rround-2_vsarah-tall",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jane",
+          "slot": "3",
+          "round": "Round 3",
+          "voterName": "Emma",
+          "id": "t1_rround-3_vemma",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Uli",
+      "tallyKey": "Uli",
+      "voterNameKey": "uli",
+      "ballotPickKey": "uli",
+      "globalAliases": [
+        "ulrika"
+      ],
+      "allAliasStrings": [
+        "ulrika"
+      ],
+      "voterBallots": 1,
+      "uniqueVoterNames": [
+        "Uli"
+      ],
+      "pickReferences": 20,
+      "pickSamples": [
+        {
+          "pick": "Uli",
+          "slot": "3",
+          "round": "Round 1",
+          "voterName": "Freame",
+          "id": "t1_rround-1_vfreame",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Uli",
+          "slot": "2",
+          "round": "Round 2",
+          "voterName": "Kat",
+          "id": "t1_rround-2_vkat",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Uli",
+          "slot": "2",
+          "round": "Round 2",
+          "voterName": "Rainy",
+          "id": "t1_rround-2_vrainy",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Uli",
+          "slot": "2",
+          "round": "Round 2",
+          "voterName": "Sarah (tall)",
+          "id": "t1_rround-2_vsarah-tall",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Uli",
+          "slot": "3",
+          "round": "Round 2",
+          "voterName": "Sarah Goalkeeper",
+          "id": "t1_rround-2_vsarah-gk",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Uli",
+          "slot": "2",
+          "round": "Round 2",
+          "voterName": "Johanna",
+          "id": "t1_rround-2_vjohanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Uli",
+          "slot": "2",
+          "round": "Round 3",
+          "voterName": "Emma",
+          "id": "t1_rround-3_vemma",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Uli",
+          "slot": "3",
+          "round": "Round 3",
+          "voterName": "Lauren",
+          "id": "t1_rround-3_vlauren",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Johanna",
+      "tallyKey": "Johanna",
+      "voterNameKey": "johanna",
+      "ballotPickKey": "johanna",
+      "globalAliases": [
+        "jay"
+      ],
+      "allAliasStrings": [
+        "jay"
+      ],
+      "voterBallots": 7,
+      "uniqueVoterNames": [
+        "Johanna"
+      ],
+      "pickReferences": 0,
+      "pickSamples": [],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Elke",
+      "tallyKey": "Elke",
+      "voterNameKey": "elke",
+      "ballotPickKey": "elke",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 6,
+      "uniqueVoterNames": [
+        "Elke"
+      ],
+      "pickReferences": 11,
+      "pickSamples": [
+        {
+          "pick": "Elke",
+          "slot": "1",
+          "round": "Round 2",
+          "voterName": "Kat",
+          "id": "t1_rround-2_vkat",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Elke",
+          "slot": "1",
+          "round": "Round 2",
+          "voterName": "Rainy",
+          "id": "t1_rround-2_vrainy",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Elke",
+          "slot": "1",
+          "round": "Round 2",
+          "voterName": "Sarah (tall)",
+          "id": "t1_rround-2_vsarah-tall",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Elke",
+          "slot": "2",
+          "round": "Round 2",
+          "voterName": "Sarah Goalkeeper",
+          "id": "t1_rround-2_vsarah-gk",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Elke",
+          "slot": "1",
+          "round": "Round 2",
+          "voterName": "Johanna",
+          "id": "t1_rround-2_vjohanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Elke",
+          "slot": "1",
+          "round": "Round 5",
+          "voterName": "Sarah (tall)",
+          "id": "t1_rround-5_vsarah-tall",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Elke",
+          "slot": "2",
+          "round": "Round 5",
+          "voterName": "Johanna",
+          "id": "t1_rround-5_vjohanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Elke",
+          "slot": "2",
+          "round": "Round 7",
+          "voterName": "Kat",
+          "id": "t1_rround-7_vkat",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Freame",
+      "tallyKey": "Freame",
+      "voterNameKey": "freame",
+      "ballotPickKey": "freame",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 2,
+      "uniqueVoterNames": [
+        "Freame"
+      ],
+      "pickReferences": 26,
+      "pickSamples": [
+        {
+          "pick": "Freame",
+          "slot": "1",
+          "round": "Round 2",
+          "voterName": "Sarah Goalkeeper",
+          "id": "t1_rround-2_vsarah-gk",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Freame",
+          "slot": "3",
+          "round": "Round 2",
+          "voterName": "Johanna",
+          "id": "t1_rround-2_vjohanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Freame",
+          "slot": "2",
+          "round": "Round 2",
+          "voterName": "Abi",
+          "id": "t1_rround-2_vabi",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Freame",
+          "slot": "1",
+          "round": "Round 3",
+          "voterName": "Emma",
+          "id": "t1_rround-3_vemma",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Freame",
+          "slot": "1",
+          "round": "Round 3",
+          "voterName": "Lauren",
+          "id": "t1_rround-3_vlauren",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Freame",
+          "slot": "1",
+          "round": "Round 3",
+          "voterName": "Sophie",
+          "id": "t1_rround-3_vsophie",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Freame",
+          "slot": "1",
+          "round": "Round 4",
+          "voterName": "Jane",
+          "id": "t1_rround-4_vjane",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Freame",
+          "slot": "2",
+          "round": "Round 4",
+          "voterName": "Erin",
+          "id": "t1_rround-4_verin",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Abi",
+      "tallyKey": "Abi",
+      "voterNameKey": "abi",
+      "ballotPickKey": "abi",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 5,
+      "uniqueVoterNames": [
+        "Abi"
+      ],
+      "pickReferences": 2,
+      "pickSamples": [
+        {
+          "pick": "Abi",
+          "slot": "1",
+          "round": "Round 9",
+          "voterName": "Jane",
+          "id": "t1_rround-9_vjane",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Abi",
+          "slot": "3",
+          "round": "Round 9",
+          "voterName": "Jess",
+          "id": "t1_rround-9_vjess",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Emma",
+      "tallyKey": "Emma",
+      "voterNameKey": "emma",
+      "ballotPickKey": "emma",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 3,
+      "uniqueVoterNames": [
+        "Emma"
+      ],
+      "pickReferences": 29,
+      "pickSamples": [
+        {
+          "pick": "Emma",
+          "slot": "2",
+          "round": "Round 1",
+          "voterName": "Elke",
+          "id": "t1_rround-1_velke",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Emma",
+          "slot": "1",
+          "round": "Round 1",
+          "voterName": "Ann",
+          "id": "t1_rround-1_vann",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Emma",
+          "slot": "2",
+          "round": "Round 1",
+          "voterName": "Johanna",
+          "id": "t1_rround-1_vjohanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Emma",
+          "slot": "1",
+          "round": "Round 1",
+          "voterName": "Erin",
+          "id": "t1_rround-1_verin",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Emma",
+          "slot": "3",
+          "round": "Round 2",
+          "voterName": "Abi",
+          "id": "t1_rround-2_vabi",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Emma",
+          "slot": "3",
+          "round": "Round 2",
+          "voterName": "Ann",
+          "id": "t1_rround-2_vann",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Emma",
+          "slot": "3",
+          "round": "Round 4",
+          "voterName": "Jane",
+          "id": "t1_rround-4_vjane",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Emma",
+          "slot": "3",
+          "round": "Round 4",
+          "voterName": "Erin",
+          "id": "t1_rround-4_verin",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Erika",
+      "tallyKey": "Erika",
+      "voterNameKey": "erika",
+      "ballotPickKey": "erika",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 5,
+      "uniqueVoterNames": [
+        "Erika"
+      ],
+      "pickReferences": 7,
+      "pickSamples": [
+        {
+          "pick": "Erika",
+          "slot": "1",
+          "round": "Round 1",
+          "voterName": "Johanna",
+          "id": "t1_rround-1_vjohanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Erika",
+          "slot": "1",
+          "round": "Round 4",
+          "voterName": "Jess",
+          "id": "t1_rround-4_vjess",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Erika",
+          "slot": "3",
+          "round": "Round 5",
+          "voterName": "Taryn (C)",
+          "id": "t1_rround-5_vtaryn",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Erika",
+          "slot": "3",
+          "round": "Round 5",
+          "voterName": "Jane",
+          "id": "t1_rround-5_vjane",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Erika",
+          "slot": "3",
+          "round": "Round 5",
+          "voterName": "Rainy",
+          "id": "t1_rround-5_vrainy",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Erika",
+          "slot": "3",
+          "round": "Round 5",
+          "voterName": "Johanna",
+          "id": "t1_rround-5_vjohanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Erika",
+          "slot": "1",
+          "round": "Round 7",
+          "voterName": "Abi",
+          "id": "t1_rround-7_vabi",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Taryn (C)",
+      "tallyKey": "Taryn (C)",
+      "voterNameKey": "taryn",
+      "ballotPickKey": "taryn",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 4,
+      "uniqueVoterNames": [
+        "Taryn (C)"
+      ],
+      "pickReferences": 16,
+      "pickSamples": [
+        {
+          "pick": "Taryn (C)",
+          "slot": "1",
+          "round": "Round 2",
+          "voterName": "Abi",
+          "id": "t1_rround-2_vabi",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Taryn (C)",
+          "slot": "2",
+          "round": "Round 2",
+          "voterName": "Ann",
+          "id": "t1_rround-2_vann",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Taryn (C)",
+          "slot": "3",
+          "round": "Round 2",
+          "voterName": "Anna",
+          "id": "t1_rround-2_vanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Taryn (C)",
+          "slot": "2",
+          "round": "Round 3",
+          "voterName": "Sophie",
+          "id": "t1_rround-3_vsophie",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Taryn (C)",
+          "slot": "3",
+          "round": "Round 3",
+          "voterName": "Anna",
+          "id": "t1_rround-3_vanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Taryn (C)",
+          "slot": "1",
+          "round": "Round 3",
+          "voterName": "Elke",
+          "id": "t1_rround-3_velke",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Taryn (C)",
+          "slot": "1",
+          "round": "Round 4",
+          "voterName": "Lauren",
+          "id": "t1_rround-4_vlauren",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Taryn (C)",
+          "slot": "2",
+          "round": "Round 6",
+          "voterName": "Jess",
+          "id": "t1_rround-6_vjess",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Rainy",
+      "tallyKey": "Rainy",
+      "voterNameKey": "rainy",
+      "ballotPickKey": "rainy",
+      "globalAliases": [
+        "rainey"
+      ],
+      "allAliasStrings": [
+        "rainey"
+      ],
+      "voterBallots": 3,
+      "uniqueVoterNames": [
+        "Rainy"
+      ],
+      "pickReferences": 13,
+      "pickSamples": [
+        {
+          "pick": "Rainy",
+          "slot": "2",
+          "round": "Round 3",
+          "voterName": "Anna",
+          "id": "t1_rround-3_vanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Rainy",
+          "slot": "2",
+          "round": "Round 3",
+          "voterName": "Elke",
+          "id": "t1_rround-3_velke",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Rainy",
+          "slot": "1",
+          "round": "Round 6",
+          "voterName": "Kat",
+          "id": "t1_rround-6_vkat",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Rainy",
+          "slot": "3",
+          "round": "Round 6",
+          "voterName": "Johanna",
+          "id": "t1_rround-6_vjohanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Rainy",
+          "slot": "1",
+          "round": "Round 6",
+          "voterName": "Abi",
+          "id": "t1_rround-6_vabi",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Rainy",
+          "slot": "1",
+          "round": "Round 8",
+          "voterName": "Taryn (C)",
+          "id": "t1_rround-8_vtaryn",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Rainy",
+          "slot": "2",
+          "round": "Round 8",
+          "voterName": "Ann",
+          "id": "t1_rround-8_vann",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Rainy",
+          "slot": "2",
+          "round": "Round 8",
+          "voterName": "Erin",
+          "id": "t1_rround-8_verin",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Jess",
+      "tallyKey": "Jess",
+      "voterNameKey": "jess",
+      "ballotPickKey": "jess",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 4,
+      "uniqueVoterNames": [
+        "Jess"
+      ],
+      "pickReferences": 13,
+      "pickSamples": [
+        {
+          "pick": "Jess",
+          "slot": "1",
+          "round": "Round 3",
+          "voterName": "Anna",
+          "id": "t1_rround-3_vanna",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jess",
+          "slot": "3",
+          "round": "Round 3",
+          "voterName": "Elke",
+          "id": "t1_rround-3_velke",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jess",
+          "slot": "3",
+          "round": "Round 3",
+          "voterName": "Erika",
+          "id": "t1_rround-3_verika",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jess",
+          "slot": "1",
+          "round": "Round 7",
+          "voterName": "Elke",
+          "id": "t1_rround-7_velke",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jess",
+          "slot": "3",
+          "round": "Round 7",
+          "voterName": "Emma",
+          "id": "t1_rround-7_vemma",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jess",
+          "slot": "2",
+          "round": "Round 7",
+          "voterName": "Erika",
+          "id": "t1_rround-7_verika",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jess",
+          "slot": "1",
+          "round": "Round 8",
+          "voterName": "Ann",
+          "id": "t1_rround-8_vann",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Jess",
+          "slot": "1",
+          "round": "Round 8",
+          "voterName": "Erin",
+          "id": "t1_rround-8_verin",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Sarah Goalkeeper",
+      "tallyKey": "Sarah Goalkeeper",
+      "voterNameKey": "sarah-gk",
+      "ballotPickKey": "sarah gk",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 3,
+      "uniqueVoterNames": [
+        "Sarah Goalkeeper"
+      ],
+      "pickReferences": 11,
+      "pickSamples": [
+        {
+          "pick": "Sarah Goalkeeper",
+          "slot": "2",
+          "round": "Round 6",
+          "voterName": "Abi",
+          "id": "t1_rround-6_vabi",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah Goalkeeper",
+          "slot": "3",
+          "round": "Round 7",
+          "voterName": "Erika",
+          "id": "t1_rround-7_verika",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah Goalkeeper",
+          "slot": "1",
+          "round": "Round 8",
+          "voterName": "Erika",
+          "id": "t1_rround-8_verika",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah Goalkeeper",
+          "slot": "2",
+          "round": "Round 8",
+          "voterName": "Kat",
+          "id": "t1_rround-8_vkat",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah Goalkeeper",
+          "slot": "2",
+          "round": "Round 8",
+          "voterName": "Elke",
+          "id": "t1_rround-8_velke",
+          "status": "matched",
+          "reason": "exact display match"
+        },
+        {
+          "pick": "Sarah",
+          "slot": "3",
+          "round": "Round 4",
+          "coachSlot": 1,
+          "id": "c1_rround-4_s1",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "1",
+          "round": "Round 5",
+          "coachSlot": 1,
+          "id": "c1_rround-5_s1",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "3",
+          "round": "Round 3",
+          "coachSlot": 1,
+          "id": "c1_rround-3_s1",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        }
+      ],
+      "ambiguousPicks": [
+        {
+          "pick": "Sarah",
+          "slot": "3",
+          "round": "Round 4",
+          "coachSlot": 1,
+          "id": "c1_rround-4_s1",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "1",
+          "round": "Round 5",
+          "coachSlot": 1,
+          "id": "c1_rround-5_s1",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "3",
+          "round": "Round 3",
+          "coachSlot": 1,
+          "id": "c1_rround-3_s1",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "3",
+          "round": "Round 4",
+          "coachSlot": 1,
+          "id": "EjHFHeBTf8PeCtvdig45",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "1",
+          "round": "Round 5",
+          "coachSlot": 1,
+          "id": "o8X7GPkel7P0wxNnQSVu",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        },
+        {
+          "pick": "Sarah",
+          "slot": "3",
+          "round": "Round 3",
+          "coachSlot": 1,
+          "id": "ytKVgnpPNs6aAk1yZY1L",
+          "status": "ambiguous",
+          "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+          "coach": true
+        }
+      ],
+      "fuzzyPicks": []
+    },
+    {
+      "canonicalName": "Kat",
+      "tallyKey": "Kat",
+      "voterNameKey": "kat",
+      "ballotPickKey": "kat",
+      "globalAliases": [],
+      "allAliasStrings": [],
+      "voterBallots": 5,
+      "uniqueVoterNames": [
+        "Kat"
+      ],
+      "pickReferences": 1,
+      "pickSamples": [
+        {
+          "pick": "Kat",
+          "slot": "2",
+          "round": "Round 5",
+          "voterName": "Abi",
+          "id": "t1_rround-5_vabi",
+          "status": "matched",
+          "reason": "exact display match"
+        }
+      ],
+      "ambiguousPicks": [],
+      "fuzzyPicks": []
+    }
+  ],
+  "stringAnalysis": [
+    {
+      "string": "Elke",
+      "kinds": [
+        "voterName",
+        "pick",
+        "coachPick"
+      ],
+      "occurrences": 17,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 1",
+          "id": "t1_rround-1_velke",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vkat",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vrainy",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vsarah-tall",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vsarah-gk",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Elke",
+      "voterNameKey": "elke",
+      "ballotPickKey": "elke",
+      "voter": {
+        "raw": "Elke",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Elke",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Elke",
+        "canonical": "Elke",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Jane",
+      "kinds": [
+        "pick",
+        "voterName",
+        "coachPick"
+      ],
+      "occurrences": 22,
+      "samples": [
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_velke",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vann",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vfreame",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vkat",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Jane",
+      "voterNameKey": "jane",
+      "ballotPickKey": "jane",
+      "voter": {
+        "raw": "Jane",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Jane",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Jane",
+        "canonical": "Jane",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Emma",
+      "kinds": [
+        "pick",
+        "voterName",
+        "coachPick"
+      ],
+      "occurrences": 32,
+      "samples": [
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_velke",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vann",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vjohanna",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_verin",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vabi",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Emma",
+      "voterNameKey": "emma",
+      "ballotPickKey": "emma",
+      "voter": {
+        "raw": "Emma",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Emma",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Emma",
+        "canonical": "Emma",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Anna",
+      "kinds": [
+        "pick",
+        "voterName"
+      ],
+      "occurrences": 14,
+      "samples": [
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_velke",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vann",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_verin",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_verika",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 2",
+          "id": "t1_rround-2_vanna",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Anna",
+      "voterNameKey": "anna",
+      "ballotPickKey": "anna",
+      "voter": {
+        "raw": "Anna",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Anna",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Anna",
+        "canonical": "Anna",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Abi",
+      "kinds": [
+        "voterName",
+        "pick"
+      ],
+      "occurrences": 7,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 1",
+          "id": "t1_rround-1_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 2",
+          "id": "t1_rround-2_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 5",
+          "id": "t1_rround-5_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 6",
+          "id": "t1_rround-6_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 7",
+          "id": "t1_rround-7_vabi",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Abi",
+      "voterNameKey": "abi",
+      "ballotPickKey": "abi",
+      "voter": {
+        "raw": "Abi",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Abi",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Abi",
+        "canonical": "Abi",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Lauren",
+      "kinds": [
+        "pick",
+        "voterName",
+        "coachPick"
+      ],
+      "occurrences": 21,
+      "samples": [
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_verin",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vjess",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 3",
+          "id": "t1_rround-3_vlauren",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 4",
+          "id": "t1_rround-4_vlauren",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Lauren",
+      "voterNameKey": "lauren",
+      "ballotPickKey": "lauren",
+      "voter": {
+        "raw": "Lauren",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Lauren",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Lauren",
+        "canonical": "Lauren",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Sophie",
+      "kinds": [
+        "pick",
+        "voterName",
+        "coachPick"
+      ],
+      "occurrences": 28,
+      "samples": [
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vjohanna",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vfreame",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_verika",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vjess",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Sophie",
+      "voterNameKey": "sophie",
+      "ballotPickKey": "sophie",
+      "voter": {
+        "raw": "Sophie",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Sophie",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Sophie",
+        "canonical": "Sophie",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Ann",
+      "kinds": [
+        "voterName",
+        "pick"
+      ],
+      "occurrences": 7,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 1",
+          "id": "t1_rround-1_vann",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vjess",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 2",
+          "id": "t1_rround-2_vann",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 6",
+          "id": "t1_rround-6_velke",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 6",
+          "id": "t1_rround-6_verika",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Ann",
+      "voterNameKey": "ann",
+      "ballotPickKey": "ann",
+      "voter": {
+        "raw": "Ann",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Ann",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Ann",
+        "canonical": "Ann",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Johanna",
+      "kinds": [
+        "voterName"
+      ],
+      "occurrences": 7,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 1",
+          "id": "t1_rround-1_vjohanna",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 2",
+          "id": "t1_rround-2_vjohanna",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 5",
+          "id": "t1_rround-5_vjohanna",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 6",
+          "id": "t1_rround-6_vjohanna",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 7",
+          "id": "t1_rround-7_vjohanna",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Johanna",
+      "voterNameKey": "johanna",
+      "ballotPickKey": "johanna",
+      "voter": {
+        "raw": "Johanna",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Johanna",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": null,
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Erika",
+      "kinds": [
+        "pick",
+        "voterName"
+      ],
+      "occurrences": 12,
+      "samples": [
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vjohanna",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 2",
+          "id": "t1_rround-2_verika",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 3",
+          "id": "t1_rround-3_verika",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 4",
+          "id": "t1_rround-4_vjess",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 5",
+          "id": "t1_rround-5_vtaryn",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Erika",
+      "voterNameKey": "erika",
+      "ballotPickKey": "erika",
+      "voter": {
+        "raw": "Erika",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Erika",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Erika",
+        "canonical": "Erika",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Erin",
+      "kinds": [
+        "voterName",
+        "pick"
+      ],
+      "occurrences": 6,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 1",
+          "id": "t1_rround-1_verin",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_verika",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 4",
+          "id": "t1_rround-4_verin",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 6",
+          "id": "t1_rround-6_verin",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 7",
+          "id": "t1_rround-7_vtaryn",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Erin",
+      "voterNameKey": "erin",
+      "ballotPickKey": "erin",
+      "voter": {
+        "raw": "Erin",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Erin",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Erin",
+        "canonical": "Erin",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Freame",
+      "kinds": [
+        "voterName",
+        "pick",
+        "coachPick"
+      ],
+      "occurrences": 28,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 1",
+          "id": "t1_rround-1_vfreame",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vsarah-gk",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vjohanna",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 3",
+          "id": "t1_rround-3_vemma",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Freame",
+      "voterNameKey": "freame",
+      "ballotPickKey": "freame",
+      "voter": {
+        "raw": "Freame",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Freame",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Freame",
+        "canonical": "Freame",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Uli",
+      "kinds": [
+        "pick",
+        "voterName",
+        "coachPick"
+      ],
+      "occurrences": 21,
+      "samples": [
+        {
+          "kind": "pick",
+          "round": "Round 1",
+          "id": "t1_rround-1_vfreame",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vkat",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vrainy",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vsarah-tall",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vsarah-gk",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Uli",
+      "voterNameKey": "uli",
+      "ballotPickKey": "uli",
+      "voter": {
+        "raw": "Uli",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Uli",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Uli",
+        "canonical": "Uli",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Jess",
+      "kinds": [
+        "voterName",
+        "pick",
+        "coachPick"
+      ],
+      "occurrences": 17,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 2",
+          "id": "t1_rround-2_vjess",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 3",
+          "id": "t1_rround-3_vanna",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 3",
+          "id": "t1_rround-3_velke",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 3",
+          "id": "t1_rround-3_verika",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 4",
+          "id": "t1_rround-4_vjess",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Jess",
+      "voterNameKey": "jess",
+      "ballotPickKey": "jess",
+      "voter": {
+        "raw": "Jess",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Jess",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Jess",
+        "canonical": "Jess",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Kat",
+      "kinds": [
+        "voterName",
+        "pick"
+      ],
+      "occurrences": 6,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 2",
+          "id": "t1_rround-2_vkat",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 4",
+          "id": "t1_rround-4_vkat",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 5",
+          "id": "t1_rround-5_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 6",
+          "id": "t1_rround-6_vkat",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 7",
+          "id": "t1_rround-7_vkat",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Kat",
+      "voterNameKey": "kat",
+      "ballotPickKey": "kat",
+      "voter": {
+        "raw": "Kat",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Kat",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Kat",
+        "canonical": "Kat",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Rainy",
+      "kinds": [
+        "voterName",
+        "pick",
+        "coachPick"
+      ],
+      "occurrences": 16,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 2",
+          "id": "t1_rround-2_vrainy",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 3",
+          "id": "t1_rround-3_vanna",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 3",
+          "id": "t1_rround-3_velke",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 5",
+          "id": "t1_rround-5_vrainy",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 6",
+          "id": "t1_rround-6_vkat",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Rainy",
+      "voterNameKey": "rainy",
+      "ballotPickKey": "rainy",
+      "voter": {
+        "raw": "Rainy",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Rainy",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Rainy",
+        "canonical": "Rainy",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Sarah (tall)",
+      "kinds": [
+        "voterName",
+        "pick"
+      ],
+      "occurrences": 12,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 2",
+          "id": "t1_rround-2_vsarah-tall",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 5",
+          "id": "t1_rround-5_vsarah-tall",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 6",
+          "id": "t1_rround-6_vfreame",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 6",
+          "id": "t1_rround-6_vanna",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 7",
+          "id": "t1_rround-7_vann",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Sarah (tall)",
+      "voterNameKey": "sarah-tall",
+      "ballotPickKey": "sarah tall",
+      "voter": {
+        "raw": "Sarah (tall)",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Sarah (tall)",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Sarah (tall)",
+        "canonical": "Sarah (tall)",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Sarah Goalkeeper",
+      "kinds": [
+        "voterName",
+        "pick"
+      ],
+      "occurrences": 8,
+      "samples": [
+        {
+          "kind": "voterName",
+          "round": "Round 2",
+          "id": "t1_rround-2_vsarah-gk",
+          "source": "restored"
+        },
+        {
+          "kind": "voterName",
+          "round": "Round 5",
+          "id": "t1_rround-5_vsarah-gk",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 6",
+          "id": "t1_rround-6_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 7",
+          "id": "t1_rround-7_verika",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 8",
+          "id": "t1_rround-8_verika",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Sarah Goalkeeper",
+      "voterNameKey": "sarah-gk",
+      "ballotPickKey": "sarah gk",
+      "voter": {
+        "raw": "Sarah Goalkeeper",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Sarah Goalkeeper",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Sarah Goalkeeper",
+        "canonical": "Sarah Goalkeeper",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Taryn (C)",
+      "kinds": [
+        "pick",
+        "voterName",
+        "coachPick"
+      ],
+      "occurrences": 20,
+      "samples": [
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vabi",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vann",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 2",
+          "id": "t1_rround-2_vanna",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 3",
+          "id": "t1_rround-3_vsophie",
+          "source": "restored"
+        },
+        {
+          "kind": "pick",
+          "round": "Round 3",
+          "id": "t1_rround-3_vanna",
+          "source": "restored"
+        }
+      ],
+      "tallyCanonical": "Taryn (C)",
+      "voterNameKey": "taryn",
+      "ballotPickKey": "taryn",
+      "voter": {
+        "raw": "Taryn (C)",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Taryn (C)",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Taryn (C)",
+        "canonical": "Taryn (C)",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    },
+    {
+      "string": "Sarah",
+      "kinds": [
+        "coachPick"
+      ],
+      "occurrences": 6,
+      "samples": [
+        {
+          "kind": "coachPick",
+          "round": "Round 4",
+          "id": "c1_rround-4_s1",
+          "source": "coach-snapshot"
+        },
+        {
+          "kind": "coachPick",
+          "round": "Round 5",
+          "id": "c1_rround-5_s1",
+          "source": "coach-snapshot"
+        },
+        {
+          "kind": "coachPick",
+          "round": "Round 3",
+          "id": "c1_rround-3_s1",
+          "source": "coach-snapshot"
+        },
+        {
+          "kind": "coachPick",
+          "round": "Round 4",
+          "id": "EjHFHeBTf8PeCtvdig45",
+          "source": "firestore-coach-only"
+        },
+        {
+          "kind": "coachPick",
+          "round": "Round 5",
+          "id": "o8X7GPkel7P0wxNnQSVu",
+          "source": "firestore-coach-only"
+        }
+      ],
+      "tallyCanonical": "Sarah",
+      "voterNameKey": "sarah",
+      "ballotPickKey": "sarah",
+      "voter": null,
+      "pick": {
+        "raw": "Sarah",
+        "canonical": null,
+        "status": "ambiguous",
+        "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+        "candidates": [
+          "Sarah (tall)",
+          "Sarah Goalkeeper"
+        ]
+      },
+      "ambiguousFirstName": [
+        "Sarah (tall)",
+        "Sarah Goalkeeper"
+      ],
+      "fuzzyCollisions": [
+        {
+          "player": "Sarah (tall)",
+          "similarity": 0.88
+        },
+        {
+          "player": "Sarah Goalkeeper",
+          "similarity": 0.88
+        }
+      ],
+      "issues": []
+    },
+    {
+      "string": "Ash",
+      "kinds": [
+        "coachPick"
+      ],
+      "occurrences": 2,
+      "samples": [
+        {
+          "kind": "coachPick",
+          "round": "Round 1",
+          "id": "c1_rround-1_s1",
+          "source": "coach-snapshot"
+        },
+        {
+          "kind": "coachPick",
+          "round": "Round 1",
+          "id": "io8XyqUhyIVmxNqLZWBS",
+          "source": "firestore-coach-only"
+        }
+      ],
+      "tallyCanonical": "Ash",
+      "voterNameKey": "ash",
+      "ballotPickKey": "ash",
+      "voter": null,
+      "pick": {
+        "raw": "Ash",
+        "canonical": null,
+        "status": "unmatched",
+        "reason": "no match — nearest Ann (33%)",
+        "nearest": {
+          "player": "Ann",
+          "similarity": 0.33
+        }
+      },
+      "ambiguousFirstName": null,
+      "fuzzyCollisions": null,
+      "issues": []
+    }
+  ],
+  "aliasProbes": [
+    {
+      "string": "Jay",
+      "tallyCanonical": "Johanna",
+      "voter": {
+        "raw": "Jay",
+        "nameMatchStatus": "fuzzy",
+        "matchedPlayer": "Johanna",
+        "tallyExcluded": false,
+        "reason": "global alias",
+        "similarity": null,
+        "aliased": true
+      },
+      "pick": {
+        "raw": "Jay",
+        "canonical": "Johanna",
+        "status": "aliased",
+        "reason": "global alias / tally canonical"
+      },
+      "voterNameKey": "jay",
+      "ballotPickKey": "johanna",
+      "ambiguous": null
+    },
+    {
+      "string": "johanna frolinghaus",
+      "tallyCanonical": "Johanna",
+      "voter": {
+        "raw": "johanna frolinghaus",
+        "nameMatchStatus": "fuzzy",
+        "matchedPlayer": "Johanna",
+        "tallyExcluded": false,
+        "reason": "fuzzy (88%)",
+        "similarity": 0.88,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "johanna frolinghaus",
+        "canonical": "Johanna",
+        "status": "aliased",
+        "reason": "fuzzy (88%)",
+        "similarity": 0.88
+      },
+      "voterNameKey": "johanna-frolinghaus",
+      "ballotPickKey": "johanna",
+      "ambiguous": null
+    },
+    {
+      "string": "Johanna Frolinghaus",
+      "tallyCanonical": "Johanna",
+      "voter": {
+        "raw": "Johanna Frolinghaus",
+        "nameMatchStatus": "fuzzy",
+        "matchedPlayer": "Johanna",
+        "tallyExcluded": false,
+        "reason": "fuzzy (88%)",
+        "similarity": 0.88,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Johanna Frolinghaus",
+        "canonical": "Johanna",
+        "status": "aliased",
+        "reason": "fuzzy (88%)",
+        "similarity": 0.88
+      },
+      "voterNameKey": "johanna-frolinghaus",
+      "ballotPickKey": "johanna",
+      "ambiguous": null
+    },
+    {
+      "string": "Ulrika",
+      "tallyCanonical": "Uli",
+      "voter": {
+        "raw": "Ulrika",
+        "nameMatchStatus": "fuzzy",
+        "matchedPlayer": "Uli",
+        "tallyExcluded": false,
+        "reason": "fuzzy (90%)",
+        "similarity": 0.9,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Ulrika",
+        "canonical": "Uli",
+        "status": "aliased",
+        "reason": "fuzzy (90%)",
+        "similarity": 0.9
+      },
+      "voterNameKey": "ulrika",
+      "ballotPickKey": "uli",
+      "ambiguous": null
+    },
+    {
+      "string": "Ulrika Delarve",
+      "tallyCanonical": "Uli",
+      "voter": {
+        "raw": "Ulrika Delarve",
+        "nameMatchStatus": "fuzzy",
+        "matchedPlayer": "Uli",
+        "tallyExcluded": false,
+        "reason": "fuzzy (90%)",
+        "similarity": 0.9,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Ulrika Delarve",
+        "canonical": "Uli",
+        "status": "aliased",
+        "reason": "fuzzy (90%)",
+        "similarity": 0.9
+      },
+      "voterNameKey": "ulrika-delarve",
+      "ballotPickKey": "uli",
+      "ambiguous": null
+    },
+    {
+      "string": "Rainey",
+      "tallyCanonical": "Rainy",
+      "voter": {
+        "raw": "Rainey",
+        "nameMatchStatus": "fuzzy",
+        "matchedPlayer": "Rainy",
+        "tallyExcluded": false,
+        "reason": "fuzzy (83%)",
+        "similarity": 0.8333333333333334,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Rainey",
+        "canonical": "Rainy",
+        "status": "aliased",
+        "reason": "fuzzy (83%)",
+        "similarity": 0.8333333333333334
+      },
+      "voterNameKey": "rainey",
+      "ballotPickKey": "rainy",
+      "ambiguous": null
+    },
+    {
+      "string": "Sarah",
+      "tallyCanonical": "Sarah",
+      "voter": {
+        "raw": "Sarah",
+        "nameMatchStatus": "unmatched",
+        "matchedPlayer": null,
+        "tallyExcluded": true,
+        "reason": "closest: Sarah (tall) (88%, need 72%)",
+        "similarity": null,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Sarah",
+        "canonical": null,
+        "status": "ambiguous",
+        "reason": "shared first name: Sarah (tall) | Sarah Goalkeeper",
+        "candidates": [
+          "Sarah (tall)",
+          "Sarah Goalkeeper"
+        ]
+      },
+      "voterNameKey": "sarah",
+      "ballotPickKey": "sarah",
+      "ambiguous": [
+        "Sarah (tall)",
+        "Sarah Goalkeeper"
+      ]
+    },
+    {
+      "string": "Sarah (tall)",
+      "tallyCanonical": "Sarah (tall)",
+      "voter": {
+        "raw": "Sarah (tall)",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Sarah (tall)",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Sarah (tall)",
+        "canonical": "Sarah (tall)",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "voterNameKey": "sarah-tall",
+      "ballotPickKey": "sarah tall",
+      "ambiguous": null
+    },
+    {
+      "string": "Sarah Goalkeeper",
+      "tallyCanonical": "Sarah Goalkeeper",
+      "voter": {
+        "raw": "Sarah Goalkeeper",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Sarah Goalkeeper",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Sarah Goalkeeper",
+        "canonical": "Sarah Goalkeeper",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "voterNameKey": "sarah-gk",
+      "ballotPickKey": "sarah gk",
+      "ambiguous": null
+    },
+    {
+      "string": "Sarah GK",
+      "tallyCanonical": "Sarah Goalkeeper",
+      "voter": {
+        "raw": "Sarah GK",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Sarah Goalkeeper",
+        "tallyExcluded": false,
+        "reason": "exact match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Sarah GK",
+        "canonical": "Sarah Goalkeeper",
+        "status": "aliased",
+        "reason": "exact match",
+        "similarity": 1
+      },
+      "voterNameKey": "sarah-gk",
+      "ballotPickKey": "sarah gk",
+      "ambiguous": null
+    },
+    {
+      "string": "Ann",
+      "tallyCanonical": "Ann",
+      "voter": {
+        "raw": "Ann",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Ann",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Ann",
+        "canonical": "Ann",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "voterNameKey": "ann",
+      "ballotPickKey": "ann",
+      "ambiguous": null
+    },
+    {
+      "string": "Anna",
+      "tallyCanonical": "Anna",
+      "voter": {
+        "raw": "Anna",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Anna",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Anna",
+        "canonical": "Anna",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "voterNameKey": "anna",
+      "ballotPickKey": "anna",
+      "ambiguous": null
+    },
+    {
+      "string": "Ash",
+      "tallyCanonical": "Ash",
+      "voter": {
+        "raw": "Ash",
+        "nameMatchStatus": "unmatched",
+        "matchedPlayer": null,
+        "tallyExcluded": true,
+        "reason": "no match — nearest Ann (33%)",
+        "similarity": null,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Ash",
+        "canonical": null,
+        "status": "unmatched",
+        "reason": "no match — nearest Ann (33%)",
+        "nearest": {
+          "player": "Ann",
+          "similarity": 0.33
+        }
+      },
+      "voterNameKey": "ash",
+      "ballotPickKey": "ash",
+      "ambiguous": null
+    },
+    {
+      "string": "Olivia Freame",
+      "tallyCanonical": "Olivia Freame",
+      "voter": {
+        "raw": "Olivia Freame",
+        "nameMatchStatus": "unmatched",
+        "matchedPlayer": null,
+        "tallyExcluded": true,
+        "reason": "no match — nearest Freame (46%)",
+        "similarity": null,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Olivia Freame",
+        "canonical": null,
+        "status": "unmatched",
+        "reason": "no match — nearest Freame (46%)",
+        "nearest": {
+          "player": "Freame",
+          "similarity": 0.46
+        }
+      },
+      "voterNameKey": "olivia-freame",
+      "ballotPickKey": "olivia freame",
+      "ambiguous": null
+    },
+    {
+      "string": "Freame",
+      "tallyCanonical": "Freame",
+      "voter": {
+        "raw": "Freame",
+        "nameMatchStatus": "matched",
+        "matchedPlayer": "Freame",
+        "tallyExcluded": false,
+        "reason": "exact display match",
+        "similarity": 1,
+        "aliased": false
+      },
+      "pick": {
+        "raw": "Freame",
+        "canonical": "Freame",
+        "status": "matched",
+        "reason": "exact display match",
+        "similarity": 1
+      },
+      "voterNameKey": "freame",
+      "ballotPickKey": "freame",
+      "ambiguous": null
+    }
+  ],
+  "issues": [
+    {
+      "severity": "high",
+      "type": "ambiguous-pick",
+      "string": "Sarah",
+      "candidates": [
+        "Sarah (tall)",
+        "Sarah Goalkeeper"
+      ],
+      "occurrences": 6,
+      "samples": [
+        {
+          "kind": "coachPick",
+          "round": "Round 4",
+          "id": "c1_rround-4_s1",
+          "source": "coach-snapshot"
+        },
+        {
+          "kind": "coachPick",
+          "round": "Round 5",
+          "id": "c1_rround-5_s1",
+          "source": "coach-snapshot"
+        },
+        {
+          "kind": "coachPick",
+          "round": "Round 3",
+          "id": "c1_rround-3_s1",
+          "source": "coach-snapshot"
+        },
+        {
+          "kind": "coachPick",
+          "round": "Round 4",
+          "id": "EjHFHeBTf8PeCtvdig45",
+          "source": "firestore-coach-only"
+        },
+        {
+          "kind": "coachPick",
+          "round": "Round 5",
+          "id": "o8X7GPkel7P0wxNnQSVu",
+          "source": "firestore-coach-only"
+        }
+      ]
+    },
+    {
+      "severity": "medium",
+      "type": "fuzzy-collision",
+      "string": "Sarah",
+      "matches": [
+        {
+          "player": "Sarah (tall)",
+          "pct": 88
+        },
+        {
+          "player": "Sarah Goalkeeper",
+          "pct": 88
+        }
+      ]
+    },
+    {
+      "severity": "high",
+      "type": "unmatched-pick",
+      "string": "Ash",
+      "reason": "no match — nearest Ann (33%)",
+      "occurrences": 2,
+      "samples": [
+        {
+          "kind": "coachPick",
+          "round": "Round 1",
+          "id": "c1_rround-1_s1",
+          "source": "coach-snapshot"
+        },
+        {
+          "kind": "coachPick",
+          "round": "Round 1",
+          "id": "io8XyqUhyIVmxNqLZWBS",
+          "source": "firestore-coach-only"
+        }
+      ]
+    },
+    {
+      "severity": "high",
+      "type": "coach-ambiguous-sarah",
+      "string": "Sarah",
+      "round": "Round 4",
+      "slot": 1,
+      "id": "c1_rround-4_s1",
+      "candidates": [
+        "Sarah (tall)",
+        "Sarah Goalkeeper"
+      ]
+    },
+    {
+      "severity": "high",
+      "type": "coach-ambiguous-sarah",
+      "string": "Sarah",
+      "round": "Round 5",
+      "slot": 1,
+      "id": "c1_rround-5_s1",
+      "candidates": [
+        "Sarah (tall)",
+        "Sarah Goalkeeper"
+      ]
+    },
+    {
+      "severity": "high",
+      "type": "coach-ambiguous-sarah",
+      "string": "Sarah",
+      "round": "Round 3",
+      "slot": 1,
+      "id": "c1_rround-3_s1",
+      "candidates": [
+        "Sarah (tall)",
+        "Sarah Goalkeeper"
+      ]
+    },
+    {
+      "severity": "high",
+      "type": "coach-ambiguous-sarah",
+      "string": "Sarah",
+      "round": "Round 4",
+      "slot": 1,
+      "id": "EjHFHeBTf8PeCtvdig45",
+      "candidates": [
+        "Sarah (tall)",
+        "Sarah Goalkeeper"
+      ]
+    },
+    {
+      "severity": "high",
+      "type": "coach-ambiguous-sarah",
+      "string": "Sarah",
+      "round": "Round 5",
+      "slot": 1,
+      "id": "o8X7GPkel7P0wxNnQSVu",
+      "candidates": [
+        "Sarah (tall)",
+        "Sarah Goalkeeper"
+      ]
+    },
+    {
+      "severity": "high",
+      "type": "coach-ambiguous-sarah",
+      "string": "Sarah",
+      "round": "Round 3",
+      "slot": 1,
+      "id": "ytKVgnpPNs6aAk1yZY1L",
+      "candidates": [
+        "Sarah (tall)",
+        "Sarah Goalkeeper"
+      ]
+    }
+  ],
+  "nearMisses": [],
+  "pendingApproval": [],
+  "adminApprovedUnmatched": [],
+  "summary": {
+    "issueCount": 9,
+    "highSeverity": 8,
+    "unmatchedVoters": 0,
+    "unmatchedPicks": 1,
+    "ambiguousPicks": 1,
+    "ambiguousVoters": 0,
+    "nearMissCount": 0,
+    "allRestoredMatched": true,
+    "allPickStringsResolved": false
+  }
+}
