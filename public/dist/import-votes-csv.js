@@ -3,6 +3,8 @@
  */
 import { canonicalPlayerName, displayPlayerName, voterNameKey } from "./name-match.js";
 
+export const VOID_PICK = "";
+
 export function roundKey(round) {
   const h = String(round || "").trim();
   const m = h.match(/^round\s*(\d+(?:\.\d+)?)$/i) || h.match(/^(\d+(?:\.\d+)?)$/);
@@ -63,14 +65,38 @@ export function parseSeasonCsv(text) {
   return { meta, players, rounds };
 }
 
-function normalizePick(name, players) {
+/** Match app season CSV export: only squad-canonical picks count. */
+export function squadKeyForExportPick(name, players) {
+  if (!name) return null;
   const c = canonicalPlayerName(displayPlayerName(name));
-  const hit = players.find(
-    (p) =>
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i];
+    if (
       voterNameKey(p) === voterNameKey(c) ||
+      canonicalPlayerName(displayPlayerName(p)) === c ||
       displayPlayerName(p).toLowerCase() === c.toLowerCase()
-  );
-  return hit || c;
+    ) {
+      return displayPlayerName(p);
+    }
+  }
+  return null;
+}
+
+export function tallyLikeSeasonExport(ballots, players) {
+  const m = Object.fromEntries(players.map((p) => [p, 0]));
+  ballots.forEach((picks) => {
+    (picks || []).forEach((pick, i) => {
+      const key = squadKeyForExportPick(pick, players);
+      if (key) m[key] = (m[key] || 0) + [3, 2, 1][i];
+    });
+  });
+  return m;
+}
+
+function normalizePick(name, players) {
+  if (!name) return VOID_PICK;
+  const hit = squadKeyForExportPick(name, players);
+  return hit || displayPlayerName(name);
 }
 
 function decomposeToBallots(players, totals, numBallots) {
@@ -109,39 +135,117 @@ function decomposeToBallots(players, totals, numBallots) {
   return search();
 }
 
-function repairTotals(players, totals) {
-  const rem = Object.fromEntries(players.map((p) => [p, totals[p] || 0]));
-  let sum = Object.values(rem).reduce((a, b) => a + b, 0);
-  const notes = [];
-  while (sum % 6 !== 0 && sum > 0) {
-    const mod = sum % 6;
-    const need = mod <= 3 ? 6 - mod : -(mod - 6);
-    const target = players.slice().sort((a, b) => (rem[b] || 0) - (rem[a] || 0))[0];
-    rem[target] = Math.max(0, (rem[target] || 0) + need);
-    sum += need;
-    notes.push("adjusted " + target + " by " + need);
-  }
-  return { totals: rem, notes, numBallots: sum / 6 };
+function lostPointsInBallot(picks, players) {
+  let lost = 0;
+  (picks || []).forEach((pick, i) => {
+    if (!squadKeyForExportPick(pick, players)) lost += [3, 2, 1][i];
+  });
+  return lost;
 }
 
-function pickVoters(ballots, squad, totals) {
-  const used = new Set();
-  const out = [];
-  const zeroReceivers = squad.filter((p) => !(totals[p] || 0));
-  let zIdx = 0;
+/**
+ * When CSV sum is not divisible by 6, the export likely dropped non-squad picks.
+ * Use void (empty) pick slots so export-style tally matches CSV exactly.
+ */
+function solveBallotsForCsv(players, csvTotals, numBallots, lostPoints) {
+  const rem = Object.fromEntries(players.map((p) => [p, csvTotals[p] || 0]));
+  const ballots = [];
+  const options = players.concat([VOID_PICK]);
 
-  for (const picks of ballots) {
-    const pickKeys = new Set(picks.map((p) => voterNameKey(p)));
-    const prefer = squad.filter((s) => !used.has(s) && !pickKeys.has(voterNameKey(s)));
-    const pool = prefer.length ? prefer : squad.filter((s) => !used.has(s));
-    let voter = null;
-    while (zIdx < zeroReceivers.length && !used.has(zeroReceivers[zIdx])) {
-      const z = zeroReceivers[zIdx++];
-      if (!pickKeys.has(voterNameKey(z))) {
-        voter = z;
-        break;
+  function search() {
+    if (ballots.length === numBallots) {
+      let lost = 0;
+      ballots.forEach((b) => {
+        lost += lostPointsInBallot(b, players);
+      });
+      if (lost !== lostPoints) return null;
+      return players.every((p) => rem[p] === 0) ? ballots.map((b) => b.slice()) : null;
+    }
+
+    for (const p3 of options) {
+      const k3 = squadKeyForExportPick(p3, players);
+      if (k3 && (rem[k3] || 0) < 3) continue;
+      for (const p2 of options) {
+        if (p2 === p3 && p3 !== VOID_PICK) continue;
+        const k2 = squadKeyForExportPick(p2, players);
+        if (k2 && (rem[k2] || 0) < 2) continue;
+        for (const p1 of options) {
+          if ((p1 === p3 || p1 === p2) && p1 !== VOID_PICK) continue;
+          const k1 = squadKeyForExportPick(p1, players);
+          if (k1 && (rem[k1] || 0) < 1) continue;
+          if (k3) rem[k3] -= 3;
+          if (k2) rem[k2] -= 2;
+          if (k1) rem[k1] -= 1;
+          ballots.push([
+            p3 === VOID_PICK ? VOID_PICK : displayPlayerName(p3),
+            p2 === VOID_PICK ? VOID_PICK : displayPlayerName(p2),
+            p1 === VOID_PICK ? VOID_PICK : displayPlayerName(p1),
+          ]);
+          const r = search();
+          if (r) return r;
+          ballots.pop();
+          if (k3) rem[k3] += 3;
+          if (k2) rem[k2] += 2;
+          if (k1) rem[k1] += 1;
+        }
       }
     }
+    return null;
+  }
+
+  return search();
+}
+
+function planRoundBallots(players, csvTotals, sum) {
+  if (!sum || sum < 1) {
+    return { ballots: null, numBallots: 0, lostPoints: 0, notes: ["empty round"] };
+  }
+  const mod = sum % 6;
+  const numBallots = mod === 0 ? sum / 6 : Math.ceil(sum / 6);
+  const lostPoints = numBallots * 6 - sum;
+  const notes = [];
+
+  if (mod === 0) {
+    const ballots = decomposeToBallots(players, csvTotals, numBallots);
+    if (!ballots) notes.push("exact decomposition failed");
+    return { ballots, numBallots, lostPoints: 0, notes };
+  }
+
+  notes.push(
+    "csv sum " + sum + " uses " + numBallots + " ballot(s) with " + lostPoints + " void point(s)"
+  );
+  const ballots = solveBallotsForCsv(players, csvTotals, numBallots, lostPoints);
+  if (!ballots) notes.push("void-slot solve failed");
+  return { ballots, numBallots, lostPoints, notes };
+}
+
+function pickVoters(ballots, squad, totals, assignmentCount) {
+  const used = new Set();
+  const out = [];
+  const counts = assignmentCount || Object.create(null);
+  const zeroReceivers = squad.filter((p) => !(totals[p] || 0));
+
+  function orderedZeroReceivers(pickKeys) {
+    return zeroReceivers
+      .filter((z) => !used.has(z) && !pickKeys.has(voterNameKey(z)))
+      .sort((a, b) => {
+        const ca = counts[a] || 0;
+        const cb = counts[b] || 0;
+        if (ca !== cb) return ca - cb;
+        return a.localeCompare(b);
+      });
+  }
+
+  for (const picks of ballots) {
+    const pickKeys = new Set(
+      picks
+        .filter(Boolean)
+        .map((p) => voterNameKey(p))
+        .filter(Boolean)
+    );
+    const prefer = squad.filter((s) => !used.has(s) && !pickKeys.has(voterNameKey(s)));
+    const pool = prefer.length ? prefer : squad.filter((s) => !used.has(s));
+    let voter = orderedZeroReceivers(pickKeys)[0] || null;
     if (!voter) voter = pool.sort((a, b) => a.localeCompare(b))[0];
     if (!voter) throw new Error("Not enough squad members for voter assignment");
     used.add(voter);
@@ -160,6 +264,34 @@ export function voteDocIdFromBallot(v, teamId) {
   return "t" + tid + "_r" + rk + "_v" + vk;
 }
 
+/** CSV tally export does not record voter identity — correct known mis-assignments. */
+const VOTER_CORRECTIONS = [
+  { round: "Round 9", to: "Elke", from: "Uli" },
+];
+
+export function applyVoterCorrections(votes, players) {
+  const squad = players || [];
+  VOTER_CORRECTIONS.forEach((fix) => {
+    const rk = roundKey(fix.round);
+    const toName = displayPlayerName(fix.to);
+    const fromName = displayPlayerName(fix.from);
+    if (!squad.some((p) => displayPlayerName(p) === toName)) return;
+    const existing = votes.find(
+      (v) => roundKey(v.round) === rk && voterNameKey(v.voterName) === voterNameKey(toName)
+    );
+    if (existing) return;
+    const src = votes.find(
+      (v) => roundKey(v.round) === rk && voterNameKey(v.voterName) === voterNameKey(fromName)
+    );
+    if (!src) return;
+    src.voterName = toName;
+    src.voterNameKey = voterNameKey(toName);
+    src.id = voteDocIdFromBallot(src, src.teamId);
+    src.recoveredFrom = (src.recoveredFrom || "csv-import") + "+voter-correction";
+  });
+  return votes;
+}
+
 export function reconstructVotesFromCsv(parsed, opts) {
   const options = opts || {};
   const teamId = options.teamId != null ? options.teamId : 1;
@@ -167,35 +299,38 @@ export function reconstructVotesFromCsv(parsed, opts) {
   const { players, rounds, meta } = parsed;
   const votes = [];
   const report = { rounds: {}, warnings: [] };
+  const assignmentCount = Object.create(null);
 
   for (const row of rounds) {
-    const { round, totals: rawTotals, sum } = row;
-    const repaired = repairTotals(players, rawTotals);
-    const numBallots = repaired.numBallots;
-    if (!numBallots || numBallots < 1) {
-      report.warnings.push(round + ": no ballots (sum=" + sum + ")");
-      report.rounds[round] = { ballots: 0, sum, status: "empty" };
-      continue;
+    const { round, totals: csvTotals, sum } = row;
+    const plan = planRoundBallots(players, csvTotals, sum);
+    if (plan.notes.length) {
+      plan.notes.forEach((n) => report.warnings.push(round + ": " + n));
     }
-    if (repaired.notes.length) {
-      report.warnings.push(round + ": " + repaired.notes.join("; "));
-    }
-    const ballots = decomposeToBallots(players, repaired.totals, numBallots);
-    if (!ballots) {
-      report.warnings.push(round + ": decomposition failed (sum=" + sum + ")");
+    if (!plan.ballots || !plan.ballots.length) {
       report.rounds[round] = { ballots: 0, sum, status: "failed" };
       continue;
     }
-    const assigned = pickVoters(ballots, players, repaired.totals);
+
+    const tally = tallyLikeSeasonExport(plan.ballots, players);
+    const mismatch = players.filter((p) => (tally[p] || 0) !== (csvTotals[p] || 0));
+    if (mismatch.length) {
+      report.warnings.push(round + ": tally mismatch after solve: " + mismatch.join(", "));
+      report.rounds[round] = { ballots: 0, sum, status: "failed" };
+      continue;
+    }
+
+    const assigned = pickVoters(plan.ballots, players, csvTotals, assignmentCount);
     const exportedAt = meta.exportedAt || new Date().toISOString();
     assigned.forEach((b) => {
       const voterName = displayPlayerName(b.voterName);
+      assignmentCount[voterName] = (assignmentCount[voterName] || 0) + 1;
       const vote = {
         teamId,
         round,
         voterName,
         voterNameKey: voterNameKey(voterName),
-        picks: b.picks.map((p) => displayPlayerName(p)),
+        picks: b.picks.map((p) => (p ? displayPlayerName(p) : VOID_PICK)),
         submittedAt: exportedAt,
         nameMatchStatus: "matched",
         tallyExcluded: false,
@@ -207,9 +342,12 @@ export function reconstructVotesFromCsv(parsed, opts) {
     report.rounds[round] = {
       ballots: assigned.length,
       sum,
+      tallySum: Object.values(tally).reduce((a, b) => a + b, 0),
+      lostPoints: plan.lostPoints,
       status: "ok",
     };
   }
+  applyVoterCorrections(votes, players);
   return { votes, report };
 }
 

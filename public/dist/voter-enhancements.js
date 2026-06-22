@@ -27,7 +27,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v182";
+} from "./name-match.js?tag=v183";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -45,7 +45,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v182";
+  return "v183";
 }
 
 function distImport(path) {
@@ -441,17 +441,37 @@ async function restoreVotesFromLocal(opts) {
     version: assetTag(),
   };
 
-  var cloudPlayerIds = Object.create(null);
+  var cloudPlayerById = Object.create(null);
   var data = loadLocalData();
   var teamIds = collectMigrationTeamIds(data);
   for (var ti = 0; ti < teamIds.length; ti++) {
     try {
       (await fetchCloudVotes(teamIds[ti], true)).forEach(function (v) {
-        if (v && v.id) cloudPlayerIds[v.id] = true;
+        if (v && v.id) cloudPlayerById[v.id] = v;
       });
     } catch (e) {
       report.errors.push("fetch votes team " + teamIds[ti] + ": " + (e.message || e));
     }
+  }
+
+  function ballotPayloadMatchesCloud(vote, cloud) {
+    if (!cloud) return false;
+    return (
+      voteRoundLabel(vote) === voteRoundLabel(cloud) &&
+      String(vote.voterNameKey || nameKey(vote.voterName || "")) ===
+        String(cloud.voterNameKey || nameKey(cloud.voterName || "")) &&
+      ballotPicksEqual(vote.picks, cloud.picks)
+    );
+  }
+
+  function ballotPicksEqual(a, b) {
+    var pa = a || [];
+    var pb = b || [];
+    if (pa.length !== pb.length) return false;
+    for (var pi = 0; pi < pa.length; pi++) {
+      if (String(pa[pi] || "") !== String(pb[pi] || "")) return false;
+    }
+    return true;
   }
 
   for (var vi = 0; vi < recovered.votes.length; vi++) {
@@ -461,7 +481,7 @@ async function restoreVotesFromLocal(opts) {
       continue;
     }
     var docId = voteDocIdForBallot(vote);
-    if (cloudPlayerIds[docId]) {
+    if (cloudPlayerById[docId] && ballotPayloadMatchesCloud(vote, cloudPlayerById[docId])) {
       report.playerSkipped++;
       continue;
     }
@@ -479,7 +499,7 @@ async function restoreVotesFromLocal(opts) {
     }
     try {
       await submitVoteRest(docId, payload);
-      cloudPlayerIds[docId] = true;
+      cloudPlayerById[docId] = payload;
       report.playerUploaded++;
     } catch (e) {
       report.errors.push("vote " + docId + ": " + (e.message || e));
@@ -713,6 +733,83 @@ function wireImportVotesButton() {
     };
     reader.readAsText(file);
   });
+}
+
+async function loadBundledRestoredVotes() {
+  var url = "/data/restored-votes.json?tag=" + encodeURIComponent(assetTag());
+  var res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error("Could not fetch " + url + " (" + res.status + ")");
+  var data = await res.json();
+  if (!data || typeof data !== "object") throw new Error("Bad restored-votes.json");
+  return data;
+}
+
+function renderAdminCsvMismatchBanner(info) {
+  var el = document.getElementById("adminCsvMismatchBanner");
+  if (!el) return;
+  if (!info) {
+    el.style.display = "none";
+    el.innerHTML = "";
+    return;
+  }
+  el.style.display = "block";
+  el.innerHTML =
+    "<div style='font-weight:900;font-size:0.92rem;color:var(--red-dark)'>Data mismatch detected</div>" +
+    "<p class='hint' style='margin:0.35rem 0 0.55rem'>" +
+    "Firestore has <strong>" +
+    escapeHtml(String(info.cloudCount)) +
+    "</strong> player ballot(s), but CSV reconstruction expects <strong>" +
+    escapeHtml(String(info.expectedCount)) +
+    "</strong>. " +
+    "To make totals match <code>Div_8_all_rounds.csv</code>, re-import now to overwrite Firestore." +
+    "</p>" +
+    "<div class='actions' style='margin:0.35rem 0 0'>" +
+    "<a class='ghost' style='display:inline-flex;align-items:center;justify-content:center;text-decoration:none' href='" +
+    escapeHtml(info.downloadUrl) +
+    "' download>Download restored-votes.json</a>" +
+    "<button type='button' class='primary' id='adminImportRestoredNow'>Import restored-votes.json now</button>" +
+    "</div>" +
+    "<p class='hint' style='margin:0.55rem 0 0'>Tip: the Import dialog also accepts the CSV directly.</p>";
+  var btn = document.getElementById("adminImportRestoredNow");
+  if (btn && !btn._svBound) {
+    btn._svBound = true;
+    btn.addEventListener("click", function () {
+      var importBtn = document.getElementById("importSeasonArchive");
+      if (importBtn) importBtn.click();
+    });
+  }
+}
+
+async function maybeShowAdminCsvMismatchBanner() {
+  if (!isSuperAdminUnlocked()) return;
+  var el = document.getElementById("adminCsvMismatchBanner");
+  if (!el) return;
+  if (!window.__svFirebaseApp || !projectId()) return;
+  try {
+    var restored = await loadBundledRestoredVotes();
+    var expectedCount = (restored.votes || []).length || 0;
+    if (!expectedCount) return;
+    var cloudCount = await countCloudPlayerVotes();
+    if (!cloudCount) {
+      renderAdminCsvMismatchBanner({
+        cloudCount: 0,
+        expectedCount: expectedCount,
+        downloadUrl: "/data/restored-votes.json?tag=" + encodeURIComponent(assetTag()),
+      });
+      return;
+    }
+    if (cloudCount !== expectedCount) {
+      renderAdminCsvMismatchBanner({
+        cloudCount: cloudCount,
+        expectedCount: expectedCount,
+        downloadUrl: "/data/restored-votes.json?tag=" + encodeURIComponent(assetTag()),
+      });
+    } else {
+      renderAdminCsvMismatchBanner(null);
+    }
+  } catch (e) {
+    console.warn("[csv-mismatch-banner]", e);
+  }
 }
 
 window.__svRestoreVotesFromLocal = restoreVotesFromLocal;
@@ -2439,23 +2536,44 @@ async function patchVoteTallyApproval(vote, includeInTally) {
 
 function triggerResultsRefresh() {
   try {
+    if (typeof window.__svRefreshResults === "function") {
+      window.__svRefreshResults();
+      return;
+    }
     var teamSel = document.getElementById("resultsTeamSelect");
     if (teamSel) teamSel.dispatchEvent(new Event("change", { bubbles: true }));
   } catch (e) {}
 }
 
-async function updateAdminBallotsList(teamId, round) {
+var adminBallotsSeq = 0;
+var adminBallotsLoadedKey = "";
+
+function ballotsPanelOpen() {
+  var wrap = document.getElementById("resultsBallotsWrap");
+  if (!wrap) return false;
+  var details = wrap.closest("details");
+  return !!(details && details.open);
+}
+
+async function updateAdminBallotsList(teamId, round, opts) {
   var wrap = document.getElementById("resultsBallotsWrap");
   if (!wrap) return;
   if (!isSuperAdminUnlocked()) {
     wrap.innerHTML = '<p class="hint" style="margin:0">Unlock super admin to view all ballots.</p>';
+    adminBallotsLoadedKey = "";
     return;
   }
   var rk = normalizeRoundLabel(round) || round || "Round 1";
-  wrap.innerHTML = "<span class='hint admin-loading'>Loading ballots…</span>";
+  var reqKey = String(teamId) + "|" + rk;
+  var seq = ++adminBallotsSeq;
+  var showLoading = !opts || opts.showLoading !== false;
+  if (showLoading && adminBallotsLoadedKey !== reqKey) {
+    wrap.innerHTML = "<span class='hint admin-loading' style='margin:0'>Loading ballots…</span>";
+  }
   mergeRecoverableIntoLocal();
   rehydrateAppVotesFromLocal();
   var pack = await loadAllVotesForTeam(teamId, { forceCloud: true });
+  if (seq !== adminBallotsSeq) return;
   var votes = pack.votes
     .filter(function (v) {
       return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === rk;
@@ -2517,6 +2635,7 @@ async function updateAdminBallotsList(teamId, round) {
   });
   html += "</div>";
   wrap.innerHTML = html;
+  adminBallotsLoadedKey = reqKey;
   wrap.querySelectorAll("input[data-vote-tally]").forEach(function (cb) {
     if (cb._svTallyWire) return;
     cb._svTallyWire = true;
@@ -2543,13 +2662,33 @@ async function updateAdminBallotsList(teamId, round) {
   });
 }
 
-window.__svRenderAdminBallots = function (teamId, round) {
+window.__svRenderAdminBallots = function (teamId, round, opts) {
   var tid = parseInt(teamId, 10) || 1;
   var rk = normalizeRoundLabel(round) || round || "Round 1";
-  updateAdminBallotsList(tid, rk).catch(function (e) {
+  updateAdminBallotsList(tid, rk, opts).catch(function (e) {
     console.warn("[admin-ballots]", e);
   });
 };
+
+function wireBallotsDetailsPanel() {
+  var wrap = document.getElementById("resultsBallotsWrap");
+  if (!wrap || wrap._svDetailsWire) return;
+  var details = wrap.closest("details");
+  if (!details) return;
+  wrap._svDetailsWire = true;
+  details.addEventListener("toggle", function () {
+    if (!details.open) return;
+    var teamSel = document.getElementById("resultsTeamSelect");
+    var roundSel = document.getElementById("resultsRoundSelect");
+    if (!teamSel || !roundSel) return;
+    adminBallotsLoadedKey = "";
+    window.__svRenderAdminBallots(
+      parseInt(teamSel.value, 10) || 1,
+      normalizeRoundLabel(roundSel.value) || roundSel.value || "Round 1",
+      { showLoading: true }
+    );
+  });
+}
 
 function ensureDuplicateBallotsBanner() {
   var card = document.getElementById("resultsSummaryCard");
@@ -2868,14 +3007,15 @@ var debouncedUpdateWhoHasntVoted = debounce(function () {
   updateWhoHasntVoted();
 }, 300);
 
-var debouncedUpdateAdminBallots = debounce(function () {
+var debouncedUpdateAdminBallots = debounce(function (opts) {
+  if (!ballotsPanelOpen()) return;
   var teamSel = document.getElementById("resultsTeamSelect");
   var roundSel = document.getElementById("resultsRoundSelect");
   if (!teamSel || !roundSel) return;
   var teamId = parseInt(teamSel.value, 10) || 1;
   var round = normalizeRoundLabel(roundSel.value) || roundSel.value || "Round 1";
   if (typeof window.__svRenderAdminBallots === "function") {
-    window.__svRenderAdminBallots(teamId, round);
+    window.__svRenderAdminBallots(teamId, round, opts);
   }
 }, 300);
 
@@ -2900,8 +3040,9 @@ function wireWhoHasntVoted() {
       Object.keys(cloudVotesCache).forEach(function (k) {
         delete cloudVotesCache[k];
       });
+      adminBallotsLoadedKey = "";
       debouncedUpdateWhoHasntVoted();
-      debouncedUpdateAdminBallots();
+      debouncedUpdateAdminBallots({ showLoading: false });
     });
     window.addEventListener("sv-ballot-pick-migration-done", ensureBallotPickMigrationHint);
     window.addEventListener("sv-ballot-doc-migration-done", ensureBallotDocMigrationHint);
@@ -2909,7 +3050,8 @@ function wireWhoHasntVoted() {
   mergeRecoverableIntoLocal();
   rehydrateAppVotesFromLocal();
   updateWhoHasntVoted();
-  debouncedUpdateAdminBallots();
+  wireBallotsDetailsPanel();
+  if (ballotsPanelOpen()) debouncedUpdateAdminBallots({ showLoading: true });
   ensureBallotPickMigrationHint();
   ensureBallotDocMigrationHint();
 }
@@ -3714,7 +3856,8 @@ function wireAdminSectionTabs() {
         triggerResultsRefresh();
         ensureWhoHasntVotedBlock();
         updateWhoHasntVoted();
-        debouncedUpdateAdminBallots();
+        wireBallotsDetailsPanel();
+        if (ballotsPanelOpen()) debouncedUpdateAdminBallots({ showLoading: true });
       } catch (e) {
         console.warn("[who-vote]", e);
       }
@@ -3889,6 +4032,19 @@ var adminObs = new MutationObserver(function () {
     wireLocationOnRoundChange();
     wirePublishedRoundControls();
     wireImportVotesButton();
+    (function () {
+      var tries = 0;
+      var iv = setInterval(function () {
+        tries++;
+        if (tries > 180) {
+          clearInterval(iv);
+          return;
+        }
+        if (!isSuperAdminUnlocked()) return;
+        clearInterval(iv);
+        maybeShowAdminCsvMismatchBanner().catch(function () {});
+      }, 500);
+    })();
   } catch (e) {
     adminEnhanceWired = false;
     console.warn("[voter-enhancements] admin wire failed", e);

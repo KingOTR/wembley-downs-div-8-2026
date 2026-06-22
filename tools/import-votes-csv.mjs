@@ -17,6 +17,8 @@ const DEFAULT_CSV =
   process.env.VOTES_CSV ||
   "C:/Users/sydne/OneDrive/Desktop/Div_8_all_rounds.csv";
 const doUpload = process.argv.includes("--upload");
+const doUpsert = process.argv.includes("--upsert") || doUpload;
+const doSync = process.argv.includes("--sync");
 const csvPath = process.argv.find((a) => a.endsWith(".csv")) || DEFAULT_CSV;
 
 const lib = await import(
@@ -82,12 +84,14 @@ if (report.warnings.length) {
   report.warnings.forEach((w) => console.log(" -", w));
 }
 
-async function uploadVotes(list) {
+async function uploadVotes(list, opts) {
+  const options = opts || {};
+  const sync = options.sync === true;
   let admin;
   try {
     const mod = await import("firebase-admin");
     admin = mod.default;
-    if (!admin.apps.length) admin.initializeApp({ projectId: PROJECT });
+    if (!admin.getApps().length) admin.initializeApp({ projectId: PROJECT });
   } catch (e) {
     throw new Error(
       "firebase-admin init failed — run: gcloud auth application-default login"
@@ -95,15 +99,13 @@ async function uploadVotes(list) {
   }
   const db = admin.firestore();
   let uploaded = 0;
+  let updated = 0;
   let skipped = 0;
+  const wantIds = new Set(list.map((v) => v.id));
   for (const v of list) {
     const ref = db.collection("votes").doc(v.id);
     const snap = await ref.get();
-    if (snap.exists) {
-      skipped++;
-      continue;
-    }
-    await ref.set({
+    const payload = {
       teamId: v.teamId,
       voterName: v.voterName,
       voterNameKey: v.voterNameKey,
@@ -113,14 +115,32 @@ async function uploadVotes(list) {
       nameMatchStatus: v.nameMatchStatus,
       tallyExcluded: v.tallyExcluded,
       recoveredFrom: v.recoveredFrom,
-    });
-    uploaded++;
+    };
+    if (!snap.exists) {
+      await ref.set(payload);
+      uploaded++;
+    } else if (sync) {
+      await ref.set(payload);
+      updated++;
+    } else {
+      skipped++;
+    }
   }
-  return { uploaded, skipped };
+  let deleted = 0;
+  if (sync) {
+    const snap = await db.collection("votes").where("teamId", "==", 1).get();
+    for (const doc of snap.docs) {
+      if (!wantIds.has(doc.id)) {
+        await doc.ref.delete();
+        deleted++;
+      }
+    }
+  }
+  return { uploaded, updated, skipped, deleted };
 }
 
-if (doUpload) {
-  const up = await uploadVotes(votes);
+if (doUpload || doSync) {
+  const up = await uploadVotes(votes, { sync: doSync });
   console.log("\nFirestore upload:", up);
 } else {
   console.log("\nWrote", outPath);
