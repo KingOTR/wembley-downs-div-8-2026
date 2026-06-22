@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const nm = await import(pathToFileURL(join(here, "../public/dist/name-match.js")).href);
-const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad, resolveCoachSlotForVoterName, classifyBallotNameMatch, isVoteExcludedFromTally, formatGoalScorerDisplayName, formatGoalScorerList, voterNameKey, findSquadMatch, displayPlayerName, ballotPickKey } = nm;
+const { matchSquadToVoters, normalizeName, findDuplicateBallotsPerSquad, dedupeVotesOnePerSquad, resolveCoachSlotForVoterName, classifyBallotNameMatch, isVoteExcludedFromTally, formatGoalScorerDisplayName, formatGoalScorerList, voterNameKey, findSquadMatch, displayPlayerName, ballotPickKey, canonicalPlayerName, STRICT_SQUAD_THRESHOLD } = nm;
 
 const squad = ["Jay", "Uli", "Sarah (tall)", "Sarah Goalkeeper", "Anna", "Erin", "Lauren", "Olivia Freame"];
 const votes = [
@@ -286,6 +286,25 @@ var ambigClass = classifyBallotNameMatch("Unknown", ambigSarah, {
 });
 if (ambigClass.nameMatchStatus !== "unmatched" || !ambigClass.tallyExcluded) {
   throw new Error("ambiguous alias target Sarah must not auto-map; should remain unmatched");
+}
+
+function canonicalForTally(name, squad) {
+  var base = canonicalPlayerName(name, squad && squad.length ? squad : undefined);
+  if (squad && squad.length) {
+    var hit = findSquadMatch(base, squad, STRICT_SQUAD_THRESHOLD);
+    if (!hit) hit = findSquadMatch(name, squad, STRICT_SQUAD_THRESHOLD);
+    if (hit && hit.match) return displayPlayerName(hit.match);
+  }
+  return base;
+}
+if (canonicalForTally("Ulrika", ["Jay", "Uli", "Anna"]) !== "Uli") {
+  throw new Error("canonicalForTally should resolve Ulrika → Uli with squad context");
+}
+if (canonicalForTally("Rainey", div8Squad) !== "Rainy") {
+  throw new Error("canonicalForTally should resolve Rainey → Rainy on div8 squad");
+}
+if (canonicalForTally("Johanna Frolinghaus", div8Squad) !== "Johanna") {
+  throw new Error("canonicalForTally Johanna Frolinghaus should stay Johanna, not alias to Jay");
 }
 
 console.log("name-match smoke test OK");

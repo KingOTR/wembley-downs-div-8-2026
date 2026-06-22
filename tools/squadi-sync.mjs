@@ -6,6 +6,7 @@
  *   node tools/squadi-sync.mjs --config squadi-config.json --dry-run
  *   node tools/squadi-sync.mjs --config squadi-config.json --print
  *   node tools/squadi-sync.mjs --config squadi-config.json --write
+ *   node tools/squadi-sync.mjs --from-firestore --write
  *
  * --write requires GOOGLE_APPLICATION_CREDENTIALS or FIREBASE_SERVICE_ACCOUNT_JSON
  * pointing at a Firebase service account with Firestore write access.
@@ -32,6 +33,9 @@ function hasFlag(name) {
 }
 
 function loadConfig() {
+  if (hasFlag("--from-firestore")) {
+    return null;
+  }
   var configPath = arg("--config") || path.join(root, "squadi-config.json");
   if (!existsSync(configPath)) {
     console.error("Missing config:", configPath);
@@ -45,7 +49,7 @@ function loadConfig() {
   };
 }
 
-async function writeFirestore(teamId, squadi) {
+async function initAdmin() {
   var saJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   var credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   var admin;
@@ -62,11 +66,35 @@ async function writeFirestore(teamId, squadi) {
     } else if (credPath && existsSync(credPath)) {
       admin.initializeApp({ credential: admin.credential.applicationDefault() });
     } else {
-      console.error("Set FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS for --write");
+      console.error("Set FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS for Firestore access");
       process.exit(1);
     }
   }
+  return admin;
+}
 
+async function loadConfigFromFirestore(teamId) {
+  var admin = await initAdmin();
+  var db = admin.firestore();
+  var snap = await db.doc("config/main").get();
+  if (!snap.exists) throw new Error("config/main not found");
+  var data = snap.data();
+  if (!Array.isArray(data.teams)) throw new Error("config/main teams missing");
+  var team = data.teams.find(function (t) {
+    return String(t.id) === String(teamId);
+  });
+  if (!team) throw new Error("team id " + teamId + " not in config/main");
+  if (!team.squadi || !team.squadi.competitionUniqueKey) {
+    throw new Error("team " + teamId + " has no squadi config in Firestore — save URL in admin first");
+  }
+  return {
+    teamId: teamId,
+    squadi: normalizeSquadiConfig(team.squadi),
+  };
+}
+
+async function writeFirestore(teamId, squadi) {
+  var admin = await initAdmin();
   var db = admin.firestore();
   var ref = db.doc("config/main");
   var snap = await ref.get();
@@ -92,7 +120,10 @@ async function writeFirestore(teamId, squadi) {
 }
 
 async function main() {
-  var cfg = loadConfig();
+  var teamId = parseInt(arg("--team") || "1", 10) || 1;
+  var cfg = hasFlag("--from-firestore")
+    ? await loadConfigFromFirestore(teamId)
+    : loadConfig();
   console.log("Squadi sync — team", cfg.teamId, cfg.squadi.teamNameFilter);
   console.log("Competition:", cfg.squadi.competitionUniqueKey, "division", cfg.squadi.divisionId);
 

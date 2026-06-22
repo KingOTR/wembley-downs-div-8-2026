@@ -32,4 +32,4 @@ jobs:
           fi
           cp squadi-config.example.json squadi-config.json
           npm install firebase-admin --no-save
-          node tools/squadi-sync.mjs --config squadi-config.json --write
+          node tools/squadi-sync.mjs --from-firestore --write || node tools/squadi-sync.mjs --config squadi-config.json --write

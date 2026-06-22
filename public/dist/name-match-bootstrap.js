@@ -9,13 +9,13 @@ import {
   findSquadMatch,
   displayPlayerName,
   STRICT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v191";
+} from "./name-match.js?tag=v192";
 
 /** Map pick/voter name to squad roster label for tally (not off-roster nicknames). */
 function canonicalForTally(name) {
-  var base = canonicalPlayerName(name);
   var squad =
     typeof window.__svGetBallotSquad === "function" ? window.__svGetBallotSquad() : [];
+  var base = canonicalPlayerName(name, squad && squad.length ? squad : undefined);
   if (squad && squad.length) {
     var hit = findSquadMatch(base, squad, STRICT_SQUAD_THRESHOLD);
     if (!hit) hit = findSquadMatch(name, squad, STRICT_SQUAD_THRESHOLD);

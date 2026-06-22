@@ -630,4 +630,64 @@ if (roundNineFromNine !== 8) {
   throw new Error("v179 round label '9' should match Round 9 ballots, got " + roundNineFromNine);
 }
 
+// v192: results tally lists every squad member (0 pts at bottom).
+function tallyRowsWithZeroSquad(squad, votes, canonFn) {
+  var m = {};
+  var weights = [3, 2, 1];
+  votes.forEach(function (v) {
+    (v.picks || []).forEach(function (p, i) {
+      if (!p) return;
+      var key = canonFn ? canonFn(p) : p;
+      m[key] = (m[key] || 0) + (weights[i] || 0);
+    });
+  });
+  var rows = Object.entries(m)
+    .sort(function (a, b) {
+      return b[1] - a[1] || a[0].localeCompare(b[0]);
+    })
+    .map(function (e) {
+      return { name: e[0], pts: e[1] };
+    });
+  var seen = {};
+  rows.forEach(function (r) {
+    seen[r.name] = true;
+  });
+  (squad || []).forEach(function (p) {
+    var n = canonFn ? canonFn(p) : p;
+    if (n && !seen[n]) {
+      rows.push({ name: n, pts: 0 });
+      seen[n] = true;
+    }
+  });
+  rows.sort(function (a, b) {
+    return b.pts - a.pts || String(a.name).localeCompare(String(b.name));
+  });
+  return rows;
+}
+var zeroSquad = ["Bob", "Carol", "Dave", "Johanna"];
+var zeroVotes = [
+  {
+    id: "z1",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Alice",
+    picks: ["Bob", "Carol", "Dave"],
+  },
+];
+var zeroRows = tallyRowsWithZeroSquad(zeroSquad, zeroVotes, function (n) {
+  return n;
+});
+if (zeroRows.length !== 4) {
+  throw new Error("v192 expected 4 squad rows including 0-pt Johanna, got " + zeroRows.length);
+}
+var johannaRow = zeroRows.find(function (r) {
+  return r.name === "Johanna";
+});
+if (!johannaRow || johannaRow.pts !== 0) {
+  throw new Error("v192 Johanna should appear with 0 pts");
+}
+if (zeroRows[zeroRows.length - 1].name !== "Johanna") {
+  throw new Error("v192 zero-pt players should sort after scorers");
+}
+
 console.log("tally regression OK");

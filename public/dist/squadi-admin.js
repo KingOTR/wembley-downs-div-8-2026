@@ -6,7 +6,7 @@ import {
   normalizeSquadiConfig,
   fetchWembleyFixtures,
   mergeFixturesIntoMatchesByRound,
-} from "./squadi-client.js?tag=v191";
+} from "./squadi-client.js?tag=v192";
 
 var STORAGE_KEY = "soccerVoteApp_v2";
 
@@ -89,10 +89,33 @@ function persistSquadiOnTeam() {
   } catch (e) {}
 }
 
+function squadiFromMemory() {
+  var teamId = currentTeamId();
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      var data = JSON.parse(raw);
+      var localTeam = getTeam(data, teamId);
+      if (localTeam && localTeam.squadi && localTeam.squadi.fixtureUrl) return localTeam.squadi;
+    }
+  } catch (e) {}
+  return null;
+}
+
 function loadSquadiFromTeam() {
-  var data = loadLocalData();
-  var team = getTeam(data, currentTeamId());
-  fillSquadiForm(team && team.squadi);
+  var teamId = currentTeamId();
+  var squadi = squadiFromMemory();
+  if (!squadi || !squadi.fixtureUrl) {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var data = JSON.parse(raw);
+        var team = getTeam(data, teamId);
+        if (team && team.squadi) squadi = team.squadi;
+      }
+    } catch (e) {}
+  }
+  fillSquadiForm(squadi);
 }
 
 function setSquadiStatus(msg, ok) {
@@ -113,7 +136,9 @@ async function importFromSquadi() {
       setSquadiStatus("Paste a Squadi fixture page URL or fill competition + year.", false);
       return;
     }
-    var syncOut = await fetchWembleyFixtures(squadi, { squad: team.players || [] });
+    var dataPre = loadLocalData();
+    var teamPre = getTeam(dataPre, currentTeamId());
+    var syncOut = await fetchWembleyFixtures(squadi, { squad: (teamPre && teamPre.players) || [] });
     var fixtures = syncOut.fixtures;
     if (!fixtures.length) {
       setSquadiStatus("No matches found for “" + squadi.teamNameFilter + "”. Check competition URL.", false);
@@ -174,29 +199,32 @@ function wireSquadiAdmin() {
   panel._svSquadiWired = true;
 
   var urlEl = document.getElementById("squadiFixtureUrl");
-  if (urlEl) {
-    urlEl.addEventListener("change", function () {
-      var parsed = parseSquadiFixtureUrl(urlEl.value);
-      if (parsed) {
-        if (parsed.competitionUniqueKey) {
-          var comp = document.getElementById("squadiCompetitionKey");
-          if (comp) comp.value = parsed.competitionUniqueKey;
-        }
-        if (parsed.yearId) {
-          var y = document.getElementById("squadiYearId");
-          if (y) y.value = String(parsed.yearId);
-        }
-        if (parsed.divisionId) {
-          var d = document.getElementById("squadiDivisionId");
-          if (d) d.value = String(parsed.divisionId);
-        }
-        if (parsed.teamId) {
-          var tid = document.getElementById("squadiTeamId");
-          if (tid) tid.value = String(parsed.teamId);
-        }
+  function onSquadiUrlInput() {
+    var parsed = parseSquadiFixtureUrl(urlEl.value);
+    if (parsed) {
+      if (parsed.competitionUniqueKey) {
+        var comp = document.getElementById("squadiCompetitionKey");
+        if (comp) comp.value = parsed.competitionUniqueKey;
       }
-      persistSquadiOnTeam();
-    });
+      if (parsed.yearId) {
+        var y = document.getElementById("squadiYearId");
+        if (y) y.value = String(parsed.yearId);
+      }
+      if (parsed.divisionId) {
+        var d = document.getElementById("squadiDivisionId");
+        if (d) d.value = String(parsed.divisionId);
+      }
+      if (parsed.teamId) {
+        var tid = document.getElementById("squadiTeamId");
+        if (tid) tid.value = String(parsed.teamId);
+      }
+    }
+    persistSquadiOnTeam();
+  }
+
+  if (urlEl) {
+    urlEl.addEventListener("input", onSquadiUrlInput);
+    urlEl.addEventListener("change", onSquadiUrlInput);
   }
 
   ["squadiTeamFilter", "squadiTeamId", "squadiYearId", "squadiCompetitionKey", "squadiDivisionId"].forEach(function (id) {
