@@ -449,4 +449,58 @@ if (emptyMemoryPts.Bob !== 24) {
   );
 }
 
+// Regression: Ds() mv() dropped ballots without id even when localStorage had them (v177 gap).
+function voteDocIdLikeApp(v) {
+  var teamId = v && v.teamId != null ? v.teamId : 1;
+  var rk = String(v && v.round ? v.round : "Round 1")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "round-1";
+  var vk = String((v && v.voterName) || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "x";
+  return "t" + teamId + "_r" + rk + "_v" + vk;
+}
+
+function dsMergeV178(teamId, cloudVotes, inMemoryVotes, localStorageVotes, cacheVotes) {
+  var byId = Object.create(null);
+  function mv(v) {
+    if (!v || String(v.teamId) !== String(teamId)) return;
+    var id = v.id;
+    if (!id) id = voteDocIdLikeApp(v);
+    if (!id) return;
+    byId[id] = Object.assign({}, v, { id: id });
+  }
+  (inMemoryVotes || []).forEach(mv);
+  (cloudVotes || []).forEach(mv);
+  (localStorageVotes || []).forEach(mv);
+  (cacheVotes || []).forEach(mv);
+  return Object.keys(byId).map(function (k) {
+    return byId[k];
+  });
+}
+
+var eightNoId = [
+  "Jay", "Anna", "Uli", "Bob", "Carol", "Dave", "Eve", "Frank",
+].map(function (name) {
+  return {
+    teamId: 1,
+    round: "Round 9",
+    voterName: name,
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Bob", "Carol", "Dave"],
+    nameMatchStatus: "matched",
+    tallyExcluded: false,
+  };
+});
+var mergedV178 = dsMergeV178(1, [], [], eightNoId, []);
+if (mergedV178.length !== 8) {
+  throw new Error("v178 Ds merge should keep 8 ballots without pre-assigned id, got " + mergedV178.length);
+}
+
 console.log("tally regression OK");

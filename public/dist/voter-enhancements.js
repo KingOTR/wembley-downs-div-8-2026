@@ -37,6 +37,7 @@ const THEME_KEY = STORAGE_KEY + "_theme";
 const VOTES_BACKUP_KEY = STORAGE_KEY + "_votes_backup";
 const VOTE_RESTORE_SESSION_KEY = "sv_vote_restore_v178";
 const LEGACY_STORAGE_KEYS = ["soccerVoteApp", "soccerVoteApp_v1"];
+const TEAM_VOTES_CACHE_PREFIX = STORAGE_KEY + "_votes_cache_t";
 
 function assetTag() {
   try {
@@ -187,6 +188,14 @@ function collectRecoverableVotes() {
       coachVotes = mergeCoachVotesLists(coachVotes, legacy.coachVotes || []);
     } catch (e) {}
   });
+  for (var ti = 1; ti <= 4; ti++) {
+    try {
+      var cacheRaw = localStorage.getItem(TEAM_VOTES_CACHE_PREFIX + String(ti));
+      if (!cacheRaw) continue;
+      var cacheData = JSON.parse(cacheRaw);
+      votes = mergeVotesLists(votes, cacheData.votes || []);
+    } catch (e) {}
+  }
   try {
     var queue = loadOfflineQueue();
     queue.forEach(function (item) {
@@ -390,6 +399,24 @@ async function restoreVotesFromLocal(opts) {
 window.__svRestoreVotesFromLocal = restoreVotesFromLocal;
 window.__svCollectRecoverableVotes = collectRecoverableVotes;
 window.__svBackupLocalVotes = backupLocalVotes;
+window.__svVoteDocIdForBallot = voteDocIdForBallot;
+window.__svExtraResultRounds = function (teamId) {
+  var rounds = Object.create(null);
+  try {
+    collectRecoverableVotes().votes.forEach(function (v) {
+      if (!v || String(v.teamId) !== String(teamId)) return;
+      var rk = voteRoundLabel(v);
+      if (rk) rounds[rk] = true;
+    });
+  } catch (e) {
+    console.warn("[extra-rounds]", e);
+  }
+  return Object.keys(rounds).sort(function (a, b) {
+    var na = parseFloat(String(a).replace(/[^\d.]/g, "")) || 0;
+    var nb = parseFloat(String(b).replace(/[^\d.]/g, "")) || 0;
+    return na !== nb ? na - nb : String(a).localeCompare(String(b));
+  });
+};
 
 function ensureVotesBackupOnBoot() {
   try {
@@ -3362,6 +3389,9 @@ function wireAdminSectionTabs() {
     });
     if (tab === "votes") {
       try {
+        mergeRecoverableIntoLocal();
+        rehydrateAppVotesFromLocal();
+        triggerResultsRefresh();
         ensureWhoHasntVotedBlock();
         updateWhoHasntVoted();
         debouncedUpdateAdminBallots();

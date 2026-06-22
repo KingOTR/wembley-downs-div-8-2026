@@ -1,5 +1,6 @@
 /**
- * v178: Merge local coach votes when cloud listener syncs; expose hydrate helper.
+ * v178: Fix Ds() dropping local votes without id; Fa() round list from local storage;
+ * hydrate with synthetic doc ids; merge per-team vote cache.
  */
 const fs = require("fs");
 const path = require("path");
@@ -21,7 +22,37 @@ const patches = [
     from:
       'function A(){localStorage.setItem(i,JSON.stringify({teams:U.teams,votes:U.votes,coachVotes:U.coachVotes}));try{localStorage.setItem(i+"_local_w",String(Date.now()))}catch{}}function N(c){',
     to:
-      'function A(){localStorage.setItem(i,JSON.stringify({teams:U.teams,votes:U.votes,coachVotes:U.coachVotes}));try{localStorage.setItem(i+"_local_w",String(Date.now()))}catch{}}window.__svHydrateVotesFromLocal=function(){try{var raw=localStorage.getItem(i);if(!raw)return{player:0,coach:0};var data=JSON.parse(raw),added=0,cadded=0,byId=Object.create(null);(U.votes||[]).forEach(function(v){if(v&&v.id)byId[v.id]=v});(data.votes||[]).forEach(function(v){if(v&&v.id&&!byId[v.id]){byId[v.id]=v;added++}});U.votes=Object.keys(byId).map(function(k){return byId[k]});var cby=Object.create(null);(U.coachVotes||[]).forEach(function(v){if(v&&v.id)cby[v.id]=v});(data.coachVotes||[]).forEach(function(v){if(v&&v.id&&!cby[v.id]){cby[v.id]=v;cadded++}});U.coachVotes=Object.keys(cby).map(function(k){return cby[k]});if(added||cadded)try{A()}catch(e){}return{player:added,coach:cadded}}catch(e){return{player:0,coach:0,error:String(e)}}};function N(c){',
+      'function A(){localStorage.setItem(i,JSON.stringify({teams:U.teams,votes:U.votes,coachVotes:U.coachVotes}));try{localStorage.setItem(i+"_local_w",String(Date.now()))}catch{}}function svVid(v){if(!v)return null;if(v.id)return v.id;try{return typeof window.__svVoteDocIdForBallot=="function"?window.__svVoteDocIdForBallot(v):null}catch(e){return null}}window.__svHydrateVotesFromLocal=function(){try{var raw=localStorage.getItem(i);if(!raw)return{player:0,coach:0};var data=JSON.parse(raw),added=0,cadded=0,byId=Object.create(null);function hv(v){var id=svVid(v);if(!id||byId[id])return;byId[id]=Object.assign({},v,{id:id});added++}(U.votes||[]).forEach(function(v){var id=svVid(v);if(id)byId[id]=Object.assign({},v,{id:id})});(data.votes||[]).forEach(hv);try{for(var ti=1;ti<=4;ti++){var cr=localStorage.getItem(qh(ti));if(!cr)continue;var cdata=JSON.parse(cr);(cdata.votes||[]).forEach(hv)}}catch(e){}U.votes=Object.keys(byId).map(function(k){return byId[k]});var cby=Object.create(null);(U.coachVotes||[]).forEach(function(v){if(v&&v.id)cby[v.id]=v});(data.coachVotes||[]).forEach(function(v){if(v&&v.id&&!cby[v.id]){cby[v.id]=v;cadded++}});U.coachVotes=Object.keys(cby).map(function(k){return cby[k]});if(added||cadded)try{A()}catch(e){}return{player:added,coach:cadded}}catch(e){return{player:0,coach:0,error:String(e)}}};function N(c){',
+    once: true,
+  },
+  {
+    name: "Ds() mv() assign synthetic id + merge per-team cache",
+    from:
+      'function mv(v){if(!v||!v.id||T(v.teamId)!==T(l))return;byId[v.id]=v}(U.votes||[]).forEach(mv);B.forEach(mv);try{var raw=localStorage.getItem(i);if(raw){var data=JSON.parse(raw);(data.votes||[]).forEach(mv)}}catch(e){}U.votes=Object.keys(byId).map(function(k){return byId[k]}),jh(l),!x||!U.votes.length?(vr&&(clearTimeout(vr),vr=0),Pt(),bt(le.teamId,le.slot)&&Vs(),Vo()):yI()}',
+    to:
+      'function mv(v){if(!v||T(v.teamId)!==T(l))return;var id=v.id;if(!id){try{id=typeof window.__svVoteDocIdForBallot=="function"?window.__svVoteDocIdForBallot(v):null}catch(e){}if(!id)return}byId[id]=Object.assign({},v,{id:id})}(U.votes||[]).forEach(mv);B.forEach(mv);try{var raw=localStorage.getItem(i);if(raw){var data=JSON.parse(raw);(data.votes||[]).forEach(mv)}}catch(e){}try{var cr=localStorage.getItem(qh(l));if(cr){var cdata=JSON.parse(cr);(cdata.votes||[]).forEach(mv)}}catch(e){}U.votes=Object.keys(byId).map(function(k){return byId[k]}),jh(l),!x||!U.votes.length?(vr&&(clearTimeout(vr),vr=0),Pt(),bt(le.teamId,le.slot)&&Vs(),Vo()):yI()}',
+    once: true,
+  },
+  {
+    name: "Fa() include local vote rounds via __svExtraResultRounds",
+    from:
+      'function Fa(c,l,h){var m=Jh(c,l),f=h||"Round 1";return m.indexOf(f)===-1&&m.unshift(f),m}',
+    to:
+      'function Fa(c,l,h){var m=Jh(c,l);try{if(typeof window.__svExtraResultRounds=="function"){(window.__svExtraResultRounds(c)||[]).forEach(function(r){r&&m.indexOf(r)===-1&&m.push(r)})}}catch(e){}var f=h||"Round 1";return m.indexOf(f)===-1&&m.unshift(f),m}',
+    once: true,
+  },
+  {
+    name: "hydrate: synthetic doc ids + per-team cache (upgrade existing)",
+    from:
+      'window.__svHydrateVotesFromLocal=function(){try{var raw=localStorage.getItem(i);if(!raw)return{player:0,coach:0};var data=JSON.parse(raw),added=0,cadded=0,byId=Object.create(null);(U.votes||[]).forEach(function(v){if(v&&v.id)byId[v.id]=v});(data.votes||[]).forEach(function(v){if(v&&v.id&&!byId[v.id]){byId[v.id]=v;added++}});U.votes=Object.keys(byId).map(function(k){return byId[k]});var cby=Object.create(null);(U.coachVotes||[]).forEach(function(v){if(v&&v.id)cby[v.id]=v});(data.coachVotes||[]).forEach(function(v){if(v&&v.id&&!cby[v.id]){cby[v.id]=v;cadded++}});U.coachVotes=Object.keys(cby).map(function(k){return cby[k]});if(added||cadded)try{A()}catch(e){}return{player:added,coach:cadded}}catch(e){return{player:0,coach:0,error:String(e)}}};',
+    to:
+      'window.__svHydrateVotesFromLocal=function(){try{var raw=localStorage.getItem(i);if(!raw)return{player:0,coach:0};var data=JSON.parse(raw),added=0,cadded=0,byId=Object.create(null);function hv(v){var id=svVid(v);if(!id||byId[id])return;byId[id]=Object.assign({},v,{id:id});added++}(U.votes||[]).forEach(function(v){var id=svVid(v);if(id)byId[id]=Object.assign({},v,{id:id})});(data.votes||[]).forEach(hv);try{for(var ti=1;ti<=4;ti++){var cr=localStorage.getItem(qh(ti));if(!cr)continue;var cdata=JSON.parse(cr);(cdata.votes||[]).forEach(hv)}}catch(e){}U.votes=Object.keys(byId).map(function(k){return byId[k]});var cby=Object.create(null);(U.coachVotes||[]).forEach(function(v){if(v&&v.id)cby[v.id]=v});(data.coachVotes||[]).forEach(function(v){if(v&&v.id&&!cby[v.id]){cby[v.id]=v;cadded++}});U.coachVotes=Object.keys(cby).map(function(k){return cby[k]});if(added||cadded)try{A()}catch(e){}return{player:added,coach:cadded}}catch(e){return{player:0,coach:0,error:String(e)}}};',
+    once: true,
+  },
+  {
+    name: "add svVid helper before hydrate",
+    from: "window.__svHydrateVotesFromLocal=function(){try{var raw=localStorage.getItem(i);",
+    to: 'function svVid(v){if(!v)return null;if(v.id)return v.id;try{return typeof window.__svVoteDocIdForBallot=="function"?window.__svVoteDocIdForBallot(v):null}catch(e){return null}}window.__svHydrateVotesFromLocal=function(){try{var raw=localStorage.getItem(i);',
     once: true,
   },
 ];
