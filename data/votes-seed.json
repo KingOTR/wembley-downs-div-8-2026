@@ -1,8 +1,8 @@
 {
   "exportVersion": 1,
-  "exportedAt": "2026-06-22T10:40:59.739Z",
+  "exportedAt": "2026-06-22T13:55:09.450Z",
   "source": "tools/import-votes-csv.mjs",
-  "recoveryNote": "Reconstructed player ballots from season CSV tally export (C:/Users/sydne/OneDrive/Desktop/Div_8_all_rounds.csv). Picks per voter are inferred; totals per round match the CSV. v194: restored Johanna voter ballots for Round 1 and Round 5 from git commit 9eb02bb (v181) where pick sets matched exactly without changing CSV totals.",
+  "recoveryNote": "Reconstructed player ballots from season CSV tally export (C:/Users/sydne/OneDrive/Desktop/Div_8_all_rounds.csv). Picks per voter are inferred; totals per round match the CSV. v196: restored Johanna/Uli voter ballots from git 9eb02bb (v181) via pick-match swaps; Johanna Round 9 voter from Ann correction.",
   "csvMeta": {
     "exportedAt": "2026-06-21T17:49:30.426Z",
     "teamName": "Div 8"
@@ -80,9 +80,82 @@
       "Round 7: csv sum 58 uses 10 ballot(s) with 2 void point(s)",
       "Round 8: csv sum 55 uses 10 ballot(s) with 5 void point(s)",
       "Round 9: csv sum 40 uses 7 ballot(s) with 2 void point(s)"
-    ]
+    ],
+    "v181Restore": [
+      {
+        "round": "Round 1",
+        "target": "Johanna",
+        "status": "ok",
+        "note": "swap Elke↔Elke"
+      },
+      {
+        "round": "Round 2",
+        "target": "Johanna",
+        "status": "skip",
+        "reason": "picks not in csv reconstruction"
+      },
+      {
+        "round": "Round 5",
+        "target": "Johanna",
+        "status": "ok",
+        "note": "swap Sarah Goalkeeper↔Sarah Goalkeeper"
+      },
+      {
+        "round": "Round 6",
+        "target": "Johanna",
+        "status": "skip",
+        "reason": "picks not in csv reconstruction"
+      },
+      {
+        "round": "Round 7",
+        "target": "Johanna",
+        "status": "skip",
+        "reason": "picks not in csv reconstruction"
+      },
+      {
+        "round": "Round 8",
+        "target": "Johanna",
+        "status": "ok",
+        "note": "swap Elke↔Elke"
+      },
+      {
+        "round": "Round 9",
+        "target": "Johanna",
+        "status": "skip",
+        "reason": "picks not in csv reconstruction"
+      },
+      {
+        "round": "Round 8",
+        "target": "Uli",
+        "status": "skip",
+        "reason": "picks not in csv reconstruction"
+      },
+      {
+        "round": "Round 9",
+        "target": "Uli",
+        "status": "skip",
+        "reason": "picks not in csv reconstruction"
+      }
+    ],
+    "crossRoundSwaps": []
   },
   "votes": [
+    {
+      "teamId": 1,
+      "round": "Round 1",
+      "voterName": "Elke",
+      "voterNameKey": "elke",
+      "picks": [
+        "Jane",
+        "Emma",
+        "Anna"
+      ],
+      "submittedAt": "2026-06-21T17:49:30.426Z",
+      "nameMatchStatus": "matched",
+      "tallyExcluded": false,
+      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-swap",
+      "id": "t1_rround-1_velke"
+    },
     {
       "teamId": 1,
       "round": "Round 1",
@@ -90,8 +163,8 @@
       "voterNameKey": "abi",
       "picks": [
         "Jane",
-        "Emma",
-        "Anna"
+        "Lauren",
+        "Sophie"
       ],
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
@@ -106,22 +179,6 @@
       "voterNameKey": "ann",
       "picks": [
         "Jane",
-        "Lauren",
-        "Sophie"
-      ],
-      "submittedAt": "2026-06-21T17:49:30.426Z",
-      "nameMatchStatus": "matched",
-      "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-1_vann"
-    },
-    {
-      "teamId": 1,
-      "round": "Round 1",
-      "voterName": "Elke",
-      "voterNameKey": "elke",
-      "picks": [
-        "Jane",
         "Anna",
         "Emma"
       ],
@@ -129,7 +186,7 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-1_velke"
+      "id": "t1_rround-1_vann"
     },
     {
       "teamId": 1,
@@ -144,14 +201,14 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "git:9eb02bb-v181-voter-restore",
+      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-restore",
       "id": "t1_rround-1_vjohanna"
     },
     {
       "teamId": 1,
       "round": "Round 1",
-      "voterName": "Freame",
-      "voterNameKey": "freame",
+      "voterName": "Erin",
+      "voterNameKey": "erin",
       "picks": [
         "Lauren",
         "Anna",
@@ -161,13 +218,13 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-1_vfreame"
+      "id": "t1_rround-1_verin"
     },
     {
       "teamId": 1,
       "round": "Round 1",
-      "voterName": "Jess",
-      "voterNameKey": "jess",
+      "voterName": "Freame",
+      "voterNameKey": "freame",
       "picks": [
         "Uli",
         "Jane",
@@ -177,7 +234,7 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-1_vjess"
+      "id": "t1_rround-1_vfreame"
     },
     {
       "teamId": 1,
@@ -198,8 +255,8 @@
     {
       "teamId": 1,
       "round": "Round 2",
-      "voterName": "Johanna",
-      "voterNameKey": "johanna",
+      "voterName": "Jess",
+      "voterNameKey": "jess",
       "picks": [
         "Sophie",
         "Ann",
@@ -209,7 +266,7 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-2_vjohanna"
+      "id": "t1_rround-2_vjess"
     },
     {
       "teamId": 1,
@@ -278,8 +335,8 @@
     {
       "teamId": 1,
       "round": "Round 2",
-      "voterName": "Abi",
-      "voterNameKey": "abi",
+      "voterName": "Johanna",
+      "voterNameKey": "johanna",
       "picks": [
         "Freame",
         "Uli",
@@ -289,13 +346,13 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-2_vabi"
+      "id": "t1_rround-2_vjohanna"
     },
     {
       "teamId": 1,
       "round": "Round 2",
-      "voterName": "Jess",
-      "voterNameKey": "jess",
+      "voterName": "Abi",
+      "voterNameKey": "abi",
       "picks": [
         "Emma",
         "Freame",
@@ -305,7 +362,7 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-2_vjess"
+      "id": "t1_rround-2_vabi"
     },
     {
       "teamId": 1,
@@ -470,8 +527,8 @@
     {
       "teamId": 1,
       "round": "Round 4",
-      "voterName": "Johanna",
-      "voterNameKey": "johanna",
+      "voterName": "Jess",
+      "voterNameKey": "jess",
       "picks": [
         "Uli",
         "Emma",
@@ -481,7 +538,7 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-4_vjohanna"
+      "id": "t1_rround-4_vjess"
     },
     {
       "teamId": 1,
@@ -592,14 +649,14 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "git:9eb02bb-v181-voter-restore",
+      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-restore",
       "id": "t1_rround-5_vjohanna"
     },
     {
       "teamId": 1,
       "round": "Round 5",
-      "voterName": "Abi",
-      "voterNameKey": "abi",
+      "voterName": "Sarah Goalkeeper",
+      "voterNameKey": "sarah-gk",
       "picks": [
         "Lauren",
         "Emma",
@@ -608,14 +665,14 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-5_vabi"
+      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-swap",
+      "id": "t1_rround-5_vsarah-gk"
     },
     {
       "teamId": 1,
       "round": "Round 5",
-      "voterName": "Ann",
-      "voterNameKey": "ann",
+      "voterName": "Abi",
+      "voterNameKey": "abi",
       "picks": [
         "Uli",
         "Kat",
@@ -625,7 +682,7 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-5_vann"
+      "id": "t1_rround-5_vabi"
     },
     {
       "teamId": 1,
@@ -726,8 +783,8 @@
     {
       "teamId": 1,
       "round": "Round 6",
-      "voterName": "Johanna",
-      "voterNameKey": "johanna",
+      "voterName": "Kat",
+      "voterNameKey": "kat",
       "picks": [
         "Taryn (C)",
         "Emma",
@@ -737,13 +794,13 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-6_vjohanna"
+      "id": "t1_rround-6_vkat"
     },
     {
       "teamId": 1,
       "round": "Round 6",
-      "voterName": "Kat",
-      "voterNameKey": "kat",
+      "voterName": "Johanna",
+      "voterNameKey": "johanna",
       "picks": [
         "Rainy",
         "Taryn (C)",
@@ -753,7 +810,7 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-6_vkat"
+      "id": "t1_rround-6_vjohanna"
     },
     {
       "teamId": 1,
@@ -790,22 +847,6 @@
     {
       "teamId": 1,
       "round": "Round 7",
-      "voterName": "Rainy",
-      "voterNameKey": "rainy",
-      "picks": [
-        "Lauren",
-        "Sophie",
-        "Sarah (tall)"
-      ],
-      "submittedAt": "2026-06-21T17:49:30.426Z",
-      "nameMatchStatus": "matched",
-      "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-7_vrainy"
-    },
-    {
-      "teamId": 1,
-      "round": "Round 7",
       "voterName": "Ann",
       "voterNameKey": "ann",
       "picks": [
@@ -818,6 +859,22 @@
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
       "id": "t1_rround-7_vann"
+    },
+    {
+      "teamId": 1,
+      "round": "Round 7",
+      "voterName": "Rainy",
+      "voterNameKey": "rainy",
+      "picks": [
+        "Lauren",
+        "Sophie",
+        "Sarah (tall)"
+      ],
+      "submittedAt": "2026-06-21T17:49:30.426Z",
+      "nameMatchStatus": "matched",
+      "tallyExcluded": false,
+      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "id": "t1_rround-7_vrainy"
     },
     {
       "teamId": 1,
@@ -838,8 +895,8 @@
     {
       "teamId": 1,
       "round": "Round 7",
-      "voterName": "Johanna",
-      "voterNameKey": "johanna",
+      "voterName": "Kat",
+      "voterNameKey": "kat",
       "picks": [
         "Uli",
         "Elke",
@@ -849,13 +906,13 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-7_vjohanna"
+      "id": "t1_rround-7_vkat"
     },
     {
       "teamId": 1,
       "round": "Round 7",
-      "voterName": "Kat",
-      "voterNameKey": "kat",
+      "voterName": "Johanna",
+      "voterNameKey": "johanna",
       "picks": [
         "Freame",
         "Elke",
@@ -865,7 +922,7 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-7_vkat"
+      "id": "t1_rround-7_vjohanna"
     },
     {
       "teamId": 1,
@@ -998,22 +1055,6 @@
     {
       "teamId": 1,
       "round": "Round 8",
-      "voterName": "Erin",
-      "voterNameKey": "erin",
-      "picks": [
-        "Freame",
-        "Rainy",
-        "Jess"
-      ],
-      "submittedAt": "2026-06-21T17:49:30.426Z",
-      "nameMatchStatus": "matched",
-      "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-8_verin"
-    },
-    {
-      "teamId": 1,
-      "round": "Round 8",
       "voterName": "Ann",
       "voterNameKey": "ann",
       "picks": [
@@ -1030,8 +1071,24 @@
     {
       "teamId": 1,
       "round": "Round 8",
-      "voterName": "Elke",
-      "voterNameKey": "elke",
+      "voterName": "Erin",
+      "voterNameKey": "erin",
+      "picks": [
+        "Freame",
+        "Rainy",
+        "Jess"
+      ],
+      "submittedAt": "2026-06-21T17:49:30.426Z",
+      "nameMatchStatus": "matched",
+      "tallyExcluded": false,
+      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "id": "t1_rround-8_verin"
+    },
+    {
+      "teamId": 1,
+      "round": "Round 8",
+      "voterName": "Johanna",
+      "voterNameKey": "johanna",
       "picks": [
         "Freame",
         "Jess",
@@ -1040,8 +1097,8 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-8_velke"
+      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-restore",
+      "id": "t1_rround-8_vjohanna"
     },
     {
       "teamId": 1,
@@ -1062,8 +1119,8 @@
     {
       "teamId": 1,
       "round": "Round 8",
-      "voterName": "Johanna",
-      "voterNameKey": "johanna",
+      "voterName": "Kat",
+      "voterNameKey": "kat",
       "picks": [
         "Jess",
         "Sarah Goalkeeper",
@@ -1073,13 +1130,13 @@
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
       "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-8_vjohanna"
+      "id": "t1_rround-8_vkat"
     },
     {
       "teamId": 1,
       "round": "Round 8",
-      "voterName": "Kat",
-      "voterNameKey": "kat",
+      "voterName": "Elke",
+      "voterNameKey": "elke",
       "picks": [
         "",
         "Sarah Goalkeeper",
@@ -1088,8 +1145,8 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-8_vkat"
+      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-swap",
+      "id": "t1_rround-8_velke"
     },
     {
       "teamId": 1,
@@ -1190,8 +1247,8 @@
     {
       "teamId": 1,
       "round": "Round 9",
-      "voterName": "Anna",
-      "voterNameKey": "anna",
+      "voterName": "Johanna",
+      "voterNameKey": "johanna",
       "picks": [
         "Rainy",
         "Emma",
@@ -1200,8 +1257,8 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
-      "id": "t1_rround-9_vanna"
+      "recoveredFrom": "csv:Div_8_all_rounds.csv+voter-correction",
+      "id": "t1_rround-9_vjohanna"
     }
   ],
   "coachVotes": []

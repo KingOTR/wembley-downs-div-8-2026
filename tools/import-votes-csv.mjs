@@ -6,6 +6,7 @@
  *   node tools/import-votes-csv.mjs --upload
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -33,8 +34,20 @@ if (!existsSync(csvPath)) {
 
 const raw = readFileSync(csvPath, "utf8");
 const parsed = parseSeasonCsv(raw);
+let v181Votes = [];
+try {
+  const v181Raw = execSync("git show 9eb02bb:data/restored-votes.json", {
+    cwd: root,
+    encoding: "utf8",
+  });
+  v181Votes = JSON.parse(v181Raw).votes || [];
+} catch {
+  v181Votes = [];
+}
 const { votes, report } = reconstructVotesFromCsv(parsed, {
   source: "csv:" + csvPath.split(/[/\\]/).pop(),
+  v181Votes,
+  v181Targets: ["Johanna", "Uli"],
 });
 
 const archive = {
@@ -44,7 +57,7 @@ const archive = {
   recoveryNote:
     "Reconstructed player ballots from season CSV tally export (" +
     csvPath +
-    "). Picks per voter are inferred; totals per round match the CSV.",
+    "). Picks per voter are inferred; totals per round match the CSV. v196: restored Johanna/Uli voter ballots from git 9eb02bb (v181) via pick-match swaps; Johanna Round 9 voter from Ann correction.",
   csvMeta: parsed.meta,
   importReport: report,
   votes,

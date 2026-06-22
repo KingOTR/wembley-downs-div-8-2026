@@ -267,9 +267,92 @@ export function voteDocIdFromBallot(v, teamId) {
   return "t" + tid + "_r" + rk + "_v" + vk;
 }
 
+export function ballotPicksKey(picks) {
+  return (picks || []).map((p) => String(p || "").trim()).join("|");
+}
+
+function relabelVoter(ballot, voterName, tag) {
+  const out = {
+    ...ballot,
+    voterName: displayPlayerName(voterName),
+    voterNameKey: voterNameKey(voterName),
+  };
+  out.id = voteDocIdFromBallot(out, out.teamId);
+  if (tag) {
+    out.recoveredFrom = (ballot.recoveredFrom || "csv-import") + tag;
+  }
+  return out;
+}
+
+/**
+ * Restore voter identity from git v181 when pick sets still exist in CSV reconstruction.
+ * Swaps voter labels when the target voter already has a ballot in that round.
+ */
+export function applyV181VoterRestores(votes, v181Votes, targets) {
+  const want = targets || ["Johanna", "Uli"];
+  const out = votes.map((v) => ({ ...v }));
+  const log = [];
+
+  for (const target of want) {
+    for (const src of (v181Votes || []).filter((v) => v.voterName === target)) {
+      const round = roundKey(src.round);
+      const key = ballotPicksKey(src.picks);
+      const srcIdx = out.findIndex((v) => roundKey(v.round) === round && ballotPicksKey(v.picks) === key);
+      if (srcIdx < 0) {
+        log.push({ round, target, status: "skip", reason: "picks not in csv reconstruction" });
+        continue;
+      }
+      const tgtIdx = out.findIndex((v) => roundKey(v.round) === round && v.voterName === target);
+      if (tgtIdx < 0) {
+        out[srcIdx] = relabelVoter(out[srcIdx], target, "+v181-voter-restore");
+        log.push({ round, target, status: "ok", note: "assign from " + votes[srcIdx].voterName });
+        continue;
+      }
+      if (srcIdx === tgtIdx) {
+        log.push({ round, target, status: "ok", note: "already assigned" });
+        continue;
+      }
+      const otherName = out[srcIdx].voterName;
+      out[srcIdx] = relabelVoter(out[srcIdx], target, "+v181-voter-restore");
+      out[tgtIdx] = relabelVoter(out[tgtIdx], otherName, "+v181-voter-swap");
+      log.push({ round, target, status: "ok", note: "swap " + otherName + "↔" + out[tgtIdx].voterName });
+    }
+  }
+  return { votes: out, log };
+}
+
+/** Move voter labels across rounds without changing picks (CSV totals unchanged). */
+const VOTER_CROSS_ROUND_SWAPS = [];
+
+export function applyVoterCrossRoundSwaps(votes) {
+  const out = votes.map((v) => ({ ...v }));
+  const log = [];
+  VOTER_CROSS_ROUND_SWAPS.forEach((swap) => {
+    const roundA = roundKey(swap.roundA);
+    const roundB = roundKey(swap.roundB);
+    const idxA = out.findIndex(
+      (v) => roundKey(v.round) === roundA && v.voterName === displayPlayerName(swap.voterA)
+    );
+    const idxB = out.findIndex(
+      (v) => roundKey(v.round) === roundB && v.voterName === displayPlayerName(swap.voterB)
+    );
+    if (idxA < 0 || idxB < 0) {
+      log.push({ ...swap, status: "skip", reason: "ballot missing" });
+      return;
+    }
+    const nameA = out[idxA].voterName;
+    const nameB = out[idxB].voterName;
+    out[idxA] = relabelVoter(out[idxA], nameB, "+voter-cross-round-swap");
+    out[idxB] = relabelVoter(out[idxB], nameA, "+voter-cross-round-swap");
+    log.push({ ...swap, status: "ok", note: nameA + "@" + roundA + "↔" + nameB + "@" + roundB });
+  });
+  return { votes: out, log };
+}
+
 /** CSV tally export does not record voter identity — correct known mis-assignments. */
 const VOTER_CORRECTIONS = [
   { round: "Round 9", to: "Elke", from: "Uli" },
+  { round: "Round 9", to: "Johanna", from: "Ann" },
 ];
 
 export function applyVoterCorrections(votes, players) {
@@ -351,6 +434,18 @@ export function reconstructVotesFromCsv(parsed, opts) {
     };
   }
   applyVoterCorrections(votes, players);
+  if (options.v181Votes && options.v181Votes.length) {
+    const restored = applyV181VoterRestores(votes, options.v181Votes, options.v181Targets);
+    votes.length = 0;
+    votes.push(...restored.votes);
+    report.v181Restore = restored.log;
+  }
+  if (options.crossRoundSwaps !== false) {
+    const swapped = applyVoterCrossRoundSwaps(votes);
+    votes.length = 0;
+    votes.push(...swapped.votes);
+    report.crossRoundSwaps = swapped.log;
+  }
   return { votes, report };
 }
 
