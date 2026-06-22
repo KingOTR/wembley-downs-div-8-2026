@@ -503,4 +503,24 @@ if (mergedV178.length !== 8) {
   throw new Error("v178 Ds merge should keep 8 ballots without pre-assigned id, got " + mergedV178.length);
 }
 
+// v179: who-voted / Ua count must see backup-only ballots (main localStorage empty).
+function countVotesForRoundV179(teamId, round, inMemoryVotes, recoveredVotes) {
+  var rk = normalizeRoundLikeApp(round);
+  var merged = mergeVotesLists(inMemoryVotes || [], recoveredVotes || []);
+  return merged.filter(function (v) {
+    return v && String(v.teamId) === String(teamId) && normalizeRoundLikeApp(v.round) === rk;
+  }).length;
+}
+var eightInBackupOnly = eightRoundNine.map(function (v) {
+  return Object.assign({}, v, { id: voteDocIdLikeApp(v) });
+});
+var backupOnlyCount = countVotesForRoundV179(1, "Round 9", [], eightInBackupOnly);
+if (backupOnlyCount !== 8) {
+  throw new Error("v179 backup-only merge should count 8 Round 9 ballots, got " + backupOnlyCount);
+}
+var roundNineFromNine = countVotesForRoundV179(1, "9", [], eightInBackupOnly);
+if (roundNineFromNine !== 8) {
+  throw new Error("v179 round label '9' should match Round 9 ballots, got " + roundNineFromNine);
+}
+
 console.log("tally regression OK");

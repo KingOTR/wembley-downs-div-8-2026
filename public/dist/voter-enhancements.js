@@ -27,7 +27,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v178";
+} from "./name-match.js?tag=v179";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -35,7 +35,7 @@ const PUBLIC_PREFS = STORAGE_KEY + "_public_prefs";
 const OFFLINE_QUEUE_KEY = STORAGE_KEY + "_offline_vote_queue";
 const THEME_KEY = STORAGE_KEY + "_theme";
 const VOTES_BACKUP_KEY = STORAGE_KEY + "_votes_backup";
-const VOTE_RESTORE_SESSION_KEY = "sv_vote_restore_v178";
+const VOTE_RESTORE_SESSION_KEY = "sv_vote_restore_v179";
 const LEGACY_STORAGE_KEYS = ["soccerVoteApp", "soccerVoteApp_v1"];
 const TEAM_VOTES_CACHE_PREFIX = STORAGE_KEY + "_votes_cache_t";
 
@@ -45,7 +45,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v178";
+  return "v179";
 }
 
 function distImport(path) {
@@ -248,6 +248,150 @@ function mergeRecoverableIntoLocal() {
   return { changed: true, votes: nextVotes.length, coachVotes: nextCoach.length };
 }
 
+function ensureVoteHasId(v) {
+  if (!v) return v;
+  var id = v.id || voteDocIdForBallot(v);
+  return Object.assign({}, v, { id: id, round: voteRoundLabel(v) });
+}
+
+function votesForTeamFromRecoverable(teamId) {
+  mergeRecoverableIntoLocal();
+  rehydrateAppVotesFromLocal();
+  return (collectRecoverableVotes().votes || [])
+    .filter(function (v) {
+      return v && String(v.teamId) === String(teamId);
+    })
+    .map(ensureVoteHasId);
+}
+
+function countVotesForRoundSync(teamId, round, inMemoryVotes) {
+  var rk = normalizeRoundLabel(round) || round || "Round 1";
+  var merged = mergeVotesLists(inMemoryVotes || [], votesForTeamFromRecoverable(teamId));
+  var cached = cloudVotesCache[String(teamId)];
+  if (cached && cached.votes && cached.votes.length) {
+    merged = mergeVotesLists(merged, cached.votes);
+  }
+  return merged.filter(function (v) {
+    return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === rk;
+  }).length;
+}
+
+window.__svCountVotesForRound = countVotesForRoundSync;
+
+async function loadAllVotesForTeam(teamId, opts) {
+  var forceCloud = opts && opts.forceCloud;
+  var local = votesForTeamFromRecoverable(teamId);
+  var cloud = [];
+  var cloudErr = "";
+  try {
+    cloud = await fetchCloudVotes(
+      teamId,
+      forceCloud != null ? forceCloud : isSuperAdminUnlocked()
+    );
+  } catch (e) {
+    cloudErr = e.message || String(e);
+  }
+  var votes = mergeVotesLists(local, cloud).map(ensureVoteHasId);
+  return { votes: votes, cloudErr: cloudErr, localCount: local.length, cloudCount: cloud.length };
+}
+
+function auditVoteSources(teamId) {
+  var tid = String(teamId);
+  var main = loadLocalData();
+  var backup = loadVotesBackup();
+  var cache = 0;
+  for (var ti = 1; ti <= 4; ti++) {
+    try {
+      var cr = localStorage.getItem(TEAM_VOTES_CACHE_PREFIX + String(ti));
+      if (!cr) continue;
+      var cdata = JSON.parse(cr);
+      (cdata.votes || []).forEach(function (v) {
+        if (v && String(v.teamId) === tid) cache++;
+      });
+    } catch (e) {}
+  }
+  var queue = 0;
+  try {
+    loadOfflineQueue().forEach(function (item) {
+      var p = item && item.payload;
+      if (p && String(p.teamId) === tid) queue++;
+    });
+  } catch (e) {}
+  var legacy = 0;
+  LEGACY_STORAGE_KEYS.forEach(function (key) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return;
+      (JSON.parse(raw).votes || []).forEach(function (v) {
+        if (v && String(v.teamId) === tid) legacy++;
+      });
+    } catch (e) {}
+  });
+  var recovered = collectRecoverableVotes();
+  var teamRecovered = (recovered.votes || []).filter(function (v) {
+    return v && String(v.teamId) === tid;
+  }).length;
+  var mainCount = (main.votes || []).filter(function (v) {
+    return v && String(v.teamId) === tid;
+  }).length;
+  var backupCount = backup
+    ? (backup.votes || []).filter(function (v) {
+        return v && String(v.teamId) === tid;
+      }).length
+    : 0;
+  return {
+    main: mainCount,
+    backup: backupCount,
+    cache: cache,
+    queue: queue,
+    legacy: legacy,
+    recovered: teamRecovered,
+  };
+}
+
+function formatVotesEmptyDiagnostic(teamId, round, audit, cloudErr) {
+  var parts = ["0 ballots for " + round + " after merging all sources on this device."];
+  if (audit.recovered > 0) {
+    parts.push(
+      audit.recovered +
+        " team ballot(s) recoverable locally (wrong round, or open the correct team)."
+    );
+  }
+  if (audit.main) parts.push("Main key: " + audit.main + ".");
+  if (audit.backup) parts.push("Backup key: " + audit.backup + ".");
+  if (audit.cache) parts.push("Per-team cache: " + audit.cache + ".");
+  if (audit.queue) parts.push("Offline queue: " + audit.queue + ".");
+  if (audit.legacy) parts.push("Legacy storage: " + audit.legacy + ".");
+  if (!audit.recovered && !audit.main && !audit.backup && !audit.cache && !audit.queue && !audit.legacy) {
+    parts.push(
+      "No votes in localStorage on this browser — check another device or re-enter ballots."
+    );
+  }
+  if (cloudErr) parts.push("Cloud: " + cloudErr);
+  return parts.join(" ");
+}
+
+function showVotesEmptyWarning(teamId, round, audit, cloudErr) {
+  if (!isSuperAdminUnlocked()) return;
+  var msg = formatVotesEmptyDiagnostic(teamId, round, audit, cloudErr);
+  var hint = document.getElementById("whoVoteStatusHint");
+  if (hint) {
+    hint.style.color = "#b91c1c";
+    hint.textContent = msg;
+  }
+  var mount = document.getElementById("resultsBallotsWrap");
+  if (!mount || !mount.parentNode) return;
+  var el = document.getElementById("voteRestoreHint");
+  if (!el) {
+    el = document.createElement("p");
+    el.id = "voteRestoreHint";
+    el.className = "hint";
+    mount.parentNode.insertBefore(el, mount);
+  }
+  el.style.color = "#b91c1c";
+  el.textContent = msg;
+}
+
 function rehydrateAppVotesFromLocal() {
   try {
     if (typeof window.__svHydrateVotesFromLocal === "function") {
@@ -398,6 +542,8 @@ async function restoreVotesFromLocal(opts) {
 
 window.__svRestoreVotesFromLocal = restoreVotesFromLocal;
 window.__svCollectRecoverableVotes = collectRecoverableVotes;
+window.__svLoadAllVotesForTeam = loadAllVotesForTeam;
+window.__svAuditVoteSources = auditVoteSources;
 window.__svBackupLocalVotes = backupLocalVotes;
 window.__svVoteDocIdForBallot = voteDocIdForBallot;
 window.__svExtraResultRounds = function (teamId) {
@@ -616,9 +762,7 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
     }
     var data = loadLocalData();
     var resolved = resolveSquadSync(teamId, data);
-    var localTeamVotes = (data.votes || []).filter(function (v) {
-      return v && String(v.teamId) === String(teamId);
-    });
+    var localTeamVotes = votesForTeamFromRecoverable(teamId);
     var merged = mergeVotesLists(localTeamVotes, list);
     if (!resolved.squad.length) return merged;
     var meta = getVoteMeta(resolved.team, round);
@@ -2125,17 +2269,10 @@ async function updateAdminBallotsList(teamId, round) {
   }
   var rk = normalizeRoundLabel(round) || round || "Round 1";
   wrap.innerHTML = "<span class='hint admin-loading'>Loading ballots…</span>";
-  var data = loadLocalData();
-  var localVotes = (data.votes || []).filter(function (v) {
-    return v && String(v.teamId) === String(teamId);
-  });
-  var cloudVotes = [];
-  try {
-    cloudVotes = await fetchCloudVotes(teamId, true);
-  } catch (e) {
-    console.warn("[admin-ballots]", e);
-  }
-  var votes = mergeVotesLists(localVotes, cloudVotes)
+  mergeRecoverableIntoLocal();
+  rehydrateAppVotesFromLocal();
+  var pack = await loadAllVotesForTeam(teamId, { forceCloud: true });
+  var votes = pack.votes
     .filter(function (v) {
       return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === rk;
     })
@@ -2144,9 +2281,13 @@ async function updateAdminBallotsList(teamId, round) {
     });
 
   if (!votes.length) {
-    wrap.innerHTML = '<p class="empty-state" style="margin:0">No ballots yet for ' + escapeHtml(rk) + ".</p>";
+    var audit = auditVoteSources(teamId);
+    showVotesEmptyWarning(teamId, rk, audit, pack.cloudErr);
+    wrap.innerHTML =
+      '<p class="empty-state" style="margin:0">No ballots yet for ' + escapeHtml(rk) + ".</p>";
     return;
   }
+  ensureVoteRestoreHint(null);
 
   var html =
     "<p class='hint' style='margin:0 0 0.45rem'>" +
@@ -2468,21 +2609,22 @@ async function updateWhoHasntVoted(skipExclRender) {
   }
 
   var meta = getVoteMeta(team, round);
-  var localVotes = (data.votes || []).filter(function (v) {
-    return v && String(v.teamId) === String(teamId);
-  });
-  var cloudVotes = [];
-  var cloudErr = "";
-  try {
-    cloudVotes = await fetchCloudVotes(teamId, isSuperAdminUnlocked());
-  } catch (e) {
-    cloudErr = e.message || String(e);
-    console.warn("[who-hasnt-voted]", e);
-  }
-  var votes = mergeVotesLists(localVotes, cloudVotes);
+  mergeRecoverableIntoLocal();
+  rehydrateAppVotesFromLocal();
+  var pack = await loadAllVotesForTeam(teamId, { forceCloud: isSuperAdminUnlocked() });
+  var votes = pack.votes;
+  var cloudErr = pack.cloudErr;
   var matched = computeParticipation(squad, votes, teamId, round, meta);
   syncVotesReceivedCount(matched.ballotCount);
   renderDuplicateBallotsWarning(matched.duplicates || []);
+
+  if (!matched.ballotCount) {
+    showVotesEmptyWarning(teamId, round, auditVoteSources(teamId), cloudErr);
+  } else {
+    var statusHint = document.getElementById("whoVoteStatusHint");
+    if (statusHint) statusHint.style.color = "";
+    ensureVoteRestoreHint(null);
+  }
 
   if (votedEl) {
     if (matched.votedSquad.length) {
@@ -2580,6 +2722,8 @@ function wireWhoHasntVoted() {
     window.addEventListener("sv-ballot-pick-migration-done", ensureBallotPickMigrationHint);
     window.addEventListener("sv-ballot-doc-migration-done", ensureBallotDocMigrationHint);
   }
+  mergeRecoverableIntoLocal();
+  rehydrateAppVotesFromLocal();
   updateWhoHasntVoted();
   debouncedUpdateAdminBallots();
   ensureBallotPickMigrationHint();
@@ -2975,16 +3119,8 @@ async function updateParticipationCounter() {
   textEl.textContent = "Loading participation…";
   el.classList.add("is-visible");
 
-  var localVotes = (data.votes || []).filter(function (v) {
-    return v && String(v.teamId) === String(teamId);
-  });
-  var cloudVotes = [];
-  try {
-    cloudVotes = await fetchCloudVotes(teamId, false);
-  } catch (e) {
-    console.warn("[participation]", e);
-  }
-  var votes = mergeVotesLists(localVotes, cloudVotes);
+  var pack = await loadAllVotesForTeam(teamId, { forceCloud: false });
+  var votes = pack.votes;
   var matched = computeParticipation(squad, votes, teamId, round, meta);
   var voted = matched.votedSquad.length;
   var total = matched.eligibleCount;
