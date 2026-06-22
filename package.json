@@ -17,6 +17,7 @@
     "sync:squadi": "node tools/squadi-sync.mjs --config squadi-config.json --dry-run",
     "sync:squadi:write": "node tools/squadi-sync.mjs --config squadi-config.json --write",
     "restore:votes": "node tools/restore-votes-from-git.mjs --write-seed",
+    "import:votes-csv": "node tools/import-votes-csv.mjs",
     "build": "node tools/build-app.mjs",
     "bump": "node tools/bump-version.js"
   },

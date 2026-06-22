@@ -1,7 +1,7 @@
 /**
  * Location search — curated WA grounds + Open-Meteo, Nominatim, Photon (all free).
  */
-import { searchCuratedGrounds } from "./wa-grounds-data.js?tag=v180";
+import { searchCuratedGrounds } from "./wa-grounds-data.js?tag=v181";
 
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";

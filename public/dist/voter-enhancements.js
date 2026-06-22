@@ -27,7 +27,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v180";
+} from "./name-match.js?tag=v181";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -45,7 +45,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v180";
+  return "v181";
 }
 
 function distImport(path) {
@@ -664,7 +664,7 @@ function wireImportVotesButton() {
     input = document.createElement("input");
     input.type = "file";
     input.id = "importSeasonArchiveFile";
-    input.accept = "application/json,.json";
+    input.accept = "application/json,.json,text/csv,.csv";
     input.hidden = true;
     document.body.appendChild(input);
   }
@@ -681,9 +681,18 @@ function wireImportVotesButton() {
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function () {
-      importVotesFromArchive(JSON.parse(String(reader.result || "{}")), {
-        source: "file:" + file.name,
-      })
+      var text = String(reader.result || "");
+      var name = String(file.name || "");
+      var loadArchive = name.toLowerCase().endsWith(".csv")
+        ? import("./import-votes-csv.js?tag=" + encodeURIComponent(assetTag()))
+            .then(function (mod) {
+              return mod.csvTextToArchive(text, { source: "file:" + name });
+            })
+        : Promise.resolve(JSON.parse(text));
+      loadArchive
+        .then(function (archive) {
+          return importVotesFromArchive(archive, { source: "file:" + name });
+        })
         .then(function (rep) {
           ensureVoteRestoreHint(rep);
           window.alert(
