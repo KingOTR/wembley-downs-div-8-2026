@@ -259,4 +259,33 @@ if (jfWho.votedSquad.indexOf("Johanna") === -1) {
   throw new Error("Johanna Frolinghaus ballot should count in who-voted for Johanna");
 }
 
+// Guard: admin alias must not override a real squad member ballot (prevents hiding votes).
+var johannaOverride = matchSquadToVoters(div8Squad, [
+  { id: "jf2", teamId: 1, round: "Round 9", voterName: "Johanna" },
+], 1, "Round 9", voteRoundLabel, undefined, {
+  aliases: { [normalizeName("Johanna")]: "Jay" },
+});
+if (johannaOverride.votedSquad.indexOf("Johanna") === -1 || johannaOverride.votedSquad.indexOf("Jay") !== -1) {
+  throw new Error("Johanna ballot must remain Johanna even with alias override");
+}
+
+// Guard: alias targets must exist on squad (no mapping to non-roster nicknames).
+var ulrikaOnly = ["Ulrika Delarve"];
+var ulrikaClass = classifyBallotNameMatch("Ulrika", ulrikaOnly);
+if (ulrikaClass.nameMatchStatus === "unmatched" || ulrikaClass.tallyExcluded) {
+  throw new Error("Ulrika should match squad Ulrika Delarve even if NAME_ALIASES has ulrika->Uli");
+}
+if (ulrikaClass.matchedPlayer !== "Ulrika Delarve") {
+  throw new Error("Ulrika should match Ulrika Delarve, got " + ulrikaClass.matchedPlayer);
+}
+
+// Guard: ambiguous admin alias target must not auto-map (needs disambiguator).
+var ambigSarah = ["Sarah (tall)", "Sarah Goalkeeper"];
+var ambigClass = classifyBallotNameMatch("Unknown", ambigSarah, {
+  aliases: { [normalizeName("Unknown")]: "Sarah" },
+});
+if (ambigClass.nameMatchStatus !== "unmatched" || !ambigClass.tallyExcluded) {
+  throw new Error("ambiguous alias target Sarah must not auto-map; should remain unmatched");
+}
+
 console.log("name-match smoke test OK");

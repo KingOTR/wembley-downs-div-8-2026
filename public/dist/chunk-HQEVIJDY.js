@@ -1,2 +1,2 @@
 /** Dynamic import target for app.min.js public lineup tab. */
-export { renderLineupTab } from "./lineup-fotmob.js?tag=v188";
+export { renderLineupTab } from "./lineup-fotmob.js?tag=v189";

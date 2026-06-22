@@ -92,18 +92,59 @@ export const NAME_ALIASES = {
   ulrika: "Uli",
 };
 
-/** Resolve alias → canonical display name (unchanged if no alias). */
-export function canonicalPlayerName(name) {
+function normalizeNameNoAliases(c) {
+  return stripNameQualifiers(c).toLowerCase();
+}
+
+function rosterExactNameHit(name, squad) {
+  var raw = displayPlayerName(name);
+  if (!raw || !squad || !squad.length) return null;
+  var rawLower = raw.toLowerCase();
+  for (var i = 0; i < squad.length; i++) {
+    var p = displayPlayerName(squad[i]);
+    if (!p) continue;
+    if (p.toLowerCase() === rawLower) return p;
+  }
+  var key = normalizeNameNoAliases(raw);
+  for (var j = 0; j < squad.length; j++) {
+    var q = displayPlayerName(squad[j]);
+    if (!q) continue;
+    if (normalizeNameNoAliases(q) === key) return q;
+  }
+  return null;
+}
+
+function resolveSafeGlobalAliasTarget(name, squad) {
+  var raw = displayPlayerName(name);
+  if (!raw) return null;
+  if (!squad || !squad.length) return null;
+  if (rosterExactNameHit(raw, squad)) return null;
+  var key = normalizeNameNoAliases(raw);
+  var target = NAME_ALIASES[key];
+  if (!target) return null;
+  var targetKey = normalizeNameNoAliases(target);
+  var hits = [];
+  for (var i = 0; i < squad.length; i++) {
+    var p = displayPlayerName(squad[i]);
+    if (!p) continue;
+    if (normalizeNameNoAliases(p) === targetKey || p.toLowerCase() === String(target).toLowerCase()) {
+      hits.push(p);
+    }
+  }
+  if (hits.length === 1) return hits[0];
+  return null;
+}
+
+/** Resolve global alias → canonical display name, but only when safe for the current squad. */
+export function canonicalPlayerName(name, squad) {
   var base = displayPlayerName(name);
   if (!base) return "";
-  var key = stripNameQualifiers(base).toLowerCase();
-  return NAME_ALIASES[key] || base;
+  var safe = resolveSafeGlobalAliasTarget(base, squad);
+  return safe || base;
 }
 
 export function normalizeName(c) {
-  var stripped = stripNameQualifiers(c).toLowerCase();
-  if (NAME_ALIASES[stripped]) return NAME_ALIASES[stripped].toLowerCase();
-  return stripped;
+  return normalizeNameNoAliases(c);
 }
 
 export function nameParts(name) {
@@ -441,6 +482,70 @@ export function resolveBallotAlias(voterName, aliases) {
   return { ballot: vn, matchAs: vn, aliased: false };
 }
 
+function resolveSafeAdminAliasTarget(ballotName, aliases, squad) {
+  if (!aliases || !squad || !squad.length) return null;
+  var raw = displayPlayerName(ballotName);
+  if (!raw) return null;
+  // Never allow admin alias to override a real squad member ballot.
+  if (rosterExactNameHit(raw, squad)) return null;
+  var alias = resolveBallotAlias(raw, aliases);
+  if (!alias.aliased || !alias.matchAs || alias.matchAs === raw) return null;
+  // Only accept alias targets that resolve uniquely to a squad member.
+  var m = findSquadMatch(alias.matchAs, squad, STRICT_SQUAD_THRESHOLD);
+  if (!m || !m.match) return null;
+  return displayPlayerName(m.match);
+}
+
+function matchBallotToSquad(ballotName, squad, threshold, aliases) {
+  var th = threshold == null ? DEFAULT_SQUAD_THRESHOLD : threshold;
+  var raw = displayPlayerName(ballotName);
+  if (!raw) return null;
+
+  var direct = findSquadMatch(raw, squad, th);
+  if (direct && direct.match) {
+    return {
+      match: direct.match,
+      exact: direct.exact,
+      similarity: direct.similarity,
+      reason: direct.reason,
+      aliased: false,
+      ballot: raw,
+    };
+  }
+
+  var safeAdmin = resolveSafeAdminAliasTarget(raw, aliases, squad);
+  if (safeAdmin) {
+    var adminMatch = findSquadMatch(safeAdmin, squad, STRICT_SQUAD_THRESHOLD);
+    if (adminMatch && adminMatch.match) {
+      return {
+        match: adminMatch.match,
+        exact: adminMatch.exact,
+        similarity: adminMatch.similarity,
+        reason: "admin alias",
+        aliased: true,
+        ballot: raw,
+      };
+    }
+  }
+
+  var safeGlobal = canonicalPlayerName(raw, squad);
+  if (safeGlobal && safeGlobal !== raw) {
+    var globalMatch = findSquadMatch(safeGlobal, squad, th);
+    if (globalMatch && globalMatch.match) {
+      return {
+        match: globalMatch.match,
+        exact: globalMatch.exact,
+        similarity: globalMatch.similarity,
+        reason: "global alias",
+        aliased: true,
+        ballot: raw,
+      };
+    }
+  }
+
+  return null;
+}
+
 /**
  * If voter name matches a configured coach (coach1Name → slot 1, coach2Name → slot 2).
  * Chris / Will convention: coach1=Will slot 1, coach2=Chris slot 2 when set in config.
@@ -499,10 +604,8 @@ export function classifyBallotNameMatch(voterName, squad, opts) {
       reason: "empty name",
     };
   }
-  var alias = resolveBallotAlias(raw, aliases);
-  var match = findSquadMatch(alias.matchAs, squad, th);
-  if (!match && alias.matchAs !== raw) match = findSquadMatch(raw, squad, th);
-  if (!match) {
+  var hit = matchBallotToSquad(raw, squad, th, aliases);
+  if (!hit) {
     return {
       nameMatchStatus: "unmatched",
       tallyExcluded: true,
@@ -512,11 +615,11 @@ export function classifyBallotNameMatch(voterName, squad, opts) {
     };
   }
   return {
-    nameMatchStatus: match.exact && !alias.aliased ? "matched" : "fuzzy",
+    nameMatchStatus: hit.exact && !hit.aliased ? "matched" : "fuzzy",
     tallyExcluded: false,
     adminApproved: false,
-    matchedPlayer: displayPlayerName(match.match),
-    reason: match.reason,
+    matchedPlayer: displayPlayerName(hit.match),
+    reason: hit.reason,
   };
 }
 
@@ -540,19 +643,17 @@ function ballotMatchesPlayer(v, player, aliases, th) {
   var raw = displayPlayerName(v.voterName || "");
   if (!raw) return null;
   if (!disambigTagsCompatible(raw, player)) return null;
-  var alias = resolveBallotAlias(raw, aliases);
-  var m = findSquadMatch(alias.matchAs, [player], th);
-  if (!m && alias.matchAs !== raw) m = findSquadMatch(raw, [player], th);
-  if (!m) return null;
+  var hit = matchBallotToSquad(raw, [player], th, aliases);
+  if (!hit) return null;
   return {
     ballot: raw,
     squadName: displayPlayerName(player),
     voterNameKey: v.voterNameKey || "",
     submittedAt: v.submittedAt || "",
     id: v.id || "",
-    exact: m.exact && !alias.aliased,
-    similarity: m.similarity,
-    aliased: alias.aliased,
+    exact: hit.exact && !hit.aliased,
+    similarity: hit.similarity,
+    aliased: hit.aliased,
   };
 }
 
@@ -721,17 +822,15 @@ export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLa
     if (usedBallots[bk]) return;
     var raw = displayPlayerName(v.voterName || "");
     if (!raw) return;
-    var alias = resolveBallotAlias(raw, aliases);
-    var onSquad = findSquadMatch(alias.matchAs, eligible, th);
-    if (!onSquad && alias.matchAs !== raw) onSquad = findSquadMatch(raw, squad, th);
-    if (onSquad) {
+    var onSquad = matchBallotToSquad(raw, eligible, th, aliases) || matchBallotToSquad(raw, squad, th, aliases);
+    if (onSquad && onSquad.match) {
       usedBallots[bk] = true;
       var squadName = displayPlayerName(onSquad.match);
       if (votedSquad.indexOf(squadName) === -1) {
         votedSquad.push(squadName);
         voted.push(squadName);
       }
-      if (!onSquad.exact || alias.aliased) possible.push(raw + " → " + squadName);
+      if (!onSquad.exact || onSquad.aliased) possible.push(raw + " → " + squadName);
     } else {
       extraVoters.push(raw);
       extraDetails.push({
@@ -766,12 +865,20 @@ var BALLOT_SLOT_POINTS = [3, 2, 1];
 function resolveBallotPickCanonical(name, squad) {
   var display = displayPlayerName(name);
   if (!display) return "";
-  var canonical = canonicalPlayerName(display);
   if (squad && squad.length) {
-    var hit = findSquadMatch(canonical, squad, STRICT_SQUAD_THRESHOLD);
-    if (hit && hit.match) canonical = canonicalPlayerName(displayPlayerName(hit.match));
+    var exact = squad.find(function (p) {
+      return displayPlayerName(p).toLowerCase() === display.toLowerCase();
+    });
+    if (exact) return displayPlayerName(exact);
+    var hit = findSquadMatch(display, squad, STRICT_SQUAD_THRESHOLD);
+    if (hit && hit.match) return displayPlayerName(hit.match);
+    var aliased = canonicalPlayerName(display, squad);
+    if (aliased && aliased !== display) {
+      var aHit = findSquadMatch(aliased, squad, STRICT_SQUAD_THRESHOLD);
+      if (aHit && aHit.match) return displayPlayerName(aHit.match);
+    }
   }
-  return canonical || display;
+  return display;
 }
 
 /** Canonical key for duplicate-pick detection on one ballot. */
