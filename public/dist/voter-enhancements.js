@@ -14,6 +14,7 @@ import {
   dedupeVotesOnePerSquad,
   dedupeBallotDocsOnePerVoter,
   dedupeCoachVotesOnePerSlot,
+  isCoachTallySlot,
   planBallotDocDedupeMigration,
   resolveCoachSlotForVoterName,
   voterNameKey,
@@ -27,7 +28,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v185";
+} from "./name-match.js?tag=v186";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -45,7 +46,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v185";
+  return "v186";
 }
 
 function distImport(path) {
@@ -1929,9 +1930,16 @@ window.__svResolveCoachSlot = function (voterName, teamId) {
   }
 };
 
+window.__svValidateCoachBallotSlot = function (slot) {
+  if (!isCoachTallySlot(slot)) {
+    throw new Error("Only two coach ballots per round (slots 1 and 2 — Will and Chris).");
+  }
+};
+
 window.__svSubmitCoachVoteFromPlayerUI = async function (opts) {
   var teamId = opts.teamId;
   var slot = parseInt(opts.slot, 10);
+  window.__svValidateCoachBallotSlot(slot);
   var uiRound = normalizeRoundLabel(opts.round) || opts.round || "Round 1";
   // Coach ballots must always route to the latest round with a result.
   // This prevents UI round-selector drift from saving into an older round.
@@ -2825,6 +2833,289 @@ window.__svRenderAdminBallots = function (teamId, round, opts) {
     console.warn("[admin-ballots]", e);
   });
 };
+
+async function loadAllCoachVotesForTeam(teamId, opts) {
+  var forceCloud = opts && opts.forceCloud;
+  mergeRecoverableIntoLocal();
+  var data = loadLocalData();
+  var local = (data.coachVotes || []).filter(function (v) {
+    return v && String(v.teamId) === String(teamId);
+  });
+  var cloud = [];
+  var cloudErr = "";
+  try {
+    cloud = await fetchCloudCoachVotes(
+      teamId,
+      forceCloud != null ? forceCloud : isSuperAdminUnlocked()
+    );
+  } catch (e) {
+    cloudErr = e.message || String(e);
+  }
+  return {
+    coachVotes: mergeCoachVotesLists(local, cloud),
+    cloudErr: cloudErr,
+    localCount: local.length,
+    cloudCount: cloud.length,
+  };
+}
+
+function removeLocalCoachBallotById(docId) {
+  if (!docId) return false;
+  var data = loadLocalData();
+  var before = (data.coachVotes || []).length;
+  data.coachVotes = (data.coachVotes || []).filter(function (v) {
+    return !v || v.id !== docId;
+  });
+  if (data.coachVotes.length === before) return false;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn("[coach-ballot-delete-local]", e);
+  }
+  return true;
+}
+
+function syncCoachBallotRemovedFromApp(docId) {
+  try {
+    if (typeof window.__svRemoveCoachVoteById === "function") {
+      window.__svRemoveCoachVoteById(docId);
+      return;
+    }
+  } catch (e) {
+    console.warn("[coach-ballot-delete-app]", e);
+  }
+  triggerResultsRefresh();
+}
+
+async function deleteCoachBallot(ballot) {
+  if (!ballot || !ballot.id) throw new Error("Missing ballot id");
+  if (!isSuperAdminUnlocked()) throw new Error("Super admin unlock required.");
+  var docId = ballot.id;
+  if (window.__svFirebaseApp && projectId() && navigator.onLine && isSuperAdminUnlocked()) {
+    await deleteFirestoreDoc("coachVotes", docId);
+  }
+  removeLocalCoachBallotById(docId);
+  if (cloudCoachVotesCache[String(ballot.teamId)]) {
+    cloudCoachVotesCache[String(ballot.teamId)].votes = (
+      cloudCoachVotesCache[String(ballot.teamId)].votes || []
+    ).filter(function (v) {
+      return !v || v.id !== docId;
+    });
+  }
+  syncCoachBallotRemovedFromApp(docId);
+  try {
+    window.dispatchEvent(new CustomEvent("sv-coach-vote-deleted", { detail: { id: docId } }));
+  } catch (e) {}
+}
+
+function coachSlotAdminLabel(teamId, slot) {
+  var names = getTeamCoachNames(teamId);
+  var s = parseInt(slot, 10);
+  if (s === 1) return names.coach1 + " (slot 1)";
+  if (s === 2) return names.coach2 + " (slot 2)";
+  return "Slot " + (slot != null ? slot : "?");
+}
+
+function coachBallotTallyStatus(ballot, deduped) {
+  if (!isCoachTallySlot(ballot.slot)) {
+    return { text: "Invalid slot (only 1–2 count)", color: "#b91c1c" };
+  }
+  var countedIds = Object.create(null);
+  (deduped.votesForTally || []).forEach(function (v) {
+    if (v && v.id) countedIds[v.id] = true;
+  });
+  if (countedIds[ballot.id]) {
+    return { text: "Counted in tally", color: "#15803d" };
+  }
+  return { text: "Duplicate (excluded)", color: "#a16207" };
+}
+
+function formatCoachPicksLine(picks) {
+  return (picks || [])
+    .map(function (p, i) {
+      return i + 1 + ". " + displayPlayerName(p) + " (" + [3, 2, 1][i] + " pts)";
+    })
+    .join(" · ");
+}
+
+var adminCoachBallotsSeq = 0;
+var adminCoachBallotsLoadedKey = "";
+
+function coachBallotsPanelOpen() {
+  var wrap = document.getElementById("coachResultsHistoryWrap");
+  if (!wrap) return false;
+  var details = wrap.closest("details");
+  return !!(details && details.open);
+}
+
+async function updateAdminCoachBallotsList(teamId, round, opts) {
+  var wrap = document.getElementById("coachResultsHistoryWrap");
+  if (!wrap) return;
+  if (!isSuperAdminUnlocked()) {
+    wrap.innerHTML =
+      '<p class="hint" style="margin:0">Unlock super admin to view and delete coach ballots.</p>';
+    adminCoachBallotsLoadedKey = "";
+    return;
+  }
+  var rk = normalizeRoundLabel(round) || round || "Round 1";
+  var reqKey = String(teamId) + "|" + rk;
+  var seq = ++adminCoachBallotsSeq;
+  var showLoading = !opts || opts.showLoading !== false;
+  if (showLoading && adminCoachBallotsLoadedKey !== reqKey) {
+    wrap.innerHTML = "<span class='hint admin-loading' style='margin:0'>Loading coach ballots…</span>";
+  }
+  mergeRecoverableIntoLocal();
+  rehydrateAppVotesFromLocal();
+  var pack = await loadAllCoachVotesForTeam(teamId, { forceCloud: true });
+  if (seq !== adminCoachBallotsSeq) return;
+  var roundVotes = pack.coachVotes
+    .filter(function (v) {
+      return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === rk;
+    })
+    .sort(function (a, b) {
+      var sa = parseInt(a.slot, 10) || 99;
+      var sb = parseInt(b.slot, 10) || 99;
+      if (sa !== sb) return sa - sb;
+      return String(b.submittedAt || "").localeCompare(String(a.submittedAt || ""));
+    });
+  var deduped = dedupeCoachVotesOnePerSlot(pack.coachVotes, teamId, rk, voteRoundLabel);
+
+  if (!roundVotes.length) {
+    wrap.innerHTML =
+      '<p class="empty-state" style="margin:0">No coach ballots for ' +
+      escapeHtml(rk) +
+      (pack.cloudErr ? " (cloud: " + escapeHtml(pack.cloudErr) + ")" : "") +
+      ".</p>";
+    adminCoachBallotsLoadedKey = reqKey;
+    return;
+  }
+
+  var counted = deduped.countedBallots || 0;
+  var html =
+    "<p class='hint' style='margin:0 0 0.45rem'>" +
+    roundVotes.length +
+    " ballot doc(s); <strong>" +
+    counted +
+    "</strong> count toward coach total (max 2: slots 1 &amp; 2).</p>" +
+    "<div style='display:flex;flex-direction:column;gap:0.45rem'>";
+  roundVotes.forEach(function (v) {
+    var status = coachBallotTallyStatus(v, deduped);
+    var when = formatBallotWhen(v.submittedAt);
+    var picksLine = formatCoachPicksLine(v.picks);
+    html +=
+      "<div class='admin-ballot-row' style='border:1px solid var(--border);border-radius:10px;padding:0.6rem 0.7rem;background:#fff'>" +
+      "<div style='display:flex;justify-content:space-between;gap:0.6rem;align-items:baseline;flex-wrap:wrap'>" +
+      "<div style='font-weight:700;font-size:0.92rem'>" +
+      escapeHtml(coachSlotAdminLabel(teamId, v.slot)) +
+      "</div>" +
+      "<span style='font-size:0.78rem;color:" +
+      status.color +
+      ";font-weight:700'>" +
+      escapeHtml(status.text) +
+      "</span></div>" +
+      "<div style='margin-top:0.2rem;font-size:0.82rem;color:#52525b'>" +
+      escapeHtml(when) +
+      (v.id ? " · id " + escapeHtml(String(v.id)) : "") +
+      "</div>" +
+      "<div style='margin-top:0.3rem;font-size:0.82rem;color:#3f3f46'>" +
+      escapeHtml(picksLine) +
+      "</div>" +
+      "<button type='button' class='ghost' data-coach-ballot-delete='" +
+      escapeHtml(v.id || "") +
+      "' style='margin-top:0.45rem;font-size:0.82rem'>Delete ballot</button>" +
+      "</div>";
+  });
+  html += "</div>";
+  wrap.innerHTML = html;
+  adminCoachBallotsLoadedKey = reqKey;
+  wrap.querySelectorAll("[data-coach-ballot-delete]").forEach(function (btn) {
+    if (btn._svCoachDelWire) return;
+    btn._svCoachDelWire = true;
+    btn.addEventListener("click", function () {
+      var id = btn.getAttribute("data-coach-ballot-delete");
+      var ballot = roundVotes.find(function (x) {
+        return x && x.id === id;
+      });
+      if (!ballot) return;
+      var label = coachSlotAdminLabel(teamId, ballot.slot);
+      if (
+        !window.confirm(
+          "Delete coach ballot for " + label + " — " + rk + "?\n\nThis removes it from this device and Firestore."
+        )
+      ) {
+        return;
+      }
+      btn.disabled = true;
+      deleteCoachBallot(ballot)
+        .then(function () {
+          adminCoachBallotsLoadedKey = "";
+          return updateAdminCoachBallotsList(teamId, rk, { showLoading: false });
+        })
+        .catch(function (e) {
+          window.alert("Could not delete coach ballot: " + (e.message || e));
+        })
+        .finally(function () {
+          btn.disabled = false;
+        });
+    });
+  });
+}
+
+window.__svRenderCoachBallots = function (teamId, round, opts) {
+  var tid = parseInt(teamId, 10) || 1;
+  var rk = normalizeRoundLabel(round) || round || "Round 1";
+  updateAdminCoachBallotsList(tid, rk, opts).catch(function (e) {
+    console.warn("[admin-coach-ballots]", e);
+  });
+};
+
+function wireCoachBallotsDetailsPanel() {
+  var wrap = document.getElementById("coachResultsHistoryWrap");
+  if (!wrap || wrap._svCoachDetailsWire) return;
+  var details = wrap.closest("details");
+  if (!details) return;
+  wrap._svCoachDetailsWire = true;
+  details.addEventListener("toggle", function () {
+    if (!details.open) return;
+    var teamSel = document.getElementById("resultsTeamSelect");
+    var roundSel = document.getElementById("coachResultsRoundSelect");
+    if (!teamSel || !roundSel) return;
+    adminCoachBallotsLoadedKey = "";
+    window.__svRenderCoachBallots(
+      parseInt(teamSel.value, 10) || 1,
+      normalizeRoundLabel(roundSel.value) || roundSel.value || "Round 1",
+      { showLoading: true }
+    );
+  });
+  var teamSel = document.getElementById("resultsTeamSelect");
+  var roundSel = document.getElementById("coachResultsRoundSelect");
+  if (teamSel && !teamSel._svCoachBallotsWire) {
+    teamSel._svCoachBallotsWire = true;
+    teamSel.addEventListener("change", function () {
+      if (!coachBallotsPanelOpen()) return;
+      adminCoachBallotsLoadedKey = "";
+      window.__svRenderCoachBallots(
+        parseInt(teamSel.value, 10) || 1,
+        roundSel
+          ? normalizeRoundLabel(roundSel.value) || roundSel.value || "Round 1"
+          : "Round 1",
+        { showLoading: true }
+      );
+    });
+  }
+  if (roundSel && !roundSel._svCoachBallotsWire) {
+    roundSel._svCoachBallotsWire = true;
+    roundSel.addEventListener("change", function () {
+      if (!coachBallotsPanelOpen()) return;
+      adminCoachBallotsLoadedKey = "";
+      window.__svRenderCoachBallots(
+        teamSel ? parseInt(teamSel.value, 10) || 1 : 1,
+        normalizeRoundLabel(roundSel.value) || roundSel.value || "Round 1",
+        { showLoading: true }
+      );
+    });
+  }
+}
 
 function wireBallotsDetailsPanel() {
   var wrap = document.getElementById("resultsBallotsWrap");
@@ -4040,6 +4331,7 @@ function wireAdminSectionTabs() {
         ensureWhoHasntVotedBlock();
         updateWhoHasntVoted();
         wireBallotsDetailsPanel();
+        wireCoachBallotsDetailsPanel();
         if (ballotsPanelOpen()) debouncedUpdateAdminBallots({ showLoading: true });
       } catch (e) {
         console.warn("[who-vote]", e);
@@ -4469,6 +4761,7 @@ var adminObs = new MutationObserver(function () {
     ensureLineupSharePackButton();
     wireSquadBadges();
     wireAdminSectionTabs();
+    wireCoachBallotsDetailsPanel();
     wireLocationOnRoundChange();
     wirePublishedRoundControls();
     wireImportVotesButton();

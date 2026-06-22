@@ -350,8 +350,28 @@ var threeCoachSlots = [
   },
 ];
 var coachPts = simulateUoCoach(threeCoachSlots, dedupeCoachForTally);
-if (coachPts.Alice !== 4 || coachPts.Bob !== 5 || coachPts.Carol !== 6 || coachPts.Dave !== 3) {
-  throw new Error("three coach slots should all tally, got " + JSON.stringify(coachPts));
+if (coachPts.Alice !== 3 || coachPts.Bob !== 5 || coachPts.Carol !== 3 || coachPts.Dave !== 1) {
+  throw new Error("only coach slots 1–2 should tally (slot 3 excluded), got " + JSON.stringify(coachPts));
+}
+if (coachDeduped.countedBallots > 2) {
+  throw new Error("coach dedupe countedBallots must be <= 2, got " + coachDeduped.countedBallots);
+}
+var slot3Only = [
+  {
+    id: "c1_rround-9_s3",
+    teamId: 1,
+    slot: 3,
+    round: "Round 9",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    picks: ["Carol", "Dave", "Alice"],
+  },
+];
+var slot3Deduped = dedupeCoachVotesOnePerSlot(slot3Only, 1, "Round 9", voteRoundLabel);
+if (slot3Deduped.votesForTally.length !== 0) {
+  throw new Error("slot 3 coach ballot must not count in tally");
+}
+if (!slot3Deduped.invalidSlots || slot3Deduped.invalidSlots.length !== 1) {
+  throw new Error("slot 3 should be reported as invalidSlots");
 }
 
 function dedupePlayerHookOnCoach(teamId, round, coachVotes) {

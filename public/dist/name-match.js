@@ -1027,7 +1027,13 @@ export function findDuplicateCoachVoteDocsPerSlot(votes, roundLabelFn) {
   return duplicates;
 }
 
-/** One coach ballot per slot for tally. Latest submittedAt wins. */
+/** Coach tally accepts exactly two slots (Will → 1, Chris → 2). */
+export function isCoachTallySlot(slot) {
+  var s = parseInt(slot, 10);
+  return s === 1 || s === 2;
+}
+
+/** One coach ballot per slot for tally. Latest submittedAt wins; slots 3+ never count. */
 export function dedupeCoachVotesOnePerSlot(coachVotes, teamId, roundLabel, roundLabelFn) {
   var roundKey = roundLabelFn({ round: roundLabel });
   var roundVotes = (coachVotes || []).filter(function (v) {
@@ -1040,14 +1046,25 @@ export function dedupeCoachVotesOnePerSlot(coachVotes, teamId, roundLabel, round
       if (x.id) skipIds[x.id] = true;
     });
   });
+  var invalidSlots = [];
   var votesForTally = roundVotes.filter(function (v) {
     if (!v) return false;
     if (v.id && skipIds[v.id]) return false;
+    if (!isCoachTallySlot(v.slot)) {
+      if (v.id) skipIds[v.id] = true;
+      invalidSlots.push({
+        id: v.id,
+        slot: v.slot,
+        reason: "invalid coach slot (only slots 1 and 2 count)",
+      });
+      return false;
+    }
     return true;
   });
   return {
     votesForTally: votesForTally,
     duplicates: duplicates,
+    invalidSlots: invalidSlots,
     ballotCount: roundVotes.length,
     countedBallots: votesForTally.length,
   };
