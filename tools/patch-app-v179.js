@@ -16,6 +16,24 @@ const patches = [
       'function Ua(c,l,h){try{if(typeof window.__svCountVotesForRound=="function"){var _svN=window.__svCountVotesForRound(c,l,h);if(typeof _svN==="number")return _svN}}catch(_svUe){console.warn("[vote-count]",_svUe)}var m=We({round:l}),f=0;return h.forEach(function(_){T(_.teamId)===T(c)&&We(_)===m&&f++}),f}',
     once: true,
   },
+  {
+    name: "Coach vote selectors use SvLatestResultRound",
+    from: 'function MI(){try{if(!ke())return;var c=ue,l=ie(c),h=Xh(c),m=SvDefaultRound(l,h);Vt&&xs(Vt,h,Vt._touched&&Vt.value||m),Ot&&xs(Ot,h,Ot._touched&&Ot.value||m)}catch{}}',
+    to: 'function MI(){try{if(!ke())return;var c=ue,l=ie(c),h=Xh(c),m=SvLatestResultRound(l)||SvDefaultRound(l,h);m&&h.indexOf(m)===-1&&h.unshift(m),Vt&&xs(Vt,h,Vt._touched&&Vt.value||m),Ot&&xs(Ot,h,Ot._touched&&Ot.value||m)}catch{}}',
+    once: true,
+  },
+  {
+    name: "Coach vote selectors use SvLatestResultRound (slot 1/2)",
+    from: 'function BI(){try{if(!bt(le.teamId,le.slot))return;var c=le.teamId,l=ie(c),h=Xh(c),m=SvDefaultRound(l,h);Rt&&xs(Rt,h,Rt._touched&&Rt.value||m)}catch{}}',
+    to: 'function BI(){try{if(!bt(le.teamId,le.slot))return;var c=le.teamId,l=ie(c),h=Xh(c),m=SvLatestResultRound(l)||SvDefaultRound(l,h);m&&h.indexOf(m)===-1&&h.unshift(m),Rt&&xs(Rt,h,Rt._touched&&Rt.value||m)}catch{}}',
+    once: true,
+  },
+  {
+    name: "Coach results default uses SvLatestResultRound",
+    from: 'function FI(c){var l=c??ue,h=ie(l),m=h.round||"Round 1",f=Fa(l,U.coachVotes,m),_=SvDefaultRound(h,f),E=vt?String(vt.value||""):"";return pi&&E&&f.map(String).indexOf(E)!==-1?E:_}',
+    to: 'function FI(c){var l=c??ue,h=ie(l),m=h.round||"Round 1",f=Fa(l,U.coachVotes,m),_=SvLatestResultRound(h)||SvDefaultRound(h,f),E=vt?String(vt.value||""):"";return _&&f.indexOf(_)===-1&&f.unshift(_),pi&&E&&f.map(String).indexOf(E)!==-1?E:_}',
+    once: true,
+  },
 ];
 
 function replaceOnce(str, from, to) {

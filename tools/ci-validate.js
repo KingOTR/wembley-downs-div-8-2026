@@ -118,5 +118,19 @@ try {
   failed = true;
 }
 
+// Focused logic tests (pure extraction + in-memory plan/apply checks).
+try {
+  const tests = [
+    path.join(root, "tools", "test-latest-result-round.mjs"),
+    path.join(root, "tools", "test-coach-votes-reschedule-mapping.mjs"),
+  ];
+  tests.forEach(function (t) {
+    execFileSync(process.execPath, [t], { stdio: "inherit" });
+  });
+} catch (e) {
+  console.error("Logic tests failed:", e.message || e);
+  failed = true;
+}
+
 if (failed) process.exit(1);
 console.log("CI validate OK");

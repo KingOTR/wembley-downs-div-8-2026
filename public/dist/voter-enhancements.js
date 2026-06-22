@@ -27,7 +27,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v184";
+} from "./name-match.js?tag=v185";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -45,7 +45,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v184";
+  return "v185";
 }
 
 function distImport(path) {
@@ -87,6 +87,158 @@ function voteRoundLabel(vote) {
   var l = vote && vote.round;
   if (l == null || l === "") return "Round 1";
   return normalizeRoundLabel(l) || "Round 1";
+}
+
+function svParseRoundNumberFromLabel(roundLabel) {
+  var l = String(roundLabel ?? "").trim();
+  var m = l.match(/^round\s*(\d+(?:\.\d+)?)$/i);
+  if (m) return parseFloat(m[1]);
+  m = l.match(/^(\d+(?:\.\d+)?)$/);
+  return m ? parseFloat(m[1]) : null;
+}
+
+/**
+ * Latest round that has a result (ourScore or oppScore present).
+ * Returns null if no round has a saved result yet.
+ */
+function SvLatestResultRoundFromMatches(matchesByRound) {
+  var mbr = matchesByRound || {};
+  var best = null;
+  var bestN = -1 / 0;
+  Object.keys(mbr).forEach(function (k) {
+    var m = mbr[k];
+    if (!m) return;
+    var has = m.ourScore != null || m.oppScore != null;
+    if (!has) return;
+    var n = svParseRoundNumberFromLabel(k);
+    if (n == null) return;
+    if (n > bestN) {
+      bestN = n;
+      best = normalizeRoundLabel(k) || k;
+    }
+  });
+  return best;
+}
+
+function SvLatestResultRoundForTeamId(teamId) {
+  try {
+    var data = loadLocalData();
+    var team = getTeamFromData(data, teamId);
+    if (!team || !team.matchesByRound) return null;
+    return SvLatestResultRoundFromMatches(team.matchesByRound);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Plan coach-vote copies to keep them associated with the latest round.
+ * Does not delete old votes.
+ */
+function planCoachVotesRoundCopy(teamId, fromRound, toRound, coachVotes, makeDocId) {
+  var tid = parseInt(teamId, 10);
+  var teamKey = String(teamId);
+  var from = normalizeRoundLabel(fromRound) || fromRound || "Round 1";
+  var to = normalizeRoundLabel(toRound) || toRound || "Round 1";
+  var votes = coachVotes || [];
+  makeDocId = makeDocId || coachVoteDocId;
+
+  var destBySlot = Object.create(null);
+  var srcBySlot = Object.create(null);
+
+  votes.forEach(function (v) {
+    if (!v) return;
+    if (String(v.teamId) !== teamKey) return;
+    var slot = parseInt(v.slot, 10);
+    if (!isFinite(slot)) return;
+    var rk = voteRoundLabel(v);
+
+    if (rk === to) {
+      // Any existing destination vote blocks copying for that slot.
+      destBySlot[slot] = destBySlot[slot] || v;
+    }
+
+    if (rk === from) {
+      // Choose the newest source doc for this slot (submittedAt).
+      var cur = srcBySlot[slot];
+      if (!cur) {
+        srcBySlot[slot] = v;
+      } else {
+        var a = String(v.submittedAt || "");
+        var b = String(cur.submittedAt || "");
+        if (a.localeCompare(b) > 0) srcBySlot[slot] = v;
+      }
+    }
+  });
+
+  var copies = [];
+  Object.keys(srcBySlot).forEach(function (slotStr) {
+    var slot = parseInt(slotStr, 10);
+    if (!isFinite(slot)) return;
+    if (destBySlot[slot]) return;
+    var src = srcBySlot[slot];
+    if (!src) return;
+
+    var payload = {
+      teamId: isFinite(tid) ? tid : src.teamId,
+      slot: slot,
+      round: to,
+      picks: Array.isArray(src.picks) ? src.picks.slice() : [],
+      submittedAt: src.submittedAt || new Date().toISOString(),
+    };
+    var fromDocId = src.id || makeDocId(payload.teamId, from, slot);
+    var toDocId = makeDocId(payload.teamId, to, slot);
+    copies.push({ slot: slot, fromDocId: fromDocId, toDocId: toDocId, payload: payload });
+  });
+
+  return { fromRound: from, toRound: to, copies: copies };
+}
+
+/**
+ * Apply a local coach-vote copy plan.
+ * If opts.deleteOld=true, old round votes for the planned slots are removed.
+ */
+function applyCoachVotesLocalCopyPlan(coachVotes, plan, opts) {
+  var votes = (coachVotes || []).slice();
+  opts = opts || {};
+  var deleteOld = !!opts.deleteOld;
+  if (!plan || !Array.isArray(plan.copies)) return votes;
+
+  var from = plan.fromRound;
+  var to = plan.toRound;
+
+  // Remove any existing duplicates for destination slots.
+  plan.copies.forEach(function (copy) {
+    var slot = copy.slot;
+    var teamId = copy.payload.teamId;
+    votes = votes.filter(function (v) {
+      if (!v) return false;
+      if (String(v.teamId) !== String(teamId)) return true;
+      var rk = voteRoundLabel(v);
+      if (rk !== to) return true;
+      return parseInt(v.slot, 10) !== slot;
+    });
+  });
+
+  if (deleteOld) {
+    plan.copies.forEach(function (copy) {
+      var slot = copy.slot;
+      var teamId = copy.payload.teamId;
+      votes = votes.filter(function (v) {
+        if (!v) return false;
+        if (String(v.teamId) !== String(teamId)) return true;
+        var rk = voteRoundLabel(v);
+        if (rk !== from) return true;
+        return parseInt(v.slot, 10) !== slot;
+      });
+    });
+  }
+
+  plan.copies.forEach(function (copy) {
+    votes.push(Object.assign({}, copy.payload, { id: copy.toDocId }));
+  });
+
+  return votes;
 }
 
 const ADMIN_SESSION_KEY = "soccerVoteAdminUnlock";
@@ -1780,7 +1932,11 @@ window.__svResolveCoachSlot = function (voterName, teamId) {
 window.__svSubmitCoachVoteFromPlayerUI = async function (opts) {
   var teamId = opts.teamId;
   var slot = parseInt(opts.slot, 10);
-  var round = normalizeRoundLabel(opts.round) || opts.round || "Round 1";
+  var uiRound = normalizeRoundLabel(opts.round) || opts.round || "Round 1";
+  // Coach ballots must always route to the latest round with a result.
+  // This prevents UI round-selector drift from saving into an older round.
+  var latestRound = SvLatestResultRoundForTeamId(teamId);
+  var round = latestRound || uiRound;
   var picks = (opts.picks || []).map(function (p) {
     return canonicalPlayerName(p) || displayPlayerName(p);
   });
@@ -3981,6 +4137,262 @@ function wirePublishedRoundControls() {
   });
 }
 
+var coachVotesLatestResultRoundByTeam = Object.create(null);
+var coachVotesRescheduleMappingInflight = Object.create(null);
+
+function ensureCoachVotesRescheduleBanner() {
+  var block = document.getElementById("coachResultsBlock");
+  if (!block) return null;
+  var banner = document.getElementById("coachVotesRescheduleBanner");
+  if (banner) return banner;
+  banner = document.createElement("div");
+  banner.id = "coachVotesRescheduleBanner";
+  banner.className = "subcard";
+  banner.style.cssText =
+    "padding:0.65rem 0.75rem; margin:0.5rem 0; border:1px dashed var(--border);";
+  banner.setAttribute("role", "status");
+  block.insertAdjacentElement("afterbegin", banner);
+  return banner;
+}
+
+function showCoachVotesRescheduleBanner(teamId, fromRound, toRound, slotsCopied) {
+  try {
+    if (!isSuperAdminUnlocked()) return;
+    var banner = ensureCoachVotesRescheduleBanner();
+    if (!banner) return;
+    banner.innerHTML =
+      "<div style='font-weight:900;color:var(--red-dark);margin-bottom:0.25rem'>Rescheduled fixtures</div>" +
+      "<div style='font-size:0.9rem;line-height:1.35'>" +
+      "Coach votes associated with <strong>" +
+      escapeHtml(fromRound) +
+      "</strong> were copied to <strong>" +
+      escapeHtml(toRound) +
+      "</strong> (" +
+      String(slotsCopied) +
+      " slot" +
+      (slotsCopied === 1 ? "" : "s") +
+      ")." +
+      "</div>" +
+      "<div style='margin-top:0.55rem;display:flex;gap:0.6rem;flex-wrap:wrap'>" +
+      "<button type='button' class='ghost' id='moveCoachVotesToNewLatestRoundBtn'>Move (copy+delete old)</button>" +
+      "<button type='button' class='ghost' id='dismissCoachVotesRescheduleBannerBtn'>Dismiss</button>" +
+      "</div>" +
+      "<div class='hint' style='margin-top:0.4rem'>Old-round coach votes were kept; click Move if you want them removed.</div>";
+
+    var moveBtn = document.getElementById("moveCoachVotesToNewLatestRoundBtn");
+    var dismissBtn = document.getElementById("dismissCoachVotesRescheduleBannerBtn");
+    if (moveBtn && !moveBtn._svBound) {
+      moveBtn._svBound = true;
+      moveBtn.addEventListener("click", function () {
+        if (typeof window.__svMoveCoachVotesRound !== "function") return;
+        moveBtn.disabled = true;
+        window.__svMoveCoachVotesRound(teamId, fromRound, toRound)
+          .then(function () {
+            showCoachVotesRescheduleBanner(teamId, fromRound, toRound, slotsCopied);
+          })
+          .catch(function (e) {
+            moveBtn.disabled = false;
+            window.alert("Move failed: " + (e && e.message ? e.message : String(e)));
+          });
+      });
+    }
+    if (dismissBtn && !dismissBtn._svBound) {
+      dismissBtn._svBound = true;
+      dismissBtn.addEventListener("click", function () {
+        banner.style.display = "none";
+      });
+    }
+  } catch (e) {
+    console.warn("[coach-votes-reschedule-banner]", e);
+  }
+}
+
+async function moveCoachVotesRound(teamId, fromRound, toRound, deleteOld) {
+  var tid = parseInt(teamId, 10) || 1;
+  var fromR = normalizeRoundLabel(fromRound) || fromRound || "Round 1";
+  var toR = normalizeRoundLabel(toRound) || toRound || "Round 1";
+
+  // Combine local + cloud so we can:
+  //  - find source payloads
+  //  - avoid overwriting destination docs
+  var localData = loadLocalData();
+  var localVotes = localData.coachVotes || [];
+
+  var cloudVotes = [];
+  try {
+    cloudVotes = await fetchCloudCoachVotes(tid, true);
+  } catch (e) {
+    console.warn("[coach-votes-reschedule move] cloud fetch failed", e);
+  }
+
+  var combined = mergeCoachVotesLists(localVotes, cloudVotes);
+
+  var slotsFrom = Object.create(null);
+  combined.forEach(function (v) {
+    if (!v) return;
+    if (String(v.teamId) !== String(tid)) return;
+    var rk = voteRoundLabel(v);
+    if (rk !== fromR) return;
+    var slot = parseInt(v.slot, 10);
+    if (!isFinite(slot)) return;
+    slotsFrom[slot] = v;
+  });
+
+  var plan = planCoachVotesRoundCopy(tid, fromR, toR, combined);
+
+  // Local: copy missing destination votes first.
+  var nextLocalCoachVotes = applyCoachVotesLocalCopyPlan(localVotes, plan, { deleteOld: false });
+  if (deleteOld) {
+    var slotSet = Object.keys(slotsFrom).map(function (k) {
+      return parseInt(k, 10);
+    });
+    nextLocalCoachVotes = nextLocalCoachVotes.filter(function (v) {
+      if (!v) return false;
+      if (String(v.teamId) !== String(tid)) return true;
+      if (voteRoundLabel(v) !== fromR) return true;
+      return slotSet.indexOf(parseInt(v.slot, 10)) === -1;
+    });
+  }
+
+  localData.coachVotes = nextLocalCoachVotes;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(localData));
+  } catch (e) {
+    console.warn("[coach-votes-reschedule move] local save failed", e);
+  }
+
+  var canWriteCloud = window.__svFirebaseApp && projectId() && navigator.onLine;
+  if (canWriteCloud) {
+    // Cloud: copy missing destination votes.
+    for (var i = 0; i < plan.copies.length; i++) {
+      var copy = plan.copies[i];
+      try {
+        await submitCoachVoteRest(copy.toDocId, copy.payload);
+      } catch (e) {
+        console.warn("[coach-votes-reschedule move] copy failed", e);
+      }
+    }
+
+    // Cloud: delete old round docs (if requested).
+    if (deleteOld) {
+      var slotKeys = Object.keys(slotsFrom);
+      for (var sIdx = 0; sIdx < slotKeys.length; sIdx++) {
+        var slot = parseInt(slotKeys[sIdx], 10);
+        if (!isFinite(slot)) continue;
+        var oldDocId = coachVoteDocId(tid, fromR, slot);
+        try {
+          await deleteFirestoreDoc("coachVotes", oldDocId);
+        } catch (e) {
+          console.warn("[coach-votes-reschedule move] delete failed", e);
+        }
+      }
+    }
+  }
+
+  window.dispatchEvent(
+    new CustomEvent("sv-coach-votes-moved", {
+      detail: { teamId: tid, fromRound: fromR, toRound: toR, deleteOld: !!deleteOld },
+    })
+  );
+}
+
+window.__svMoveCoachVotesRound = async function (teamId, fromRound, toRound) {
+  return moveCoachVotesRound(teamId, fromRound, toRound, true);
+};
+
+async function handleCoachVotesLatestResultRoundChange(teamId) {
+  var tid = parseInt(teamId, 10) || 1;
+  var key = String(tid);
+  if (coachVotesRescheduleMappingInflight[key]) return;
+  coachVotesRescheduleMappingInflight[key] = true;
+  try {
+    var prev = coachVotesLatestResultRoundByTeam[key];
+    var latestNow = SvLatestResultRoundForTeamId(tid);
+    if (prev === undefined) {
+      coachVotesLatestResultRoundByTeam[key] = latestNow || null;
+      return;
+    }
+    if (!prev || !latestNow || String(prev) === String(latestNow)) {
+      coachVotesLatestResultRoundByTeam[key] = latestNow || null;
+      return;
+    }
+
+    // Use local + cloud so we can copy the full payloads.
+    var localData = loadLocalData();
+    var localVotes = localData.coachVotes || [];
+    var cloudVotes = [];
+    try {
+      cloudVotes = await fetchCloudCoachVotes(tid, true);
+    } catch (e) {
+      console.warn("[coach-votes-reschedule] cloud fetch failed", e);
+    }
+    var combined = mergeCoachVotesLists(localVotes, cloudVotes);
+    var plan = planCoachVotesRoundCopy(tid, prev, latestNow, combined);
+
+    if (!plan.copies.length) {
+      coachVotesLatestResultRoundByTeam[key] = latestNow;
+      return;
+    }
+
+    // Local copy (keep old).
+    localData.coachVotes = applyCoachVotesLocalCopyPlan(localVotes, plan, { deleteOld: false });
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(localData));
+    } catch (e) {
+      console.warn("[coach-votes-reschedule] local save failed", e);
+    }
+
+    // Cloud copy (keep old).
+    var canWriteCloud = window.__svFirebaseApp && projectId() && navigator.onLine;
+    if (canWriteCloud) {
+      for (var i = 0; i < plan.copies.length; i++) {
+        var copy = plan.copies[i];
+        try {
+          await submitCoachVoteRest(copy.toDocId, copy.payload);
+        } catch (e) {
+          console.warn("[coach-votes-reschedule] copy failed", e);
+        }
+      }
+    }
+
+    // Admin UX: warn and offer delete-old option.
+    showCoachVotesRescheduleBanner(tid, prev, latestNow, plan.copies.length);
+
+    window.dispatchEvent(
+      new CustomEvent("sv-coach-votes-latest-round-mapped", {
+        detail: { teamId: tid, fromRound: prev, toRound: latestNow, copies: plan.copies.length },
+      })
+    );
+
+    coachVotesLatestResultRoundByTeam[key] = latestNow;
+  } finally {
+    coachVotesRescheduleMappingInflight[key] = false;
+  }
+}
+
+function wireCoachVotesRescheduleMapping() {
+  if (window.__svCoachVotesRescheduleMappingWired) return;
+  window.__svCoachVotesRescheduleMappingWired = true;
+  try {
+    // Seed "previous latest-with-result" so the first sv-match-saved event
+    // can detect a reschedule immediately.
+    var data = loadLocalData();
+    (data.teams || []).forEach(function (t) {
+      if (!t || t.id == null) return;
+      coachVotesLatestResultRoundByTeam[String(t.id)] = SvLatestResultRoundFromMatches(
+        t.matchesByRound
+      );
+    });
+  } catch (e) {}
+  window.addEventListener("sv-match-saved", function (ev) {
+    var teamId = ev && ev.detail ? ev.detail.teamId : null;
+    if (teamId == null) return;
+    handleCoachVotesLatestResultRoundChange(teamId).catch(function (e) {
+      console.warn("[coach-votes-reschedule] handler failed", e);
+    });
+  });
+}
+
 function wireSubmitReadyState() {
   var btn = document.getElementById("submitVote");
   var nameInput = document.getElementById("voterNameInput");
@@ -4016,6 +4428,7 @@ function init() {
   wireLineupPublicTabs();
   wireSarahDisambiguation();
   wirePublishedRoundControls();
+  wireCoachVotesRescheduleMapping();
   scheduleBallotPickMigration();
   scheduleBallotDocMigration();
   scheduleVoteRecovery();
