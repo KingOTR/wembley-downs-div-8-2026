@@ -1,6 +1,6 @@
 {
   "exportVersion": 1,
-  "exportedAt": "2026-06-22T13:55:09.450Z",
+  "exportedAt": "2026-06-22T14:49:12.721Z",
   "source": "tools/import-votes-csv.mjs",
   "recoveryNote": "Reconstructed player ballots from season CSV tally export (C:/Users/sydne/OneDrive/Desktop/Div_8_all_rounds.csv). Picks per voter are inferred; totals per round match the CSV. v196: restored Johanna/Uli voter ballots from git 9eb02bb (v181) via pick-match swaps; Johanna Round 9 voter from Ann correction.",
   "csvMeta": {

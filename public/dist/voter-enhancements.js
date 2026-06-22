@@ -28,7 +28,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v196";
+} from "./name-match.js?tag=v197";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -46,7 +46,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v196";
+  return "v197";
 }
 
 function distImport(path) {
@@ -1158,6 +1158,47 @@ function computeParticipation(squad, votes, teamId, round, meta) {
   return matchSquadToVoters(squad, votes, teamId, round, voteRoundLabel, DEFAULT_SQUAD_THRESHOLD, {
     excluded: m.excluded,
     aliases: m.aliases,
+  });
+}
+
+/** Unique squad members who submitted at least one voter ballot this season. */
+function computeSeasonVoterParticipation(squad, votes, teamId) {
+  var votedKeys = Object.create(null);
+  (votes || []).forEach(function (v) {
+    if (!v || v.voterName == null || String(v.teamId) !== String(teamId)) return;
+    var vk = voterNameKey(v.voterName);
+    if (!vk) return;
+    squad.forEach(function (p) {
+      if (voterNameKey(p) === vk) votedKeys[voterNameKey(p)] = displayPlayerName(p);
+    });
+  });
+  var votedList = squad
+    .map(function (p) {
+      return displayPlayerName(p);
+    })
+    .filter(function (p) {
+      return votedKeys[voterNameKey(p)];
+    });
+  var never = squad
+    .map(function (p) {
+      return displayPlayerName(p);
+    })
+    .filter(function (p) {
+      return !votedKeys[voterNameKey(p)];
+    });
+  return {
+    votedCount: votedList.length,
+    squadCount: squad.length,
+    votedList: votedList,
+    neverVoted: never,
+  };
+}
+
+function votesLookCsvReconstructed(votes, teamId) {
+  return (votes || []).some(function (v) {
+    if (!v || String(v.teamId) !== String(teamId)) return false;
+    var src = String(v.recoveredFrom || "");
+    return /csv/i.test(src);
   });
 }
 
@@ -3329,6 +3370,7 @@ function ensureWhoHasntVotedBlock() {
   details.innerHTML =
     "<summary style='cursor:pointer;font-weight:800;color:var(--red-dark)'>Who has / hasn't voted?</summary>" +
     "<p class='hint' style='margin:0.35rem 0 0'>Eligible squad vs ballots this round (local + cloud). Exclude players who didn't play/watch.</p>" +
+    "<div id='whoVoteSeasonSummary' style='margin-top:0.45rem;font-size:0.88rem;line-height:1.45;padding:0.4rem 0.5rem;background:rgba(0,0,0,0.04);border-radius:6px'></div>" +
     "<div id='whoVotedList' style='margin-top:0.45rem;font-size:0.9rem;line-height:1.5'></div>" +
     "<div id='whoHasntVotedList' style='margin-top:0.45rem;font-size:0.9rem;line-height:1.5'></div>" +
     "<div id='whoVoteUnmatched' style='margin-top:0.45rem;font-size:0.88rem;line-height:1.45'></div>" +
@@ -3516,6 +3558,32 @@ async function updateWhoHasntVoted(skipExclRender) {
   var votes = pack.votes;
   var cloudErr = pack.cloudErr;
   var matched = computeParticipation(squad, votes, teamId, round, meta);
+  var seasonEl = document.getElementById("whoVoteSeasonSummary");
+  if (seasonEl) {
+    var season = computeSeasonVoterParticipation(squad, votes, teamId);
+    var seasonParts = [
+      "<strong>Season:</strong> " +
+        season.votedCount +
+        " of " +
+        season.squadCount +
+        " squad voted at least once",
+    ];
+    if (season.neverVoted.length) {
+      seasonParts.push(
+        "<span style='color:var(--red-dark)'>Never as voter: " +
+          escapeHtml(season.neverVoted.join(", ")) +
+          "</span>"
+      );
+    }
+    if (votesLookCsvReconstructed(votes, teamId)) {
+      seasonParts.push(
+        "<span class='hint'>Ballots rebuilt from CSV point totals — each round has only points÷6 voter slots (typically 5–10 of " +
+          season.squadCount +
+          "), not one per squad member. Points received are complete; voter names are inferred.</span>"
+      );
+    }
+    seasonEl.innerHTML = seasonParts.join("<br>");
+  }
   syncVotesReceivedCount(matched.ballotCount);
   renderDuplicateBallotsWarning(matched);
 

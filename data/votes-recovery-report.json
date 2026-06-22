@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-06-22T06:25:29.976Z",
+  "generatedAt": "2026-06-22T14:37:58.809Z",
   "project": "wembley-downs-div-8-2026",
   "sources": {
     "gitLogPlayerVotes": 0,
     "dataDirPlayerVotes": 280,
     "firestorePlayerVotes": 70,
-    "firestoreCoachVotes": 13
+    "firestoreCoachVotes": 7
   },
   "playerVotesByRound": {
     "Round 1": 6,
-    "Round 2": 11,
+    "Round 2": 10,
     "Round 3": 6,
     "Round 4": 5,
     "Round 5": 7,
@@ -28,13 +28,13 @@
     "Round 5": 1,
     "Round 3": 1
   },
-  "recoverablePlayerTotal": 71,
+  "recoverablePlayerTotal": 70,
   "recoverableCoachTotal": 12,
   "gitSearchNote": "No player vote payloads (voterName + 3 picks) found anywhere in git history.",
   "firestoreNote": null,
   "rounds1to9Player": {
     "Round 1": 6,
-    "Round 2": 11,
+    "Round 2": 10,
     "Round 3": 6,
     "Round 4": 5,
     "Round 5": 7,

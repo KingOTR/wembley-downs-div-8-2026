@@ -1,144 +1,8 @@
 {
   "exportVersion": 1,
-  "exportedAt": "2026-06-22T13:55:09.450Z",
-  "source": "tools/import-votes-csv.mjs",
-  "recoveryNote": "Reconstructed player ballots from season CSV tally export (C:/Users/sydne/OneDrive/Desktop/Div_8_all_rounds.csv). Picks per voter are inferred; totals per round match the CSV. v196: restored Johanna/Uli voter ballots from git 9eb02bb (v181) via pick-match swaps; Johanna Round 9 voter from Ann correction.",
-  "csvMeta": {
-    "exportedAt": "2026-06-21T17:49:30.426Z",
-    "teamName": "Div 8"
-  },
-  "importReport": {
-    "rounds": {
-      "Round 1": {
-        "ballots": 6,
-        "sum": 36,
-        "tallySum": 36,
-        "lostPoints": 0,
-        "status": "ok"
-      },
-      "Round 2": {
-        "ballots": 10,
-        "sum": 56,
-        "tallySum": 56,
-        "lostPoints": 4,
-        "status": "ok"
-      },
-      "Round 3": {
-        "ballots": 6,
-        "sum": 33,
-        "tallySum": 33,
-        "lostPoints": 3,
-        "status": "ok"
-      },
-      "Round 4": {
-        "ballots": 5,
-        "sum": 30,
-        "tallySum": 30,
-        "lostPoints": 0,
-        "status": "ok"
-      },
-      "Round 5": {
-        "ballots": 7,
-        "sum": 42,
-        "tallySum": 42,
-        "lostPoints": 0,
-        "status": "ok"
-      },
-      "Round 6": {
-        "ballots": 9,
-        "sum": 50,
-        "tallySum": 50,
-        "lostPoints": 4,
-        "status": "ok"
-      },
-      "Round 7": {
-        "ballots": 10,
-        "sum": 58,
-        "tallySum": 58,
-        "lostPoints": 2,
-        "status": "ok"
-      },
-      "Round 8": {
-        "ballots": 10,
-        "sum": 55,
-        "tallySum": 55,
-        "lostPoints": 5,
-        "status": "ok"
-      },
-      "Round 9": {
-        "ballots": 7,
-        "sum": 40,
-        "tallySum": 40,
-        "lostPoints": 2,
-        "status": "ok"
-      }
-    },
-    "warnings": [
-      "Round 2: csv sum 56 uses 10 ballot(s) with 4 void point(s)",
-      "Round 3: csv sum 33 uses 6 ballot(s) with 3 void point(s)",
-      "Round 6: csv sum 50 uses 9 ballot(s) with 4 void point(s)",
-      "Round 7: csv sum 58 uses 10 ballot(s) with 2 void point(s)",
-      "Round 8: csv sum 55 uses 10 ballot(s) with 5 void point(s)",
-      "Round 9: csv sum 40 uses 7 ballot(s) with 2 void point(s)"
-    ],
-    "v181Restore": [
-      {
-        "round": "Round 1",
-        "target": "Johanna",
-        "status": "ok",
-        "note": "swap Elke↔Elke"
-      },
-      {
-        "round": "Round 2",
-        "target": "Johanna",
-        "status": "skip",
-        "reason": "picks not in csv reconstruction"
-      },
-      {
-        "round": "Round 5",
-        "target": "Johanna",
-        "status": "ok",
-        "note": "swap Sarah Goalkeeper↔Sarah Goalkeeper"
-      },
-      {
-        "round": "Round 6",
-        "target": "Johanna",
-        "status": "skip",
-        "reason": "picks not in csv reconstruction"
-      },
-      {
-        "round": "Round 7",
-        "target": "Johanna",
-        "status": "skip",
-        "reason": "picks not in csv reconstruction"
-      },
-      {
-        "round": "Round 8",
-        "target": "Johanna",
-        "status": "ok",
-        "note": "swap Elke↔Elke"
-      },
-      {
-        "round": "Round 9",
-        "target": "Johanna",
-        "status": "skip",
-        "reason": "picks not in csv reconstruction"
-      },
-      {
-        "round": "Round 8",
-        "target": "Uli",
-        "status": "skip",
-        "reason": "picks not in csv reconstruction"
-      },
-      {
-        "round": "Round 9",
-        "target": "Uli",
-        "status": "skip",
-        "reason": "picks not in csv reconstruction"
-      }
-    ],
-    "crossRoundSwaps": []
-  },
+  "exportedAt": "2026-06-22T14:37:58.823Z",
+  "source": "tools/restore-votes-from-git.mjs",
+  "recoveryNote": "Merged from git + data/ + Firestore snapshot.",
   "votes": [
     {
       "teamId": 1,
@@ -153,7 +17,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-swap",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-1_velke"
     },
     {
@@ -169,7 +33,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-1_vabi"
     },
     {
@@ -185,7 +49,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-1_vann"
     },
     {
@@ -201,7 +65,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-restore",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-1_vjohanna"
     },
     {
@@ -217,7 +81,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-1_verin"
     },
     {
@@ -233,7 +97,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-1_vfreame"
     },
     {
@@ -249,7 +113,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-2_verika"
     },
     {
@@ -265,7 +129,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-2_vjess"
     },
     {
@@ -281,7 +145,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-2_vkat"
     },
     {
@@ -297,7 +161,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-2_vrainy"
     },
     {
@@ -313,7 +177,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-2_vsarah-tall"
     },
     {
@@ -329,7 +193,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-2_vsarah-gk"
     },
     {
@@ -345,7 +209,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-2_vjohanna"
     },
     {
@@ -361,7 +225,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-2_vabi"
     },
     {
@@ -377,7 +241,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-2_vann"
     },
     {
@@ -393,7 +257,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-2_vanna"
     },
     {
@@ -409,7 +273,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-3_vemma"
     },
     {
@@ -425,7 +289,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-3_vlauren"
     },
     {
@@ -441,7 +305,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-3_vsophie"
     },
     {
@@ -457,7 +321,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-3_vanna"
     },
     {
@@ -473,7 +337,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-3_velke"
     },
     {
@@ -489,7 +353,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-3_verika"
     },
     {
@@ -505,7 +369,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-4_vjane"
     },
     {
@@ -521,7 +385,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-4_verin"
     },
     {
@@ -537,7 +401,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-4_vjess"
     },
     {
@@ -553,7 +417,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-4_vkat"
     },
     {
@@ -569,7 +433,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-4_vlauren"
     },
     {
@@ -585,7 +449,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-5_vtaryn"
     },
     {
@@ -601,7 +465,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-5_vjane"
     },
     {
@@ -617,7 +481,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-5_vrainy"
     },
     {
@@ -633,7 +497,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-5_vsarah-tall"
     },
     {
@@ -649,7 +513,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-restore",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-5_vjohanna"
     },
     {
@@ -665,7 +529,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-swap",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-5_vsarah-gk"
     },
     {
@@ -681,7 +545,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-5_vabi"
     },
     {
@@ -697,7 +561,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-6_vfreame"
     },
     {
@@ -713,7 +577,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-6_vanna"
     },
     {
@@ -729,7 +593,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-6_velke"
     },
     {
@@ -745,7 +609,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-6_verika"
     },
     {
@@ -761,7 +625,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-6_verin"
     },
     {
@@ -777,7 +641,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-6_vjess"
     },
     {
@@ -793,7 +657,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-6_vkat"
     },
     {
@@ -809,7 +673,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-6_vjohanna"
     },
     {
@@ -825,7 +689,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-6_vabi"
     },
     {
@@ -841,7 +705,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-7_vtaryn"
     },
     {
@@ -857,7 +721,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-7_vann"
     },
     {
@@ -873,7 +737,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-7_vrainy"
     },
     {
@@ -889,7 +753,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-7_vanna"
     },
     {
@@ -905,7 +769,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-7_vkat"
     },
     {
@@ -921,7 +785,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-7_vjohanna"
     },
     {
@@ -937,7 +801,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-7_vabi"
     },
     {
@@ -953,7 +817,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-7_velke"
     },
     {
@@ -969,7 +833,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-7_vemma"
     },
     {
@@ -985,7 +849,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-7_verika"
     },
     {
@@ -1001,7 +865,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-8_vuli"
     },
     {
@@ -1017,7 +881,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-8_vemma"
     },
     {
@@ -1033,7 +897,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-8_vjane"
     },
     {
@@ -1049,7 +913,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-8_vtaryn"
     },
     {
@@ -1065,7 +929,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-8_vann"
     },
     {
@@ -1081,7 +945,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-8_verin"
     },
     {
@@ -1097,7 +961,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-restore",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-8_vjohanna"
     },
     {
@@ -1113,7 +977,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-8_verika"
     },
     {
@@ -1129,7 +993,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-8_vkat"
     },
     {
@@ -1145,7 +1009,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv+v181-voter-swap",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-8_velke"
     },
     {
@@ -1161,7 +1025,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv+voter-correction",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-9_velke"
     },
     {
@@ -1177,7 +1041,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-9_vsarah-tall"
     },
     {
@@ -1193,7 +1057,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-9_vsarah-gk"
     },
     {
@@ -1209,7 +1073,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-9_vjane"
     },
     {
@@ -1225,7 +1089,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-9_vjess"
     },
     {
@@ -1241,7 +1105,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-9_vtaryn"
     },
     {
@@ -1257,7 +1121,7 @@
       "submittedAt": "2026-06-21T17:49:30.426Z",
       "nameMatchStatus": "matched",
       "tallyExcluded": false,
-      "recoveredFrom": "csv:Div_8_all_rounds.csv+voter-correction",
+      "recoveredFrom": "firestore-live",
       "id": "t1_rround-9_vjohanna"
     }
   ],
