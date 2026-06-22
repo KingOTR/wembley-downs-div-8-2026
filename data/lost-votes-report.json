@@ -1,0 +1,641 @@
+{
+  "generatedAt": "2026-06-22T15:30:25.790Z",
+  "version": "v198",
+  "commit": "f225950",
+  "deployUrl": "https://wembley-downs-div-8-2026.web.app/",
+  "csvPath": "C:/Users/sydne/OneDrive/Desktop/Div_8_all_rounds.csv",
+  "ballotCounts": {
+    "restored": 70,
+    "firestore": 0,
+    "firestoreErr": "fetch failed"
+  },
+  "summary": {
+    "currentBallotsMatchCsv": true,
+    "historicalGitInflationAboveCsv": [
+      {
+        "player": "Uli",
+        "currentPts": 38,
+        "maxEverInGit": 45,
+        "delta": 7,
+        "evidence": {
+          "commit": "9839313",
+          "file": "data/restored-votes.json",
+          "pts": 45
+        },
+        "recoverable": false
+      },
+      {
+        "player": "Sophie",
+        "currentPts": 46,
+        "maxEverInGit": 52,
+        "delta": 6,
+        "evidence": {
+          "commit": "9839313",
+          "file": "data/restored-votes.json",
+          "pts": 52
+        },
+        "recoverable": false
+      },
+      {
+        "player": "Freame",
+        "currentPts": 48,
+        "maxEverInGit": 53,
+        "delta": 5,
+        "evidence": {
+          "commit": "9839313",
+          "file": "data/restored-votes.json",
+          "pts": 53
+        },
+        "recoverable": false
+      },
+      {
+        "player": "Lauren",
+        "currentPts": 42,
+        "maxEverInGit": 44,
+        "delta": 2,
+        "evidence": {
+          "commit": "9839313",
+          "file": "data/restored-votes.json",
+          "pts": 44
+        },
+        "recoverable": false
+      }
+    ],
+    "recoverableVotesFound": false,
+    "shipNewVersionRecommended": false,
+    "oldGraphVsCsv": {
+      "inflatedPlayers": 0,
+      "deflatedPlayers": 0,
+      "mechanism": "On current 70 deduped ballots old $p() equals Uo(). Pre-v198 inflation only when Firestore had duplicate ballots per voter (dedupe in Uo, not in old $p)."
+    },
+    "johannaAliasImpact": "NO — alias changes did not delete received votes. Zero ballots ever picked Johanna/Jay (3/2/1); CSV column is all 0s. v139 johanna→Jay only affected voter-name matching, not picks received."
+  },
+  "oldOverRoundsGraph": {
+    "description": "Pre-v198 $p(): raw pick strings, no ballot dedupe, no svCanon. v198 routes trend through Uo() per round.",
+    "players": [
+      {
+        "player": "Erin",
+        "csvTruth": 3,
+        "oldGraphSeason": 3,
+        "currentUoSeason": 3,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Lauren",
+        "csvTruth": 42,
+        "oldGraphSeason": 42,
+        "currentUoSeason": 42,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Sophie",
+        "csvTruth": 46,
+        "oldGraphSeason": 46,
+        "currentUoSeason": 46,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Sarah (tall)",
+        "csvTruth": 15,
+        "oldGraphSeason": 15,
+        "currentUoSeason": 15,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Anna",
+        "csvTruth": 16,
+        "oldGraphSeason": 16,
+        "currentUoSeason": 16,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Ann",
+        "csvTruth": 5,
+        "oldGraphSeason": 5,
+        "currentUoSeason": 5,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Jane",
+        "csvTruth": 34,
+        "oldGraphSeason": 34,
+        "currentUoSeason": 34,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Uli",
+        "csvTruth": 38,
+        "oldGraphSeason": 38,
+        "currentUoSeason": 38,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Johanna",
+        "csvTruth": 0,
+        "oldGraphSeason": 0,
+        "currentUoSeason": 0,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Elke",
+        "csvTruth": 13,
+        "oldGraphSeason": 13,
+        "currentUoSeason": 13,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Freame",
+        "csvTruth": 48,
+        "oldGraphSeason": 48,
+        "currentUoSeason": 48,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Abi",
+        "csvTruth": 4,
+        "oldGraphSeason": 4,
+        "currentUoSeason": 4,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Emma",
+        "csvTruth": 47,
+        "oldGraphSeason": 47,
+        "currentUoSeason": 47,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Erika",
+        "csvTruth": 15,
+        "oldGraphSeason": 15,
+        "currentUoSeason": 15,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Taryn (C)",
+        "csvTruth": 20,
+        "oldGraphSeason": 20,
+        "currentUoSeason": 20,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Rainy",
+        "csvTruth": 20,
+        "oldGraphSeason": 20,
+        "currentUoSeason": 20,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Jess",
+        "csvTruth": 22,
+        "oldGraphSeason": 22,
+        "currentUoSeason": 22,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Sarah Goalkeeper",
+        "csvTruth": 10,
+        "oldGraphSeason": 10,
+        "currentUoSeason": 10,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      },
+      {
+        "player": "Kat",
+        "csvTruth": 2,
+        "oldGraphSeason": 2,
+        "currentUoSeason": 2,
+        "oldHigherThanCsv": 0,
+        "currentHigherThanCsv": 0,
+        "oldVsCurrent": 0
+      }
+    ],
+    "inflatedVsCsv": [],
+    "deflatedVsCsv": [],
+    "oldVsCurrentOnCurrentBallots": [],
+    "duplicateBallotMechanismDemo": {
+      "note": "Synthetic: duplicate all Round 2 ballots once. Shows how old graph inflated while Uo dedupes.",
+      "sample": [
+        {
+          "player": "Erin",
+          "oldGraphWithDupes": 4,
+          "currentWithDupes": 3,
+          "csvTruth": 3,
+          "inflationFromDupes": 1
+        },
+        {
+          "player": "Lauren",
+          "oldGraphWithDupes": 43,
+          "currentWithDupes": 42,
+          "csvTruth": 42,
+          "inflationFromDupes": 1
+        },
+        {
+          "player": "Sophie",
+          "oldGraphWithDupes": 52,
+          "currentWithDupes": 46,
+          "csvTruth": 46,
+          "inflationFromDupes": 6
+        },
+        {
+          "player": "Anna",
+          "oldGraphWithDupes": 18,
+          "currentWithDupes": 16,
+          "csvTruth": 16,
+          "inflationFromDupes": 2
+        },
+        {
+          "player": "Ann",
+          "oldGraphWithDupes": 7,
+          "currentWithDupes": 5,
+          "csvTruth": 5,
+          "inflationFromDupes": 2
+        },
+        {
+          "player": "Jane",
+          "oldGraphWithDupes": 43,
+          "currentWithDupes": 34,
+          "csvTruth": 34,
+          "inflationFromDupes": 9
+        },
+        {
+          "player": "Uli",
+          "oldGraphWithDupes": 49,
+          "currentWithDupes": 38,
+          "csvTruth": 38,
+          "inflationFromDupes": 11
+        },
+        {
+          "player": "Elke",
+          "oldGraphWithDupes": 19,
+          "currentWithDupes": 13,
+          "csvTruth": 13,
+          "inflationFromDupes": 6
+        },
+        {
+          "player": "Freame",
+          "oldGraphWithDupes": 54,
+          "currentWithDupes": 48,
+          "csvTruth": 48,
+          "inflationFromDupes": 6
+        },
+        {
+          "player": "Emma",
+          "oldGraphWithDupes": 53,
+          "currentWithDupes": 47,
+          "csvTruth": 47,
+          "inflationFromDupes": 6
+        },
+        {
+          "player": "Taryn (C)",
+          "oldGraphWithDupes": 26,
+          "currentWithDupes": 20,
+          "csvTruth": 20,
+          "inflationFromDupes": 6
+        }
+      ]
+    },
+    "johannaNonZeroInOldGraph": 0
+  },
+  "johannaAlias": {
+    "timeline": [
+      {
+        "era": "v139-v187",
+        "commit": "e78e82c",
+        "rule": "johanna→Jay (unsafe global canonicalPlayerName)",
+        "aliasMap": {
+          "johanna": "Jay"
+        },
+        "rosterSafe": false,
+        "johannaPtsReceived": 0
+      },
+      {
+        "era": "v188-v193",
+        "commit": "b992045",
+        "rule": "johanna→Jay removed",
+        "aliasMap": {},
+        "rosterSafe": false,
+        "johannaPtsReceived": 0
+      },
+      {
+        "era": "v189+",
+        "commit": "311085b",
+        "rule": "roster-safe aliases (no johanna/jay until v194)",
+        "aliasMap": {},
+        "rosterSafe": true,
+        "johannaPtsReceived": 0
+      },
+      {
+        "era": "v194+",
+        "commit": "41dd13f",
+        "rule": "jay→Johanna (roster-safe)",
+        "aliasMap": {
+          "jay": "Johanna"
+        },
+        "rosterSafe": true,
+        "johannaPtsReceived": 0
+      }
+    ],
+    "picksInCurrentBallots": {
+      "johanna": [],
+      "jay": [],
+      "johannaFrolinghaus": []
+    },
+    "gitPickSearch": {
+      "pickHits": []
+    },
+    "voterBallotsAsJohanna": 7,
+    "csvJohannaPts": 0,
+    "conclusion": "NO — alias changes did not delete received votes. Zero ballots ever picked Johanna/Jay (3/2/1); CSV column is all 0s. v139 johanna→Jay only affected voter-name matching, not picks received."
+  },
+  "perPlayerMaxEverGit": [
+    {
+      "player": "Uli",
+      "currentPts": 38,
+      "maxEverInGit": 45,
+      "delta": 7,
+      "evidence": {
+        "commit": "9839313",
+        "file": "data/restored-votes.json",
+        "pts": 45
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Sophie",
+      "currentPts": 46,
+      "maxEverInGit": 52,
+      "delta": 6,
+      "evidence": {
+        "commit": "9839313",
+        "file": "data/restored-votes.json",
+        "pts": 52
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Freame",
+      "currentPts": 48,
+      "maxEverInGit": 53,
+      "delta": 5,
+      "evidence": {
+        "commit": "9839313",
+        "file": "data/restored-votes.json",
+        "pts": 53
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Lauren",
+      "currentPts": 42,
+      "maxEverInGit": 44,
+      "delta": 2,
+      "evidence": {
+        "commit": "9839313",
+        "file": "data/restored-votes.json",
+        "pts": 44
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Erin",
+      "currentPts": 3,
+      "maxEverInGit": 3,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 3
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Sarah (tall)",
+      "currentPts": 15,
+      "maxEverInGit": 15,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 15
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Anna",
+      "currentPts": 16,
+      "maxEverInGit": 16,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 16
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Ann",
+      "currentPts": 5,
+      "maxEverInGit": 5,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 5
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Jane",
+      "currentPts": 34,
+      "maxEverInGit": 34,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 34
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Johanna",
+      "currentPts": 0,
+      "maxEverInGit": 0,
+      "delta": 0,
+      "evidence": null,
+      "recoverable": false
+    },
+    {
+      "player": "Elke",
+      "currentPts": 13,
+      "maxEverInGit": 13,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 13
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Abi",
+      "currentPts": 4,
+      "maxEverInGit": 4,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 4
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Emma",
+      "currentPts": 47,
+      "maxEverInGit": 47,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 47
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Erika",
+      "currentPts": 15,
+      "maxEverInGit": 15,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 15
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Taryn (C)",
+      "currentPts": 20,
+      "maxEverInGit": 20,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 20
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Rainy",
+      "currentPts": 20,
+      "maxEverInGit": 20,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 20
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Jess",
+      "currentPts": 22,
+      "maxEverInGit": 22,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 22
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Sarah Goalkeeper",
+      "currentPts": 10,
+      "maxEverInGit": 10,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 10
+      },
+      "recoverable": false
+    },
+    {
+      "player": "Kat",
+      "currentPts": 2,
+      "maxEverInGit": 2,
+      "delta": 0,
+      "evidence": {
+        "commit": "f225950",
+        "file": "data/restored-votes.json",
+        "pts": 2
+      },
+      "recoverable": false
+    }
+  ],
+  "historicalInflation": {
+    "note": "v182 (9839313) had CSV mismatches fixed in v187 (d819957). Not recoverable extra votes — bad reconstruction.",
+    "v182Excess": [
+      {
+        "player": "Lauren",
+        "v182Tally": 44,
+        "csv": 42,
+        "excess": 2
+      },
+      {
+        "player": "Sophie",
+        "v182Tally": 52,
+        "csv": 46,
+        "excess": 6
+      },
+      {
+        "player": "Uli",
+        "v182Tally": 45,
+        "csv": 38,
+        "excess": 7
+      },
+      {
+        "player": "Freame",
+        "v182Tally": 53,
+        "csv": 48,
+        "excess": 5
+      }
+    ]
+  }
+}
