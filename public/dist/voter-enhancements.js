@@ -28,7 +28,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v186";
+} from "./name-match.js?tag=v187";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -46,7 +46,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v186";
+  return "v187";
 }
 
 function distImport(path) {
@@ -424,7 +424,8 @@ function countVotesForRoundSync(teamId, round, inMemoryVotes) {
   if (cached && cached.votes && cached.votes.length) {
     merged = mergeVotesLists(merged, cached.votes);
   }
-  return merged.filter(function (v) {
+  var voterDeduped = dedupeBallotDocsOnePerVoter(merged, teamId, rk, voteRoundLabel);
+  return (voterDeduped.votesForTally || []).filter(function (v) {
     return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === rk;
   }).length;
 }
@@ -1198,8 +1199,6 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
     var resolved = resolveSquadSync(teamId, data);
     var localTeamVotes = votesForTeamFromRecoverable(teamId);
     var merged = mergeVotesLists(localTeamVotes, list);
-    if (!resolved.squad.length) return merged;
-    var meta = getVoteMeta(resolved.team, round);
     var cached = cloudVotesCache[String(teamId)];
     if (cached && cached.votes && cached.votes.length) {
       merged = mergeVotesLists(merged, cached.votes);
@@ -1207,6 +1206,8 @@ window.__svDedupeVotesForTally = function (teamId, round, votes) {
     merged = sanitizeVotesWithDuplicatePicks(merged);
     var voterDeduped = dedupeBallotDocsOnePerVoter(merged, teamId, round, voteRoundLabel);
     merged = Array.isArray(voterDeduped.votesForTally) ? voterDeduped.votesForTally : merged;
+    if (!resolved.squad.length) return merged;
+    var meta = getVoteMeta(resolved.team, round);
     var out = dedupeVotesOnePerSquad(
       resolved.squad,
       merged,
@@ -1510,7 +1511,7 @@ function scheduleBallotPickMigration() {
   }, 1500);
 }
 
-var BALLOT_DOC_MIGRATION_KEY = STORAGE_KEY + "_ballot_doc_dedupe_v174";
+var BALLOT_DOC_MIGRATION_KEY = STORAGE_KEY + "_ballot_doc_dedupe_v187";
 var BALLOT_DOC_MIGRATION_REPORT_KEY = STORAGE_KEY + "_ballot_doc_dedupe_report";
 
 function removeLocalBallotsByIds(removeMap) {
@@ -1663,6 +1664,64 @@ async function migrateAllDuplicateBallotDocs(opts) {
 }
 
 window.__svMigrateDuplicateBallotDocs = migrateAllDuplicateBallotDocs;
+
+async function removeDuplicateBallotsForRound(teamId, round, opts) {
+  var rk = normalizeRoundLabel(round) || round || "Round 1";
+  var pack = await loadAllVotesForTeam(teamId, { forceCloud: isSuperAdminUnlocked() });
+  var roundVotes = (pack.votes || []).filter(function (v) {
+    return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === rk;
+  });
+  var roundCoach = (pack.coachVotes || []).filter(function (v) {
+    return v && String(v.teamId) === String(teamId) && voteRoundLabel(v) === rk;
+  });
+  var plan = planBallotDocDedupeMigration(roundVotes, roundCoach, voteRoundLabel);
+  if (!plan.removed) {
+    return { removed: 0, round: rk, teamId: teamId, byRound: {} };
+  }
+  backupLocalVotes("pre-round-ballot-dedupe-" + rk.replace(/\s+/g, "-").toLowerCase());
+  removeLocalBallotsByIds(plan.removeIds);
+  rehydrateAppVotesFromLocal();
+  var report = {
+    removed: plan.removed,
+    round: rk,
+    teamId: teamId,
+    byRound: plan.byRound,
+    cloudDeleted: 0,
+    at: new Date().toISOString(),
+    version: assetTag(),
+  };
+  var canDeleteCloud =
+    !!(opts && opts.cloudDelete !== false) &&
+    isSuperAdminUnlocked() &&
+    window.__svFirebaseApp &&
+    projectId();
+  if (canDeleteCloud) {
+    var deleteTasks = [];
+    Object.keys(plan.removeIds).forEach(function (id) {
+      var row = plan.removeIds[id];
+      var col = row.kind === "coach" ? "coachVotes" : "votes";
+      deleteTasks.push(
+        deleteFirestoreDoc(col, id).then(function () {
+          report.cloudDeleted++;
+        })
+      );
+    });
+    await Promise.all(
+      deleteTasks.map(function (p) {
+        return p.catch(function (e) {
+          console.warn("[round-ballot-dedupe] cloud delete", e);
+        });
+      })
+    );
+  }
+  try {
+    window.dispatchEvent(new CustomEvent("sv-ballot-doc-migration-done", { detail: report }));
+    window.dispatchEvent(new CustomEvent("sv-votes-merged"));
+  } catch (e) {}
+  return report;
+}
+
+window.__svRemoveDuplicateBallotsForRound = removeDuplicateBallotsForRound;
 
 function scheduleBallotDocMigration() {
   try {
@@ -2616,8 +2675,8 @@ function mergeVotesLists() {
   for (var i = 0; i < arguments.length; i++) {
     (arguments[i] || []).forEach(function (v) {
       if (!v) return;
-      var id = v.id || "t" + v.teamId + "|" + (v.voterNameKey || v.voterName) + "|" + voteRoundLabel(v);
-      byId[id] = v;
+      var id = v.id || voteDocIdForBallot(v);
+      byId[id] = Object.assign({}, v, { id: id });
     });
   }
   return Object.keys(byId).map(function (k) {
@@ -3211,7 +3270,52 @@ function renderDuplicateBallotsWarning(matched) {
       ".</li>";
   });
   html += "</ul>";
+  if (isSuperAdminUnlocked()) {
+    html +=
+      "<p style='margin:0.55rem 0 0'><button type='button' class='secondary' id='removeDupBallotsThisRoundBtn'>Remove duplicate ballots this round</button> " +
+      "<span class='hint'>Keeps latest per voter/slot; deletes extras from local + Firestore.</span></p>";
+  }
   el.innerHTML = html;
+  var btn = document.getElementById("removeDupBallotsThisRoundBtn");
+  if (btn && !btn._svWire) {
+    btn._svWire = true;
+    btn.addEventListener("click", function () {
+      var teamSel = document.getElementById("resultsTeamSelect");
+      var roundSel = document.getElementById("resultsRoundSelect");
+      if (!teamSel || !roundSel) return;
+      var teamId = parseInt(teamSel.value, 10) || 1;
+      var round = normalizeRoundLabel(roundSel.value) || roundSel.value || "Round 1";
+      if (
+        !window.confirm(
+          "Remove duplicate ballot documents for " + round + " (team " + teamId + ")? Latest ballot per voter wins."
+        )
+      ) {
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "Removing…";
+      removeDuplicateBallotsForRound(teamId, round, { cloudDelete: true })
+        .then(function (rep) {
+          btn.disabled = false;
+          btn.textContent = "Remove duplicate ballots this round";
+          window.alert(
+            rep.removed
+              ? "Removed " + rep.removed + " duplicate doc(s)" + (rep.cloudDeleted ? " (" + rep.cloudDeleted + " from Firestore)" : "") + "."
+              : "No duplicate docs to remove for this round."
+          );
+          updateWhoHasntVoted();
+          try {
+            var roundSel = document.getElementById("resultsRoundSelect");
+            if (roundSel) roundSel.dispatchEvent(new Event("change", { bubbles: true }));
+          } catch (e) {}
+        })
+        .catch(function (e) {
+          btn.disabled = false;
+          btn.textContent = "Remove duplicate ballots this round";
+          window.alert("Remove failed: " + (e.message || e));
+        });
+    });
+  }
 }
 
 function ensureWhoHasntVotedBlock() {
@@ -3528,6 +3632,11 @@ function wireWhoHasntVoted() {
   if (ballotsPanelOpen()) debouncedUpdateAdminBallots({ showLoading: true });
   ensureBallotPickMigrationHint();
   ensureBallotDocMigrationHint();
+  if (isSuperAdminUnlocked()) {
+    migrateAllDuplicateBallotDocs({ cloudDelete: true }).catch(function (e) {
+      console.warn("[ballot-doc-migration]", e);
+    });
+  }
 }
 
 function ensureLineupSharePackButton() {

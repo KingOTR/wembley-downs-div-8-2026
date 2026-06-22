@@ -279,6 +279,93 @@ if (voterDocPts.Carol !== 3) {
   throw new Error("duplicate voter docs should tally once, got " + JSON.stringify(voterDocPts));
 }
 
+// v187: id-less duplicate from mergeVotesLists id mismatch must not double-count tally.
+function voteDocIdForBallotTest(v) {
+  if (v && v.id && /^t\d+_r.+_v[a-z0-9-]+$/i.test(String(v.id))) return String(v.id);
+  var teamId = v && v.teamId != null ? v.teamId : 1;
+  var rk = String(voteRoundLabel(v))
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "round-1";
+  var vk = (v && v.voterNameKey) || String((v && v.voterName) || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "x";
+  return "t" + teamId + "_r" + rk + "_v" + vk;
+}
+function mergeVotesListsV187() {
+  var byId = Object.create(null);
+  for (var i = 0; i < arguments.length; i++) {
+    (arguments[i] || []).forEach(function (v) {
+      if (!v) return;
+      var id = v.id || voteDocIdForBallotTest(v);
+      byId[id] = Object.assign({}, v, { id: id });
+    });
+  }
+  return Object.keys(byId).map(function (k) {
+    return byId[k];
+  });
+}
+function dedupeTallyHook(teamId, round, inMemoryVotes, squad) {
+  var merged = mergeVotesListsV187(inMemoryVotes || [], []);
+  var voterDeduped = dedupeBallotDocsOnePerVoter(merged, teamId, round, voteRoundLabel);
+  merged = voterDeduped.votesForTally || merged;
+  if (!squad || !squad.length) return merged;
+  return dedupeVotesOnePerSquad(squad, merged, teamId, round, voteRoundLabel).votesForTally || [];
+}
+var guestDupInMem = [
+  {
+    id: "t1_rround-9_vguest-parent",
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Guest Parent",
+    voterNameKey: "guest-parent",
+    picks: ["Bob", "Carol", "Dave"],
+  },
+];
+var guestDupLocal = [
+  {
+    teamId: 1,
+    round: "Round 9",
+    voterName: "Guest Parent",
+    picks: ["Bob", "Carol", "Dave"],
+  },
+];
+var guestMerged = mergeVotesListsV187(guestDupInMem, guestDupLocal);
+if (guestMerged.length !== 1) {
+  throw new Error("v187 merge should collapse guest dup to 1 ballot, got " + guestMerged.length);
+}
+var guestTallyPts = tallyPoints(
+  dedupeTallyHook(1, "Round 9", guestMerged, ["Bob", "Carol", "Dave"])
+);
+if (guestTallyPts.Bob !== 3 || guestTallyPts.Carol !== 2 || guestTallyPts.Dave !== 1) {
+  throw new Error(
+    "v187 guest duplicate ballot must tally once (Bob:3), got " + JSON.stringify(guestTallyPts)
+  );
+}
+var guestLegacyMerge = (function () {
+  var byId = Object.create(null);
+  [guestDupInMem[0], guestDupLocal[0]].forEach(function (v) {
+    var id = v.id || "t" + v.teamId + "|" + (v.voterNameKey || v.voterName) + "|" + voteRoundLabel(v);
+    byId[id] = v;
+  });
+  return Object.keys(byId).map(function (k) {
+    return byId[k];
+  });
+})();
+var guestLegacyDeduped = dedupeBallotDocsOnePerVoter(guestLegacyMerge, 1, "Round 9", voteRoundLabel);
+if (guestLegacyDeduped.votesForTally.length !== 1) {
+  throw new Error(
+    "v187 voter dedupe must keep 1 guest ballot after legacy merge, got " + guestLegacyDeduped.votesForTally.length
+  );
+}
+var guestLegacyPts = tallyPoints(guestLegacyDeduped.votesForTally);
+if (guestLegacyPts.Bob !== 3) {
+  throw new Error("v187 legacy merge + voter dedupe should tally Bob:3, got " + JSON.stringify(guestLegacyPts));
+}
+
 var dupCoachDocs = [
   {
     id: "c1_rround-9_s1",

@@ -972,16 +972,26 @@ export function dedupeBallotDocsOnePerVoter(votes, teamId, roundLabel, roundLabe
     return v && String(v.teamId) === String(teamId) && roundLabelFn(v) === roundKey;
   });
   var duplicates = findDuplicateBallotDocsPerVoter(roundVotes, roundLabelFn);
-  var skipIds = Object.create(null);
-  duplicates.forEach(function (d) {
-    d.excluded.forEach(function (x) {
-      if (x.id) skipIds[x.id] = true;
-    });
+  var groups = Object.create(null);
+  roundVotes.forEach(function (v) {
+    var gk = ballotVoterGroupKey(v, roundLabelFn);
+    if (!groups[gk]) groups[gk] = [];
+    groups[gk].push(v);
   });
-  var votesForTally = roundVotes.filter(function (v) {
-    if (!v) return false;
-    if (v.id && skipIds[v.id]) return false;
-    return true;
+  var votesForTally = [];
+  Object.keys(groups).forEach(function (gk) {
+    var list = groups[gk];
+    if (list.length === 1) {
+      votesForTally.push(list[0]);
+      return;
+    }
+    list.sort(function (a, b) {
+      return (
+        ballotSubmittedAt(b) - ballotSubmittedAt(a) ||
+        String(b.id || "").localeCompare(String(a.id || ""))
+      );
+    });
+    votesForTally.push(list[0]);
   });
   return {
     votesForTally: votesForTally,
@@ -1040,26 +1050,32 @@ export function dedupeCoachVotesOnePerSlot(coachVotes, teamId, roundLabel, round
     return v && String(v.teamId) === String(teamId) && roundLabelFn(v) === roundKey;
   });
   var duplicates = findDuplicateCoachVoteDocsPerSlot(roundVotes, roundLabelFn);
-  var skipIds = Object.create(null);
-  duplicates.forEach(function (d) {
-    d.excluded.forEach(function (x) {
-      if (x.id) skipIds[x.id] = true;
-    });
+  var groups = Object.create(null);
+  roundVotes.forEach(function (v) {
+    var gk = coachVoteSlotGroupKey(v, roundLabelFn);
+    if (!groups[gk]) groups[gk] = [];
+    groups[gk].push(v);
   });
   var invalidSlots = [];
-  var votesForTally = roundVotes.filter(function (v) {
-    if (!v) return false;
-    if (v.id && skipIds[v.id]) return false;
-    if (!isCoachTallySlot(v.slot)) {
-      if (v.id) skipIds[v.id] = true;
+  var votesForTally = [];
+  Object.keys(groups).forEach(function (gk) {
+    var list = groups[gk];
+    list.sort(function (a, b) {
+      return (
+        ballotSubmittedAt(b) - ballotSubmittedAt(a) ||
+        String(b.id || "").localeCompare(String(a.id || ""))
+      );
+    });
+    var kept = list[0];
+    if (!isCoachTallySlot(kept.slot)) {
       invalidSlots.push({
-        id: v.id,
-        slot: v.slot,
+        id: kept.id,
+        slot: kept.slot,
         reason: "invalid coach slot (only slots 1 and 2 count)",
       });
-      return false;
+      return;
     }
-    return true;
+    votesForTally.push(kept);
   });
   return {
     votesForTally: votesForTally,
