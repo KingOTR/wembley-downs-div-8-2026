@@ -45,6 +45,19 @@ function inputHasDisambiguator(name) {
   return false;
 }
 
+/** Disambiguator tags (tall, gk, etc.) must align when either side has them. */
+function disambigTagsCompatible(a, b) {
+  var aTags = disambigTagsFromName(a);
+  var bTags = disambigTagsFromName(b);
+  if (!aTags.length && !bTags.length) return true;
+  if (!aTags.length || !bTags.length) return false;
+  if (aTags.length !== bTags.length) return false;
+  for (var i = 0; i < aTags.length; i++) {
+    if (aTags[i] !== bTags[i]) return false;
+  }
+  return true;
+}
+
 /** Strip role badges/suffixes; keep disambiguation tags (e.g. two Sarahs). */
 export function stripNameQualifiers(name) {
   var base = displayPlayerName(name)
@@ -320,7 +333,10 @@ export function findSquadMatch(voterName, players, threshold) {
   var exact = (players || []).find(function (p) {
     return normalizeName(p) === normalizeName(voterName);
   });
-  if (exact) return { match: exact, exact: true, similarity: 1, reason: "exact match" };
+  if (exact) {
+    if (!disambigTagsCompatible(voterName, exact)) return null;
+    return { match: exact, exact: true, similarity: 1, reason: "exact match" };
+  }
 
   var candidates = [];
   (players || []).forEach(function (p) {
@@ -333,6 +349,7 @@ export function findSquadMatch(voterName, players, threshold) {
 
   if (candidates.length === 1) {
     var lone = candidates[0];
+    if (!disambigTagsCompatible(voterName, lone.match)) return null;
     return {
       match: lone.match,
       exact: false,
@@ -348,7 +365,7 @@ export function findSquadMatch(voterName, players, threshold) {
     var pa = nameParts(voterName);
     if (pa.first) {
       var firstExact = candidates.filter(function (c) {
-        return nameParts(c.match).first === pa.first;
+        return nameParts(c.match).first === pa.first && disambigTagsCompatible(voterName, c.match);
       });
       if (firstExact.length === 1) {
         var hit = firstExact[0];
@@ -366,7 +383,7 @@ export function findSquadMatch(voterName, players, threshold) {
   var pa = nameParts(voterName);
   if (pa.first && pa.first.length >= 2) {
     var firstHits = (players || []).filter(function (p) {
-      return nameParts(p).first === pa.first;
+      return nameParts(p).first === pa.first && disambigTagsCompatible(voterName, p);
     });
     if (firstHits.length === 1) {
       return {
@@ -523,6 +540,7 @@ function ballotDedupeKey(v, roundKey) {
 function ballotMatchesPlayer(v, player, aliases, th) {
   var raw = displayPlayerName(v.voterName || "");
   if (!raw) return null;
+  if (!disambigTagsCompatible(raw, player)) return null;
   var alias = resolveBallotAlias(raw, aliases);
   var m = findSquadMatch(alias.matchAs, [player], th);
   if (!m && alias.matchAs !== raw) m = findSquadMatch(raw, [player], th);
@@ -645,9 +663,13 @@ export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLa
   });
   var ballotCount = roundVotes.length;
 
+  var voterDeduped = dedupeBallotDocsOnePerVoter(votes, teamId, roundLabel, voteRoundLabelFn);
+  var voterDocDuplicates = voterDeduped.duplicates || [];
+  var votesForMatching = voterDeduped.votesForTally || roundVotes;
+
   var deduped = dedupeVotesOnePerSquad(
     squad,
-    votes,
+    votesForMatching,
     teamId,
     roundLabel,
     voteRoundLabelFn,
@@ -731,6 +753,9 @@ export function matchSquadToVoters(squad, votes, teamId, roundLabel, voteRoundLa
     ballotCount: ballotCount,
     countedBallots: deduped.countedBallots,
     duplicates: duplicates,
+    voterDocDuplicates: voterDocDuplicates,
+    voterDocBallotCount: voterDeduped.ballotCount,
+    voterDocCountedBallots: voterDeduped.countedBallots,
     eligibleCount: eligible.length,
     excluded: excluded.slice(),
     squadCount: (squad || []).length,

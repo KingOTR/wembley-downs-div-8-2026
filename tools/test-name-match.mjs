@@ -213,4 +213,31 @@ if (annAnnaMatch.possible.some(function (p) { return p.indexOf("Anna → Ann") !
   throw new Error("Ann/Anna must not cross-map in who-voted: " + annAnnaMatch.possible.join("; "));
 }
 
+var sarahDupVotes = [
+  { id: "sg1", teamId: 1, round: "Round 9", voterName: "Sarah Goalkeeper", voterNameKey: "sarah-gk", submittedAt: "2026-06-22T01:49:00Z" },
+  { id: "sg2", teamId: 1, round: "Round 9", voterName: "Sarah Goalkeeper", voterNameKey: "sarah-gk", submittedAt: "2026-06-22T01:49:00Z" },
+  { id: "st1", teamId: 1, round: "Round 9", voterName: "Sarah (tall)", voterNameKey: "sarah-tall", submittedAt: "2026-06-22T01:49:00Z" },
+  { id: "st2", teamId: 1, round: "Round 9", voterName: "Sarah (tall)", voterNameKey: "sarah-tall", submittedAt: "2026-06-22T01:49:00Z" },
+];
+var sarahSquadDups = findDuplicateBallotsPerSquad(squad, sarahDupVotes);
+if (sarahSquadDups.length !== 2) {
+  throw new Error("Sarah dup groups must be separate per squad member, got " + sarahSquadDups.length);
+}
+sarahSquadDups.forEach(function (d) {
+  var names = d.ballotNames || [];
+  if (d.squadName === "Sarah (tall)" && names.some(function (n) { return /goalkeeper/i.test(n); })) {
+    throw new Error("Sarah (tall) group must not include goalkeeper ballots");
+  }
+  if (d.squadName === "Sarah Goalkeeper" && names.some(function (n) { return /\(tall\)/i.test(n); })) {
+    throw new Error("Sarah Goalkeeper group must not include tall ballots");
+  }
+});
+var sarahMatch = matchSquadToVoters(squad, sarahDupVotes, 1, "Round 9", voteRoundLabel);
+if (sarahMatch.voterDocDuplicates.length !== 2) {
+  throw new Error("expected 2 voter-doc duplicate groups for stacked Sarah imports, got " + sarahMatch.voterDocDuplicates.length);
+}
+if (sarahMatch.voterDocDuplicates.some(function (d) { return /goalkeeper/i.test(d.voterName) && /tall/i.test(d.voterName); })) {
+  throw new Error("voter doc duplicate groups must not merge Sarah (tall) and Sarah Goalkeeper");
+}
+
 console.log("name-match smoke test OK");

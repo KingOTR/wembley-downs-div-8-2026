@@ -27,7 +27,7 @@ import {
   fixBallotsWithDuplicatePicks,
   formatBallotDuplicatePickError,
   validateBallotPicks,
-} from "./name-match.js?tag=v183";
+} from "./name-match.js?tag=v184";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const PREFS_KEY = STORAGE_KEY + "_cache";
@@ -45,7 +45,7 @@ function assetTag() {
     var n = m ? String(m.getAttribute("content") || "").trim() : "";
     if (n) return "v" + n;
   } catch (e) {}
-  return "v183";
+  return "v184";
 }
 
 function distImport(path) {
@@ -2701,35 +2701,62 @@ function ensureDuplicateBallotsBanner() {
   card.insertAdjacentElement("afterend", el);
 }
 
-function renderDuplicateBallotsWarning(duplicates) {
+function renderDuplicateBallotsWarning(matched) {
   ensureDuplicateBallotsBanner();
   var el = document.getElementById("duplicateBallotsBanner");
   if (!el) return;
-  if (!duplicates || !duplicates.length) {
+  var voterDocDups = (matched && matched.voterDocDuplicates) || [];
+  var squadDups = (matched && matched.duplicates) || [];
+  if (!voterDocDups.length && !squadDups.length) {
     el.hidden = true;
     el.innerHTML = "";
     return;
   }
   el.hidden = false;
   var html =
-    "<strong>Duplicate ballots</strong> — someone may have accidentally submitted twice under different names. " +
-    "Only the <em>latest</em> ballot counts for results. Ask the voter to use <strong>Change vote</strong>, or remove extras in Firestore.";
+    "<strong>Duplicate ballots</strong> — extra ballot document(s) found for the same voter this round. " +
+    "Only the <em>latest</em> ballot counts for results. Remove extras in Firestore or re-sync restored votes.";
   html += "<ul class='duplicate-ballots-list'>";
-  duplicates.forEach(function (d) {
-    var names = d.ballotNames.join(", ");
+  voterDocDups.forEach(function (d) {
+    var count = 1 + (d.excluded ? d.excluded.length : 0);
+    html +=
+      "<li><strong>" +
+      escapeHtml(d.voterName || "Unknown") +
+      "</strong> has " +
+      count +
+      " ballot docs" +
+      (d.round ? " (" + escapeHtml(String(d.round)) + ")" : "") +
+      ". Counting: <strong>" +
+      escapeHtml(d.voterName || "") +
+      "</strong>" +
+      (d.kept && d.kept.submittedAt ? " · " + escapeHtml(formatBallotWhen(d.kept.submittedAt)) : "") +
+      ". Ignored: " +
+      (d.excluded || [])
+        .map(function (x) {
+          return (
+            escapeHtml(x.voterName || d.voterName || "duplicate") +
+            (x.submittedAt ? " (" + formatBallotWhen(x.submittedAt) + ")" : "") +
+            (x.id ? " [" + escapeHtml(String(x.id)) + "]" : "")
+          );
+        })
+        .join("; ") +
+      ".</li>";
+  });
+  squadDups.forEach(function (d) {
+    var names = (d.ballotNames || []).join(", ");
     html +=
       "<li><strong>" +
       escapeHtml(d.squadName) +
       "</strong> received " +
-      d.ballotNames.length +
-      " ballots (" +
+      (d.ballotNames ? d.ballotNames.length : 0) +
+      " ballots under different names (" +
       escapeHtml(names) +
       "). Counting: <strong>" +
-      escapeHtml(d.kept.ballot) +
+      escapeHtml(d.kept && d.kept.ballot ? d.kept.ballot : "") +
       "</strong>" +
-      (d.kept.submittedAt ? " · " + escapeHtml(formatBallotWhen(d.kept.submittedAt)) : "") +
+      (d.kept && d.kept.submittedAt ? " · " + escapeHtml(formatBallotWhen(d.kept.submittedAt)) : "") +
       ". Ignored: " +
-      d.excluded
+      (d.excluded || [])
         .map(function (x) {
           return escapeHtml(x.ballot) + (x.submittedAt ? " (" + formatBallotWhen(x.submittedAt) + ")" : "");
         })
@@ -2939,7 +2966,7 @@ async function updateWhoHasntVoted(skipExclRender) {
   var cloudErr = pack.cloudErr;
   var matched = computeParticipation(squad, votes, teamId, round, meta);
   syncVotesReceivedCount(matched.ballotCount);
-  renderDuplicateBallotsWarning(matched.duplicates || []);
+  renderDuplicateBallotsWarning(matched);
 
   if (!matched.ballotCount) {
     showVotesEmptyWarning(teamId, round, auditVoteSources(teamId), cloudErr);
@@ -2951,10 +2978,10 @@ async function updateWhoHasntVoted(skipExclRender) {
 
   if (votedEl) {
     if (matched.votedSquad.length) {
-      var dupNote =
-        matched.duplicates && matched.duplicates.length
-          ? " · " + matched.duplicates.length + " duplicate group(s) — latest counts"
-          : "";
+      var dupGroups =
+        (matched.voterDocDuplicates ? matched.voterDocDuplicates.length : 0) +
+        (matched.duplicates ? matched.duplicates.length : 0);
+      var dupNote = dupGroups ? " · " + dupGroups + " duplicate group(s) — latest counts" : "";
       votedEl.innerHTML =
         "<div style='font-weight:700;color:#15803d;margin-bottom:0.25rem'>Voted (" +
         matched.votedSquad.length +
