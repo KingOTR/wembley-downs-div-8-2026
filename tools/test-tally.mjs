@@ -730,4 +730,64 @@ if (!jayJohanna || jayJohanna.pts !== 3) {
   throw new Error("v194 Jay 3pt pick should tally to Johanna, got " + (jayJohanna && jayJohanna.pts));
 }
 
+// v198: Over-rounds cumulative trend must equal sum of per-round Uo() totals.
+import { tallyBreakdownForRound, loadNameMatch as loadNmBreakdown } from "./tally-breakdown.mjs";
+
+function simulateTrendCumulative(votes, squad, teamId, rounds, nm) {
+  var f = {};
+  squad.forEach(function (p) {
+    f[p] = rounds.map(function () {
+      return 0;
+    });
+  });
+  rounds.forEach(function (round, idx) {
+    var out = tallyBreakdownForRound(votes, squad, teamId, round, nm);
+    var breakdown = out.breakdown;
+    squad.forEach(function (p) {
+      var row = breakdown[p] || { pts: 0 };
+      f[p][idx] = row.pts;
+    });
+  });
+  squad.forEach(function (p) {
+    var cum = 0;
+    f[p] = f[p].map(function (pts) {
+      cum += pts;
+      return cum;
+    });
+  });
+  return f;
+}
+
+var nmBreakdown = await loadNmBreakdown();
+var restored198 = JSON.parse(readFileSync(join(here, "../data/restored-votes.json"), "utf8"));
+var votes198 = restored198.votes || [];
+var squad198 = [
+  "Erin", "Lauren", "Sophie", "Sarah (tall)", "Anna", "Ann", "Jane", "Uli", "Johanna",
+  "Elke", "Freame", "Abi", "Emma", "Erika", "Taryn (C)", "Rainy", "Jess",
+  "Sarah Goalkeeper", "Kat",
+];
+var rounds198 = [
+  "Round 1", "Round 2", "Round 3", "Round 4", "Round 5",
+  "Round 6", "Round 7", "Round 8", "Round 9",
+];
+var trend198 = simulateTrendCumulative(votes198, squad198, 1, rounds198, nmBreakdown);
+var seasonMismatches = [];
+squad198.forEach(function (player) {
+  var roundSum = 0;
+  rounds198.forEach(function (round) {
+    var out = tallyBreakdownForRound(votes198, squad198, 1, round, nmBreakdown);
+    roundSum += (out.breakdown[player] && out.breakdown[player].pts) || 0;
+  });
+  var series = trend198[player] || [];
+  var lastCum = series.length ? series[series.length - 1] : 0;
+  if (lastCum !== roundSum) {
+    seasonMismatches.push({ player: player, trend: lastCum, roundSum: roundSum });
+  }
+});
+if (seasonMismatches.length) {
+  throw new Error(
+    "v198 season vs round mismatch: " + JSON.stringify(seasonMismatches.slice(0, 5))
+  );
+}
+
 console.log("tally regression OK");
