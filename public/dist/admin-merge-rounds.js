@@ -11,7 +11,7 @@ import {
   nameSimilarity,
   DEFAULT_SQUAD_THRESHOLD,
   STRICT_SQUAD_THRESHOLD,
-} from "./name-match.js?tag=v179";
+} from "./name-match.js?tag=v180";
 
 const STORAGE_KEY = "soccerVoteApp_v2";
 const CHRIS_COACH_SLOT = 2;

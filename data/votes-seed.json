@@ -1,0 +1,8 @@
+{
+  "exportVersion": 1,
+  "exportedAt": "2026-06-22T05:13:59.142Z",
+  "source": "tools/restore-votes-from-git.mjs",
+  "recoveryNote": "No player votes recovered from git or data/*.json. Import a season archive JSON via Admin → Import votes.",
+  "votes": [],
+  "coachVotes": []
+}

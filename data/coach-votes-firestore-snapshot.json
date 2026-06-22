@@ -1,0 +1,174 @@
+{
+  "exportedAt": "2026-06-22T05:13:59.137Z",
+  "coachVotes": [
+    {
+      "teamId": 1,
+      "slot": 1,
+      "round": "Round 9",
+      "picks": [
+        "Lauren",
+        "Freame",
+        "Anna"
+      ],
+      "submittedAt": "2026-06-21T15:28:11.703Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-9_s1"
+    },
+    {
+      "teamId": 1,
+      "slot": 2,
+      "round": "Round 6",
+      "picks": [
+        "Rainey",
+        "Sarah Goalkeeper",
+        "Johanna"
+      ],
+      "submittedAt": "2026-06-08T16:32:08.771Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-6_s2"
+    },
+    {
+      "teamId": 1,
+      "slot": 1,
+      "round": "Round 6",
+      "picks": [
+        "Jane",
+        "Jess",
+        "Sarah (tall)"
+      ],
+      "submittedAt": "2026-05-25T02:47:23.538Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-6_s1"
+    },
+    {
+      "teamId": 1,
+      "slot": 1,
+      "round": "Round 9",
+      "picks": [
+        "Freame",
+        "Sarah (tall)",
+        "Lauren"
+      ],
+      "submittedAt": "2026-06-14T12:03:14.541Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-9_s1"
+    },
+    {
+      "teamId": 1,
+      "slot": 1,
+      "round": "Round 4",
+      "picks": [
+        "Sarah",
+        "Taryn (C)",
+        "Emma"
+      ],
+      "submittedAt": "2026-05-03T07:32:51.926Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-4_s1"
+    },
+    {
+      "teamId": 1,
+      "slot": 1,
+      "round": "Round 7",
+      "picks": [
+        "Freame",
+        "Lauren",
+        "Elke"
+      ],
+      "submittedAt": "2026-06-08T16:31:53.668Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-7_s1"
+    },
+    {
+      "teamId": 1,
+      "slot": 2,
+      "round": "Round 1",
+      "picks": [
+        "Jane",
+        "Lauren",
+        "Taryn (C)"
+      ],
+      "submittedAt": "2026-04-13T11:26:21.677Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-1_s2"
+    },
+    {
+      "teamId": 1,
+      "slot": 2,
+      "round": "Round 2",
+      "picks": [
+        "Uli",
+        "Sophie",
+        "Emma"
+      ],
+      "submittedAt": "2026-04-20T22:12:43.723Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-2_s2"
+    },
+    {
+      "teamId": 1,
+      "slot": 1,
+      "round": "Round 1",
+      "picks": [
+        "Ash",
+        "Jane",
+        "Sophie"
+      ],
+      "submittedAt": "2026-04-13T07:57:15.100Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-1_s1"
+    },
+    {
+      "teamId": 1,
+      "slot": 1,
+      "round": "Round 2",
+      "picks": [
+        "Freame",
+        "Elke",
+        "Uli"
+      ],
+      "submittedAt": "2026-04-19T12:07:23.553Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-2_s1"
+    },
+    {
+      "teamId": 1,
+      "slot": 1,
+      "round": "Round 5",
+      "picks": [
+        "Rainy",
+        "Emma",
+        "Sarah"
+      ],
+      "submittedAt": "2026-05-18T12:21:16.824Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-5_s1"
+    },
+    {
+      "teamId": 1,
+      "slot": 2,
+      "round": "Round 9",
+      "picks": [
+        "Freame",
+        "Sarah (tall)",
+        "Lauren"
+      ],
+      "submittedAt": "2026-06-21T15:28:42.317Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-9_s2"
+    },
+    {
+      "teamId": 1,
+      "slot": 1,
+      "round": "Round 3",
+      "picks": [
+        "Sarah",
+        "Taryn (C)",
+        "Jess"
+      ],
+      "submittedAt": "2026-05-04T15:58:01.223Z",
+      "recoveredFrom": "firestore-live",
+      "id": "c1_rround-3_s1"
+    }
+  ]
+}

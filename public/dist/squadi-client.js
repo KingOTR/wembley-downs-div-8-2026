@@ -2,7 +2,7 @@
  * Browser copy of tools/squadi-lib.mjs — keep in sync.
  */
 
-import { formatGoalScorerList } from "./name-match.js?tag=v179";
+import { formatGoalScorerList } from "./name-match.js?tag=v180";
 
 export const SQUADI_LIVE_BASE = "https://api.squadi.com/livescores";
 
