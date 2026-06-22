@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#EE2B33" />
   <meta name="color-scheme" content="light dark" />
-  <meta name="sv-app-version" content="190" />
+  <meta name="sv-app-version" content="191" />
   <!-- app-v51: bump ASSET_TAG whenever app.js changes (immutable caching) -->
-  <!-- v190: centered content column; coach ballot saved modal on player UI -->
+  <!-- v191: centered header branding; tighter header/match spacing -->
   <script>
     (function () {
       try {
@@ -106,7 +106,7 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" /></noscript>
   <link rel="dns-prefetch" href="//www.gstatic.com" />
   <link rel="preload" as="image" href="/wembley-downs-logo.png" fetchpriority="high" />
-  <link rel="preload" as="script" href="dist/app.min.js?tag=v190" />
+  <link rel="preload" as="script" href="dist/app.min.js?tag=v191" />
   <style>
     /* Iwanoff-inspired design system — warm concrete, terracotta, charcoal */
     :root {
@@ -295,7 +295,7 @@
       width: 100%;
       margin: 0 auto;
       box-sizing: border-box;
-      padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(3.5rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
+      padding: max(0.75rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(3.5rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
     }
 
     @media (min-width: 768px) {
@@ -327,22 +327,22 @@
     }
 
     header {
-      text-align: left;
-      margin-bottom: 1.35rem;
-      padding-bottom: 1rem;
+      text-align: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
       border-bottom: 3px solid var(--charcoal);
     }
 
     header h1 {
-      margin: 0 0 0.35rem;
+      margin: 0;
       font-family: var(--font-display);
       font-size: clamp(1.15rem, 3.6vw, 1.45rem);
       color: var(--charcoal);
       letter-spacing: 0.02em;
       line-height: 1.15;
       font-weight: 800;
-      min-height: 2.4em;
       text-transform: uppercase;
+      text-align: center;
     }
 
     .round-pill {
@@ -365,7 +365,7 @@
     }
 
     .sync-status {
-      margin-top: 0.5rem;
+      margin-top: 0.4rem;
       font-size: 0.78rem;
       color: var(--slate);
     }
@@ -752,7 +752,7 @@
       border: 2px solid var(--charcoal);
       box-shadow: var(--shadow);
       backdrop-filter: none;
-      padding: 1.25rem 1.1rem 1.25rem;
+      padding: 1.05rem 1.1rem 1.2rem;
       text-align: left;
       font-family: var(--font-body);
       min-height: 8.5rem;
@@ -795,7 +795,7 @@
       text-transform: uppercase;
       font-size: 0.72rem;
       font-weight: 900;
-      margin-bottom: 0.8rem;
+      margin-bottom: 0.65rem;
       color: var(--terracotta-deep);
     }
 
@@ -805,7 +805,7 @@
 
     @media (min-width: 520px) {
       #matchCard {
-        padding: 1.45rem 1.25rem 1.5rem;
+        padding: 1.2rem 1.25rem 1.35rem;
       }
     }
 
@@ -3045,7 +3045,7 @@
     }
 
     .team-row {
-      margin: 0.85rem auto 0.55rem;
+      margin: 0.65rem auto 0.45rem;
       max-width: 320px;
     }
 
@@ -3064,7 +3064,7 @@
     }
 
     .team-row {
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.6rem;
     }
 
     #publicRoundSelect {
@@ -3097,7 +3097,7 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0.55rem;
-      margin: 0 0 1rem;
+      margin: 0 0 0.85rem;
     }
 
     .main-tabs button {
@@ -3846,9 +3846,15 @@
     .brand {
       display: flex;
       align-items: center;
-      justify-content: flex-start;
-      gap: 1rem;
-      margin-bottom: 0.35rem;
+      justify-content: center;
+      gap: 0.75rem;
+      margin: 0 auto 0.5rem;
+      max-width: 100%;
+    }
+
+    .brand h1 {
+      flex: 0 1 auto;
+      max-width: min(100%, 34rem);
     }
 
     .brand-logo {
@@ -3895,7 +3901,8 @@
     @media (max-width: 400px) {
       .brand {
         flex-direction: column;
-        gap: 0.45rem;
+        align-items: center;
+        gap: 0.35rem;
       }
       .brand-logo {
         width: 64px;
@@ -4176,7 +4183,7 @@
             fetchpriority="high"
           />
         </div>
-        <h1 style="margin:0">Wembley Downs Div 8s Player's Player Award</h1>
+        <h1>Wembley Downs Div 8s Player's Player Award</h1>
       </div>
       <div class="team-row" id="publicTeamRow" style="display:none">
         <label class="field" for="publicTeamSelect" style="margin-bottom: 0.25rem">Team</label>
@@ -4858,9 +4865,9 @@
 
   <!-- Firebase scripts are lazy-loaded by app.js for faster first paint -->
   <!-- Load app.js ASAP (defer preserves execution order after Firebase scripts) -->
-  <script type="module" src="dist/name-match-bootstrap.js?tag=v190"></script>
-  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v190"></script>
-  <script type="module" defer src="dist/voter-enhancements.js?tag=v190"></script>
+  <script type="module" src="dist/name-match-bootstrap.js?tag=v191"></script>
+  <script type="module" fetchpriority="high" src="dist/app.min.js?tag=v191"></script>
+  <script type="module" defer src="dist/voter-enhancements.js?tag=v191"></script>
   <script>
     (function () {
       var mergeLoaded = false;
@@ -4870,7 +4877,7 @@
       function loadSquadiAdmin() {
         if (squadiLoaded) return;
         squadiLoaded = true;
-        import("./dist/squadi-admin.js?tag=v190").catch(function (e) {
+        import("./dist/squadi-admin.js?tag=v191").catch(function (e) {
           console.warn("squadi-admin module failed to load", e);
           squadiLoaded = false;
         });
@@ -4885,7 +4892,7 @@
           } catch (e) {}
           mergeObs = null;
         }
-        import("./dist/admin-merge-rounds.js?tag=v190").catch(function (e) {
+        import("./dist/admin-merge-rounds.js?tag=v191").catch(function (e) {
           console.warn("merge-rounds module failed to load", e);
           mergeLoaded = false;
           var errEl = document.getElementById("mergeRoundsErr");
