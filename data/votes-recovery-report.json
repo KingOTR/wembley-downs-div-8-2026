@@ -1,13 +1,23 @@
 {
-  "generatedAt": "2026-06-22T05:13:59.108Z",
+  "generatedAt": "2026-06-22T06:25:29.976Z",
   "project": "wembley-downs-div-8-2026",
   "sources": {
     "gitLogPlayerVotes": 0,
-    "dataDirPlayerVotes": 0,
-    "firestorePlayerVotes": 0,
+    "dataDirPlayerVotes": 280,
+    "firestorePlayerVotes": 70,
     "firestoreCoachVotes": 13
   },
-  "playerVotesByRound": {},
+  "playerVotesByRound": {
+    "Round 1": 6,
+    "Round 2": 11,
+    "Round 3": 6,
+    "Round 4": 5,
+    "Round 5": 7,
+    "Round 6": 9,
+    "Round 7": 10,
+    "Round 8": 10,
+    "Round 9": 7
+  },
   "coachVotesByRound": {
     "Round 9": 2,
     "Round 6": 2,
@@ -18,19 +28,19 @@
     "Round 5": 1,
     "Round 3": 1
   },
-  "recoverablePlayerTotal": 0,
+  "recoverablePlayerTotal": 71,
   "recoverableCoachTotal": 12,
   "gitSearchNote": "No player vote payloads (voterName + 3 picks) found anywhere in git history.",
-  "firestoreNote": "Firestore votes/ collection is empty. Player ballots must be imported from a season archive JSON (Download season archive) or another device's localStorage.",
+  "firestoreNote": null,
   "rounds1to9Player": {
-    "Round 1": 0,
-    "Round 2": 0,
-    "Round 3": 0,
-    "Round 4": 0,
-    "Round 5": 0,
-    "Round 6": 0,
-    "Round 7": 0,
-    "Round 8": 0,
-    "Round 9": 0
+    "Round 1": 6,
+    "Round 2": 11,
+    "Round 3": 6,
+    "Round 4": 5,
+    "Round 5": 7,
+    "Round 6": 9,
+    "Round 7": 10,
+    "Round 8": 10,
+    "Round 9": 7
   }
 }
